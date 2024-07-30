@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MAUIDesigner.Designer"
+             Title="Designer">
+
+    <Grid VerticalOptions="FillAndExpand">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <VerticalStackLayout Grid.Column="0">
+            <Label x:Name="LabelSelector" Text="Label">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="CreateElementInDesignerFrame"/>
+                </Label.GestureRecognizers>
+            </Label>
+            <Label x:Name="EditorSelector" Text="Editor">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="CreateElementInDesignerFrame"/>
+                </Label.GestureRecognizers>
+            </Label>
+            <Label x:Name="ShowPointer">
+                
+            </Label>
+        </VerticalStackLayout>
+        <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1">
+            <AbsoluteLayout.GestureRecognizers>
+                <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped"  NumberOfTapsRequired="2"/>
+                <PointerGestureRecognizer PointerMoved="PointerGestureRecognizer_PointerMoved" PointerPressed="PointerGestureRecognizer_PointerPressed" PointerReleased="PointerGestureRecognizer_PointerReleased"/>
+            </AbsoluteLayout.GestureRecognizers>
+
+        </AbsoluteLayout>
+    </Grid>
+</ContentPage>
