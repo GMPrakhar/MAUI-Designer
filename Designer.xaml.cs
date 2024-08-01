@@ -14,6 +14,7 @@ public partial class Designer : ContentPage
     {
         StrokeThickness = 2,
         ZIndex = -10,
+        Padding = new Thickness(20,0),
         HorizontalOptions = LayoutOptions.Center,
         StrokeShape = new RoundRectangle
         {
@@ -29,48 +30,24 @@ public partial class Designer : ContentPage
     public Designer()
 	{
 		InitializeComponent();
+        var allVisualElements = ToolBox.GetAllVisualElementsAlongWithType();
+        foreach (var element in allVisualElements)
+        {
+            var label = new Label
+            {
+                Text = element.Key,
+                FontSize = 20,
+                TextColor = Colors.White,
+                BackgroundColor = Colors.Transparent,
+                Margin = new Thickness(10),
+            };
+            var gestureRecognizer = new TapGestureRecognizer();
+            gestureRecognizer.Tapped += CreateElementInDesignerFrame;
+            label.GestureRecognizers.Add(gestureRecognizer);
+            Toolbox.Children.Add(label);
+        }
         designerFrame.Add(gradientBorder);
     }
-    //private async void DragGestureRecognizer_DragStarting_1(object sender, DragStartingEventArgs e)
-    //{
-    //    var label = (sender as Element)?.Parent as VisualElement;
-    //    await label.TranslateTo(10000, 10000, 1);
-    //    e.Data.Properties.Add("DraggingObject", label);
-    //}
-
-    //private void DropGestureRecognizer_Drop_1(object sender, DropEventArgs e)
-    //{
-    //    var data = e.Data.Properties["DraggingObject"] as VisualElement;
-    //    // add the data element as a child of the frame
-
-    //    //frameGrid.Add(data);
-
-    //    Point location = e.GetPosition(data).Value;
-
-    //    data.TranslateTo(location.X + data.TranslationX + data.X - data.Width/2, location.Y + data.TranslationY - data.Y, 1);
-
-    //    data.Opacity = 1;
-    //}
-
-    //private async void ElementSelector_DragStarted(object sender, DragStartingEventArgs e)
-    //{
-    //    var element = sender as VisualElement;
-    //    // Duplicate element as a VisualElement class object
-    //    /*var elementType = element.GetType();
-    //    VisualElement duplicate = Activator.CreateInstance(elementType) as VisualElement;
-    //    element.GetType().GetProperties().ToList().ForEach(p =>
-    //    {
-    //        if (p.CanWrite)
-    //        {
-    //            p.SetValue(duplicate, p.GetValue(element));
-    //        }
-    //    });*/
-
-    //    //Point location = e.GetPosition(element).Value;
-    //    await element.TranslateTo(10000, 10000, 1);
-
-    //    e.Data.Properties.Add("DraggingObject", element);
-    //}
 
     private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
     {
@@ -154,17 +131,11 @@ public partial class Designer : ContentPage
             if (draggingView != null) return;
             View? senderView = (sender as View);
             var location = new Point(senderView.X, senderView.Y);
-            //var gestureRecognizer = new PointerGestureRecognizer();
-            //gestureRecognizer.PointerExited += RemoveBorder;
-
-            //gradientBorder.GestureRecognizers.Add(gestureRecognizer);
 
             gradientBorder.HeightRequest = senderView.Height;
-            gradientBorder.WidthRequest = senderView.Width+10;
+            gradientBorder.WidthRequest = senderView.Width;
             gradientBorder.Opacity = 1;
-            gradientBorder.TranslationX = senderView.TranslationX+ gradientBorder.Width/4;
-            gradientBorder.TranslationY = senderView.Y;
-            gradientBorder.Frame = new Rect(senderView.X, senderView.Y, senderView.Width, senderView.Height);
+            gradientBorder.Margin = new Thickness(senderView.X, senderView.Y);
         }catch(Exception)
         {
 
@@ -173,35 +144,25 @@ public partial class Designer : ContentPage
 
     private void PointerGestureRecognizer_PointerMoved(object sender, PointerEventArgs e)
     {
-        // Get pointer location from PointerEventArgs
         if(!isDragging || draggingView == null) return;
 
         Point location = e.GetPosition(designerFrame).Value;
         gradientBorder.Opacity = 1;
-        gradientBorder.ZIndex = -10;
-        draggingView.ZIndex = 0;
-        draggingView.TranslationX = location.X - draggingView.Width/3;
-        draggingView.TranslationY = location.Y - draggingView.Height;
-        gradientBorder.TranslationX = location.X;
-        gradientBorder.TranslationY = location.Y;
-        draggingView.Frame = new Rect(location.X, location.Y, draggingView.Width, draggingView.Height);
-        gradientBorder.Frame = new Rect(location.X, location.Y + draggingView.Height, draggingView.Width, draggingView.Height);
+        draggingView.Margin = new Thickness(location.X, location.Y);
+        gradientBorder.Margin = draggingView.Margin;
+        gradientBorder.HeightRequest = draggingView.Height;
+        gradientBorder.WidthRequest = draggingView.Width;
     }
 
     private void PointerGestureRecognizer_PointerPressed(object sender, PointerEventArgs e)
     {
         isDragging = true;
         Point location = e.GetPosition(designerFrame).Value;
-        ShowPointer.Text = location.ToString();
+
         // Get all children of designerFrame and find the element that is being dragged
         var childElements = designerFrame.Children.Where(c => c.Frame.Contains(location) && c is not Border);
 
         draggingView = (View)childElements.FirstOrDefault();
-        if (draggingView != null)
-        {
-           // gradientBorder.HeightRequest = draggingView.Height;
-           // gradientBorder.WidthRequest = draggingView.Width;
-        }
     }
 
     private void PointerGestureRecognizer_PointerReleased(object sender, PointerEventArgs e)
@@ -209,10 +170,6 @@ public partial class Designer : ContentPage
         if (!isDragging || draggingView == null) return;
         isDragging = false;
         RemoveBorder(draggingView, null);
-        //Point location = e.GetPosition(designerFrame).Value;
-        //await draggingView.TranslateTo(location.X, location.Y - 80, 1);
-        //views[draggingView.Id].Layout(new Rect(location.X, location.Y, draggingView.Width, draggingView.Height));
-        //draggingView.Layout(new Rect(location.X, location.Y, draggingView.Width, draggingView.Height));
         draggingView = null;
     }
 
