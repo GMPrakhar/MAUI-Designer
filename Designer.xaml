@@ -9,24 +9,13 @@
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <VerticalStackLayout Grid.Column="0">
-            <Label x:Name="LabelSelector" Text="Label">
-                <Label.GestureRecognizers>
-                    <TapGestureRecognizer Tapped="CreateElementInDesignerFrame"/>
-                </Label.GestureRecognizers>
-            </Label>
-            <Label x:Name="EditorSelector" Text="Editor">
-                <Label.GestureRecognizers>
-                    <TapGestureRecognizer Tapped="CreateElementInDesignerFrame"/>
-                </Label.GestureRecognizers>
-            </Label>
-            <Label x:Name="ShowPointer">
-                
-            </Label>
-        </VerticalStackLayout>
+        <ScrollView>
+            <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
+            </VerticalStackLayout>
+        </ScrollView>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1">
             <AbsoluteLayout.GestureRecognizers>
-                <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped"  NumberOfTapsRequired="2"/>
+                <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped"/>
                 <PointerGestureRecognizer PointerMoved="PointerGestureRecognizer_PointerMoved" PointerPressed="PointerGestureRecognizer_PointerPressed" PointerReleased="PointerGestureRecognizer_PointerReleased"/>
             </AbsoluteLayout.GestureRecognizers>
 

@@ -14,6 +14,8 @@ namespace MAUIDesigner
             var elementType = typeof(View).Assembly.GetTypes().FirstOrDefault(t => t.Name == elementTypeName);
             var newElement = Activator.CreateInstance(elementType) as View;
             newElement.Margin = new Thickness(20);
+            newElement.HeightRequest = 100;
+            newElement.WidthRequest = 100;
             if(newElement is Label)
             {
                 (newElement as Label).Text = "Drag me!";
@@ -24,6 +26,7 @@ namespace MAUIDesigner
                 element.Text = "Type here";
                 // disable editor text edit
                 element.IsEnabled = false;
+                element.InputTransparent = false;
             }
 
             return newElement;
