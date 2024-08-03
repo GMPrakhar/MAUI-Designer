@@ -14,8 +14,8 @@ namespace MAUIDesigner
             var elementType = typeof(View).Assembly.GetTypes().FirstOrDefault(t => t.Name == elementTypeName);
             var newElement = Activator.CreateInstance(elementType) as View;
             newElement.Margin = new Thickness(20);
-            newElement.HeightRequest = 100;
-            newElement.WidthRequest = 100;
+            newElement.MinimumHeightRequest = 20;
+            newElement.MinimumWidthRequest = 20;
             if(newElement is Label)
             {
                 (newElement as Label).Text = "Drag me!";
