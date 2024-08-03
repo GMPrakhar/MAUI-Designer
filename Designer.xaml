@@ -8,17 +8,64 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
         <ScrollView>
             <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
             </VerticalStackLayout>
         </ScrollView>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1">
+            <AbsoluteLayout x:Name="gradientBorder2">
+                <!-- Frame in the center -->
+                <Border Stroke="#C49B33"
+                StrokeThickness="4"
+                AbsoluteLayout.LayoutBounds="0.5, 0.5, 0.98, 0.98"
+                AbsoluteLayout.LayoutFlags="All"
+                Padding="16,8"
+                >
+                </Border>
+
+                <!-- Top Left Rectangle -->
+                <Rectangle Fill="White"
+                 WidthRequest="5"
+                 HeightRequest="5"
+                 AbsoluteLayout.LayoutBounds="0, 0, 0.05, 0.05"
+                 AbsoluteLayout.LayoutFlags="All">
+                    <Rectangle.GestureRecognizers>
+                        <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting" DropCompleted="DragGestureRecognizer_DropCompleted" />
+                    </Rectangle.GestureRecognizers>
+                </Rectangle>
+
+                <!-- Top Right Rectangle -->
+                <Rectangle Fill="White"
+                 WidthRequest="5"
+                 HeightRequest="5"
+                 AbsoluteLayout.LayoutBounds="1, 0, 0.05, 0.05"
+                 AbsoluteLayout.LayoutFlags="All"/>
+
+                <!-- Bottom Left Rectangle -->
+                <Rectangle Fill="White"
+                 WidthRequest="5"
+                 HeightRequest="5"
+                 AbsoluteLayout.LayoutBounds="0, 1, 0.05, 0.05"
+                 AbsoluteLayout.LayoutFlags="All"/>
+
+                <!-- Bottom Right Rectangle -->
+                <Rectangle Fill="White"
+                 WidthRequest="5"
+                 HeightRequest="5"
+                 AbsoluteLayout.LayoutBounds="1, 1, 0.05, 0.05"
+                 AbsoluteLayout.LayoutFlags="All"/>
+            </AbsoluteLayout>
             <AbsoluteLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped"/>
                 <PointerGestureRecognizer PointerMoved="PointerGestureRecognizer_PointerMoved" PointerPressed="PointerGestureRecognizer_PointerPressed" PointerReleased="PointerGestureRecognizer_PointerReleased"/>
             </AbsoluteLayout.GestureRecognizers>
 
         </AbsoluteLayout>
+        <ScrollView Grid.Column="2">
+            <VerticalStackLayout x:Name="Properties">
+            </VerticalStackLayout>
+        </ScrollView>
     </Grid>
 </ContentPage>
