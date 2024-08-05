@@ -1,4 +1,4 @@
-
+﻿
 
 using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Devices.Sensors;
@@ -9,6 +9,7 @@ namespace MAUIDesigner;
 public partial class Designer : ContentPage
 {
     private bool isDragging = false;
+    private Type[] allowedTypesForXamlProperties = { typeof(string), typeof(Color), typeof(Thickness), typeof(Enum) };
     private View? draggingView;
     private View? focusedView;
     private Rectangle? scalerRect;
@@ -24,7 +25,7 @@ public partial class Designer : ContentPage
             var label = new Label
             {
                 Text = element.Key,
-                FontSize = 20,
+                FontSize = 10,
                 TextColor = Colors.White,
                 BackgroundColor = Colors.Transparent,
                 Margin = new Thickness(10),
@@ -45,6 +46,7 @@ public partial class Designer : ContentPage
         try
         {
             var newElement = ElementCreator.Create((sender as Label).Text);
+            newElement.PropertyChanged += ElementPropertyChanged;
             var tapGestureRecognizer = new TapGestureRecognizer();
             tapGestureRecognizer.Tapped += EnableElementForOperations;
             designerFrame.Add(newElement);
@@ -59,6 +61,16 @@ public partial class Designer : ContentPage
             // Do nothing
         }
     }
+
+    private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if(sender == draggingView || sender == focusedView)
+        {
+            RemoveBorder(sender, null);
+            AddBorder(sender, null);
+        }
+    }
+
     private void EnableElementForOperations(object? sender, TappedEventArgs e)
     {
         var senderView = sender as View;
@@ -69,6 +81,11 @@ public partial class Designer : ContentPage
     public string GetXamlForElement(VisualElement element)
     {
         StringBuilder xamlBuilder = new StringBuilder();
+        if(element.StyleId == nameof(gradientBorder2))
+        {
+            return string.Empty;
+        }
+
         xamlBuilder.AppendLine($"<{element.GetType().Name}");
 
         foreach (var property in element.GetType().GetProperties())
@@ -77,8 +94,18 @@ public partial class Designer : ContentPage
             {
                 var value = property.GetValue(element);
                 var valueType = value?.GetType();
-                if (value != null && OnlyPrimitiveTypeOrString(valueType))
+                if (value != null && IsSupportedType(valueType) && value.ToString() != "∞")
                 {
+                    if (valueType == typeof(Color))
+                    {
+                        value = ((Color)value).ToArgbHex(true);
+                    }
+                    else if (valueType == typeof(Thickness))
+                    {
+                        var tValue = ((Thickness)value);
+                        value = $"{tValue.Left},{tValue.Top},{tValue.Right},{tValue.Bottom}";
+                    }
+
                     xamlBuilder.AppendLine($"    {property.Name}=\"{value}\"");
                 }
             }
@@ -102,16 +129,15 @@ public partial class Designer : ContentPage
         return xamlBuilder.ToString();
     }
 
-    private bool OnlyPrimitiveTypeOrString(Type valueType)
+    private bool IsSupportedType(Type valueType)
     {
         // Check if the type is a primitive type or string
-        return valueType.IsPrimitive || valueType == typeof(string);
+        return valueType.IsPrimitive || valueType.IsEnum || allowedTypesForXamlProperties.Contains(valueType);
     }
 
     private void RemoveBorder(object? sender, PointerEventArgs e)
     {
         gradientBorder2.Opacity = 0;
-        if(draggingView != null) return;
     }
 
     private void AddBorder(object? sender, PointerEventArgs e)
@@ -134,20 +160,11 @@ public partial class Designer : ContentPage
     private void PointerGestureRecognizer_PointerMoved(object sender, PointerEventArgs e)
     {
         Point location = e.GetPosition(designerFrame).Value;
-        //if (focusedView != null && isDragging)
-        //{
-        //    focusedView.HeightRequest += focusedView.Y - location.Y;
-        //    focusedView.WidthRequest += location.X - focusedView.X;
-        //    focusedView.Margin = new Thickness(location.X, location.Y);
-        //}
 
         if (!isDragging || draggingView == null) return;
 
         gradientBorder2.Opacity = 1;
         draggingView.Margin = new Thickness(location.X, location.Y);
-        gradientBorder2.Margin = draggingView.Margin;
-        gradientBorder2.HeightRequest = draggingView.Height;
-        gradientBorder2.WidthRequest = draggingView.Width;
     }
 
     private void PointerGestureRecognizer_PointerPressed(object sender, PointerEventArgs e)
@@ -240,5 +257,25 @@ public partial class Designer : ContentPage
     private void DragGestureRecognizer_DropCompleted(object? sender, DropCompletedEventArgs e)
     {
         scalerRect = null;
+    }
+
+    private void GenerateXamlForTheView(object sender, EventArgs e)
+    {
+        var xaml = GetXamlForElement(designerFrame);
+        var finalXamlBuilder = new StringBuilder();
+        finalXamlBuilder.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<ContentPage xmlns=\"http://schemas.microsoft.com/dotnet/2021/maui\"\r\n             xmlns:x=\"http://schemas.microsoft.com/winfx/2009/xaml\"\r\n>");
+        finalXamlBuilder.AppendLine(xaml);
+        finalXamlBuilder.AppendLine("</ContentPage>");
+        Properties.Clear();
+
+        // create a new label with text as xaml and add it to the Properties
+        var label = new Editor
+        {
+            Text = finalXamlBuilder.ToString(),
+            FontSize = 10,
+            TextColor = Colors.White,
+            BackgroundColor = Colors.Transparent,
+        };
+        Properties.Children.Add(label);
     }
 }
