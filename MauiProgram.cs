@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿
+using Microsoft.Extensions.Logging;
 
 namespace MAUIDesigner
 {
@@ -18,6 +19,7 @@ namespace MAUIDesigner
 #if DEBUG
     		builder.Logging.AddDebug();
 #endif
+
 
             return builder.Build();
         }

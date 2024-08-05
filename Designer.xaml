@@ -6,12 +6,14 @@
 
     <Grid VerticalOptions="FillAndExpand">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="150"/>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="300" />
         </Grid.ColumnDefinitions>
         <ScrollView>
             <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
+                <Button Text="Generate XAML" Clicked="GenerateXamlForTheView">
+                </Button>
             </VerticalStackLayout>
         </ScrollView>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1">
