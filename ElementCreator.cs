@@ -26,7 +26,6 @@ namespace MAUIDesigner
                 element.Text = "Type here";
                 // disable editor text edit
                 element.IsEnabled = false;
-                element.InputTransparent = false;
             }
 
             return newElement;

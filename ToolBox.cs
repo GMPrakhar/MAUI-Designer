@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -25,11 +26,8 @@ namespace MAUIDesigner
         internal static IDictionary<string, View> GetAllPropertiesForView(View view)
         {
             var viewProperties = view.GetType().GetProperties().Where(x => x.CanWrite);
-            var properties = new Dictionary<string, View>();
-            foreach (var property in viewProperties)
-            {
-                properties[property.Name] = GetViewForPropertyType(view, property, property.GetValue(view));
-            }
+            var properties = new ConcurrentDictionary<string, View>();
+            Parallel.ForEach(viewProperties, property => properties[property.Name] = GetViewForPropertyType(view, property, property.GetValue(view)));
 
             return properties;
         }
@@ -132,10 +130,10 @@ namespace MAUIDesigner
                 {
                     try
                     {
-                        var valueA = byte.Parse(red.Text);
-                        var valueB = byte.Parse(green.Text);
-                        var valueC = byte.Parse(blue.Text);
-                        var valueD = byte.Parse(alpha.Text);
+                        var valueA = int.Parse(red.Text);
+                        var valueB = int.Parse(green.Text);
+                        var valueC = int.Parse(blue.Text);
+                        var valueD = int.Parse(alpha.Text);
                         if (value.GetType() == typeof(Color))
                         {
                             var color = Color.FromRgba(valueA, valueB, valueC, valueD);

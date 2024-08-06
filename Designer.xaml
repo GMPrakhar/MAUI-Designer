@@ -60,7 +60,7 @@
                  AbsoluteLayout.LayoutFlags="All"/>
             </AbsoluteLayout>
             <AbsoluteLayout.GestureRecognizers>
-                <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped"/>
+                <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" Buttons="Secondary,Primary"/>
                 <PointerGestureRecognizer PointerMoved="PointerGestureRecognizer_PointerMoved" PointerPressed="PointerGestureRecognizer_PointerPressed" PointerReleased="PointerGestureRecognizer_PointerReleased"/>
             </AbsoluteLayout.GestureRecognizers>
 

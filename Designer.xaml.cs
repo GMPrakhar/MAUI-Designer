@@ -1,20 +1,19 @@
 ﻿
 
+using MAUIDesigner.XamlHelpers;
 using Microsoft.Maui.Controls.Shapes;
-using Microsoft.Maui.Devices.Sensors;
-using System.Text;
-
 namespace MAUIDesigner;
 
 public partial class Designer : ContentPage
 {
     private bool isDragging = false;
-    private Type[] allowedTypesForXamlProperties = { typeof(string), typeof(Color), typeof(Thickness), typeof(Enum) };
-    private View? draggingView;
     private View? focusedView;
     private Rectangle? scalerRect;
+    private ISet<Type> nonTappableTypes = new HashSet<Type> { typeof(Editor) };
+    private IList<View> nonTappableViews = new List<View>();
     private const string LabelXAML = "<Label Text=\"Drag Me away\" HorizontalTextAlignment=\"Center\" TextColor=\"White\" FontSize=\"36\">\r\n</Label>";
     private IDictionary<Guid, View> views = new Dictionary<Guid, View>();
+    private SortedDictionary<string, Grid>? PropertiesForFocusedView;
 
     public Designer()
 	{
@@ -39,6 +38,31 @@ public partial class Designer : ContentPage
 
     private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
     {
+        // Check if the event location has a child editor element on the location
+        var location = e.GetPosition(designerFrame).Value;
+
+        focusedView = nonTappableViews.FirstOrDefault(x => x.Frame.Contains(location));
+
+        if (focusedView != null)
+        {
+            AddBorder(focusedView, null);
+            PopulatePropertyGridField();
+            UpdateActualPropertyView();
+        }
+        else
+        {
+            RemoveBorder(focusedView, null);
+        }
+    }
+
+    private void UpdateActualPropertyView()
+    {
+        Properties.Children.Clear();
+        if (PropertiesForFocusedView == null) return;
+        foreach (var property in PropertiesForFocusedView)
+        {
+            Properties.Children.Add(property.Value);
+        }
     }
 
     private void CreateElementInDesignerFrame(object sender, TappedEventArgs e)
@@ -49,11 +73,18 @@ public partial class Designer : ContentPage
             newElement.PropertyChanged += ElementPropertyChanged;
             var tapGestureRecognizer = new TapGestureRecognizer();
             tapGestureRecognizer.Tapped += EnableElementForOperations;
+            tapGestureRecognizer.Buttons = ButtonsMask.Primary | ButtonsMask.Secondary;
+            newElement.GestureRecognizers.Add(tapGestureRecognizer);
             designerFrame.Add(newElement);
             views.Add(newElement.Id, newElement);
 
+            if(nonTappableTypes.Contains(newElement.GetType()))
+            {
+                nonTappableViews.Add(newElement);
+            }
+
             // Get the XAML from the new element
-            var xaml = GetXamlForElement(designerFrame);
+            var xaml = XAMLGenerator.GetXamlForElement(designerFrame);
         }
         catch (Exception et)
         {
@@ -64,75 +95,21 @@ public partial class Designer : ContentPage
 
     private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if(sender == draggingView || sender == focusedView)
+        if(sender == focusedView)
         {
             RemoveBorder(sender, null);
             AddBorder(sender, null);
+            UpdatePropertyForFocusedView(e.PropertyName, focusedView.GetType().GetProperty(e.PropertyName)?.GetValue(focusedView));
         }
     }
 
     private void EnableElementForOperations(object? sender, TappedEventArgs e)
     {
         var senderView = sender as View;
-        draggingView = senderView;
+        focusedView = senderView;
         AddBorder(senderView, null);
-    }
-
-    public string GetXamlForElement(VisualElement element)
-    {
-        StringBuilder xamlBuilder = new StringBuilder();
-        if(element.StyleId == nameof(gradientBorder2))
-        {
-            return string.Empty;
-        }
-
-        xamlBuilder.AppendLine($"<{element.GetType().Name}");
-
-        foreach (var property in element.GetType().GetProperties())
-        {
-            if (property.CanRead && property.CanWrite && property.GetIndexParameters().Length == 0)
-            {
-                var value = property.GetValue(element);
-                var valueType = value?.GetType();
-                if (value != null && IsSupportedType(valueType) && value.ToString() != "∞")
-                {
-                    if (valueType == typeof(Color))
-                    {
-                        value = ((Color)value).ToArgbHex(true);
-                    }
-                    else if (valueType == typeof(Thickness))
-                    {
-                        var tValue = ((Thickness)value);
-                        value = $"{tValue.Left},{tValue.Top},{tValue.Right},{tValue.Bottom}";
-                    }
-
-                    xamlBuilder.AppendLine($"    {property.Name}=\"{value}\"");
-                }
-            }
-        }
-
-        // Check if element can contain children
-        if (element is Layout layout)
-        {
-            xamlBuilder.AppendLine(">");
-            foreach (var child in layout.Children.Where(x => x is VisualElement))
-            {
-                xamlBuilder.AppendLine(GetXamlForElement(child as VisualElement));
-            }
-            xamlBuilder.AppendLine($"</{element.GetType().Name}>");
-        }
-        else
-        {
-
-            xamlBuilder.AppendLine("/>");
-        }
-        return xamlBuilder.ToString();
-    }
-
-    private bool IsSupportedType(Type valueType)
-    {
-        // Check if the type is a primitive type or string
-        return valueType.IsPrimitive || valueType.IsEnum || allowedTypesForXamlProperties.Contains(valueType);
+        PopulatePropertyGridField();
+        UpdateActualPropertyView();
     }
 
     private void RemoveBorder(object? sender, PointerEventArgs e)
@@ -161,92 +138,23 @@ public partial class Designer : ContentPage
     {
         Point location = e.GetPosition(designerFrame).Value;
 
-        if (!isDragging || draggingView == null) return;
+        if (!isDragging || focusedView == null) return;
 
         gradientBorder2.Opacity = 1;
-        draggingView.Margin = new Thickness(location.X, location.Y);
+        // Update margin property for the focusedView using Update function
+        location.X = (int)location.X;
+        location.Y = (int)location.Y;
+        UpdatePropertyForFocusedView("Margin", new Thickness(location.X, location.Y));
     }
 
-    private void PointerGestureRecognizer_PointerPressed(object sender, PointerEventArgs e)
+    private async void PointerGestureRecognizer_PointerPressed(object sender, PointerEventArgs e)
     {
         isDragging = true;
-        Point location = e.GetPosition(designerFrame).Value;
-
-        // Get all children of designerFrame and find the element that is being dragged
-        var childElements = designerFrame.Children.Where(c => c.Frame.Contains(location) && c != gradientBorder2);
-
-
-        var firstChild = (View)childElements.FirstOrDefault();
-        if (firstChild is Rectangle)
-        {
-            scalerRect = firstChild as Rectangle;
-            var nonRectFirstChild = childElements.Where(c => c != firstChild).FirstOrDefault();
-            if (nonRectFirstChild != null)
-            {
-                draggingView = nonRectFirstChild as View;
-            }
-        }
-        else
-        {
-            draggingView = firstChild;
-        }
-
-        if (draggingView != null)
-        {
-            AddBorder(draggingView, null);
-            focusedView = draggingView;
-            // Get properties for the focused view and display it in the properties panel
-            var properties = ToolBox.GetAllPropertiesForView(focusedView);
-            Properties.Children.Clear();
-
-            foreach (var property in properties)
-            {
-                var label = new Label
-                {
-                    Text = property.Key,
-                    FontSize = 10,
-                    TextColor = Colors.White,
-                    BackgroundColor = Colors.Transparent,
-                };
-                var value = property.Value;
-                // Put the label and value in a grid layout
-                var grid = new Grid()
-                {
-                    ColumnDefinitions = new ColumnDefinitionCollection
-                    {
-                        new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
-                        new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) }
-                    },
-                    HeightRequest = 30,
-                    Margin = new Thickness(0, 0, 0, 10),
-                    InputTransparent = true,
-                    CascadeInputTransparent = false,
-                };
-
-                grid.Children.Add(label);
-                grid.Children.Add(value);
-
-                grid.SetColumn(label, 0);
-                grid.SetColumn(value, 1);
-
-
-                Properties.Children.Add(grid);
-            }
-        }
-        else
-        {
-            focusedView = null;
-            RemoveBorder(draggingView, null);
-        }
     }
 
     private void PointerGestureRecognizer_PointerReleased(object sender, PointerEventArgs e)
     {
-        if (!isDragging || draggingView == null) return;
         isDragging = false;
-        //RemoveBorder(draggingView, null);
-        draggingView = null;
-        scalerRect = null;
     }
 
     private void DragGestureRecognizer_DragStarting(object? sender, DragStartingEventArgs e)
@@ -261,21 +169,98 @@ public partial class Designer : ContentPage
 
     private void GenerateXamlForTheView(object sender, EventArgs e)
     {
-        var xaml = GetXamlForElement(designerFrame);
-        var finalXamlBuilder = new StringBuilder();
-        finalXamlBuilder.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<ContentPage xmlns=\"http://schemas.microsoft.com/dotnet/2021/maui\"\r\n             xmlns:x=\"http://schemas.microsoft.com/winfx/2009/xaml\"\r\n>");
-        finalXamlBuilder.AppendLine(xaml);
-        finalXamlBuilder.AppendLine("</ContentPage>");
+        var xaml = XAMLGenerator.GetXamlForElement(designerFrame);
         Properties.Clear();
 
         // create a new label with text as xaml and add it to the Properties
         var label = new Editor
         {
-            Text = finalXamlBuilder.ToString(),
+            Text = xaml,
             FontSize = 10,
             TextColor = Colors.White,
             BackgroundColor = Colors.Transparent,
         };
         Properties.Children.Add(label);
+    }
+
+    private void PopulatePropertyGridField()
+    {
+        if (focusedView == null) return;
+        this.PropertiesForFocusedView?.Clear();
+        var properties = ToolBox.GetAllPropertiesForView(focusedView);
+        var gridList = new SortedDictionary<string, Grid>();
+        foreach (var property in properties)
+        {
+            var label = new Label
+            {
+                Text = property.Key,
+                FontSize = 10,
+                TextColor = Colors.White,
+                BackgroundColor = Colors.Transparent,
+            };
+            var value = property.Value;
+            // Put the label and value in a grid layout
+            var grid = new Grid()
+            {
+                ColumnDefinitions = new ColumnDefinitionCollection
+                {
+                    new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
+                    new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) }
+                },
+                HeightRequest = 30,
+                Margin = new Thickness(0, 0, 0, 10),
+                InputTransparent = true,
+                CascadeInputTransparent = false,
+            };
+
+            grid.Children.Add(label);
+            grid.Children.Add(value);
+
+            grid.SetColumn(label, 0);
+            grid.SetColumn(value, 1);
+
+            gridList[property.Key] = grid;
+        }
+
+        this.PropertiesForFocusedView = gridList;
+    }
+
+    private void UpdatePropertyForFocusedView(string propertyName, object updatedValue)
+    {
+        if (focusedView == null || PropertiesForFocusedView == null || !PropertiesForFocusedView.ContainsKey(propertyName)) return;
+        var property = PropertiesForFocusedView?[propertyName];
+        var value = property?.Children[1];
+        if (value is Entry entry)
+        {
+            entry.Text = updatedValue.ToString();
+        }
+        else if (value is Picker picker)
+        {
+            picker.SelectedItem = updatedValue;
+        }
+        else if (value is Grid colorGrid)
+        {
+            var red = colorGrid.Children[0] as Entry;
+            var green = colorGrid.Children[1] as Entry;
+            var blue = colorGrid.Children[2] as Entry;
+            var alpha = colorGrid.Children[3] as Entry;
+
+            if (updatedValue.GetType() == typeof(Color))
+            {
+                var color = (Color)updatedValue;
+                red.Text = color.Red.ToString();
+                green.Text = color.Green.ToString();
+                blue.Text = color.Blue.ToString();
+                alpha.Text = color.Alpha.ToString();
+            }
+            else
+            {
+                var thickness = (Thickness)updatedValue;
+                red.Text = thickness.Left.ToString();
+                green.Text = thickness.Top.ToString();
+                blue.Text = 0.ToString();
+                alpha.Text = 0.ToString();
+            }
+        }
     }
 }
