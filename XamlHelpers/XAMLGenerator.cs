@@ -60,7 +60,7 @@ namespace MAUIDesigner.XamlHelpers
                 xamlBuilder.AppendLine(">");
                 foreach (var child in layout.Children.Where(x => x is VisualElement))
                 {
-                    xamlBuilder.AppendLine(XAMLGenerator.GetXamlForElement(child as VisualElement));
+                    xamlBuilder.AppendLine(GetInternalXAML(child as VisualElement));
                 }
                 xamlBuilder.AppendLine($"</{element.GetType().Name}>");
             }
