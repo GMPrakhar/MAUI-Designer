@@ -11,9 +11,9 @@ public partial class Designer : ContentPage
     private Rectangle? scalerRect;
     private ISet<Type> nonTappableTypes = new HashSet<Type> { typeof(Editor) };
     private IList<View> nonTappableViews = new List<View>();
-    private const string LabelXAML = "<Label Text=\"Drag Me away\" HorizontalTextAlignment=\"Center\" TextColor=\"White\" FontSize=\"36\">\r\n</Label>";
     private IDictionary<Guid, View> views = new Dictionary<Guid, View>();
     private SortedDictionary<string, Grid>? PropertiesForFocusedView;
+    private ICollection<string> GuiUpdatableProperties = new [] { "Margin" };
 
     public Designer()
 	{
@@ -25,8 +25,6 @@ public partial class Designer : ContentPage
             {
                 Text = element.Key,
                 FontSize = 10,
-                TextColor = Colors.White,
-                BackgroundColor = Colors.Transparent,
                 Margin = new Thickness(10),
             };
             var gestureRecognizer = new TapGestureRecognizer();
@@ -99,7 +97,7 @@ public partial class Designer : ContentPage
         {
             RemoveBorder(sender, null);
             AddBorder(sender, null);
-            UpdatePropertyForFocusedView(e.PropertyName, focusedView.GetType().GetProperty(e.PropertyName)?.GetValue(focusedView));
+            //UpdatePropertyForFocusedView(e.PropertyName, focusedView.GetType().GetProperty(e.PropertyName)?.GetValue(focusedView));
         }
     }
 
@@ -177,8 +175,6 @@ public partial class Designer : ContentPage
         {
             Text = xaml,
             FontSize = 10,
-            TextColor = Colors.White,
-            BackgroundColor = Colors.Transparent,
         };
         Properties.Children.Add(label);
     }
@@ -195,8 +191,6 @@ public partial class Designer : ContentPage
             {
                 Text = property.Key,
                 FontSize = 10,
-                TextColor = Colors.White,
-                BackgroundColor = Colors.Transparent,
             };
             var value = property.Value;
             // Put the label and value in a grid layout
@@ -227,7 +221,7 @@ public partial class Designer : ContentPage
 
     private void UpdatePropertyForFocusedView(string propertyName, object updatedValue)
     {
-        if (focusedView == null || PropertiesForFocusedView == null || !PropertiesForFocusedView.ContainsKey(propertyName)) return;
+        if (focusedView == null || PropertiesForFocusedView == null || !PropertiesForFocusedView.ContainsKey(propertyName) || !this.GuiUpdatableProperties.Contains(propertyName)) return;
         var property = PropertiesForFocusedView?[propertyName];
         var value = property?.Children[1];
         if (value is Entry entry)
@@ -238,29 +232,18 @@ public partial class Designer : ContentPage
         {
             picker.SelectedItem = updatedValue;
         }
-        else if (value is Grid colorGrid)
+        else if (value is Grid thicknessgrid)
         {
-            var red = colorGrid.Children[0] as Entry;
-            var green = colorGrid.Children[1] as Entry;
-            var blue = colorGrid.Children[2] as Entry;
-            var alpha = colorGrid.Children[3] as Entry;
+            var left = thicknessgrid.Children[0] as Entry;
+            var top = thicknessgrid.Children[1] as Entry;
+            var right = thicknessgrid.Children[2] as Entry;
+            var bottom = thicknessgrid.Children[3] as Entry;
 
-            if (updatedValue.GetType() == typeof(Color))
-            {
-                var color = (Color)updatedValue;
-                red.Text = color.Red.ToString();
-                green.Text = color.Green.ToString();
-                blue.Text = color.Blue.ToString();
-                alpha.Text = color.Alpha.ToString();
-            }
-            else
-            {
-                var thickness = (Thickness)updatedValue;
-                red.Text = thickness.Left.ToString();
-                green.Text = thickness.Top.ToString();
-                blue.Text = 0.ToString();
-                alpha.Text = 0.ToString();
-            }
+            var thickness = (Thickness)updatedValue;
+            left.Text = thickness.Left.ToString();
+            top.Text = thickness.Top.ToString();
+            right.Text = thickness.Right.ToString();
+            bottom.Text = thickness.Bottom.ToString();
         }
     }
 }
