@@ -28,34 +28,35 @@
                 </Border>
 
                 <!-- Top Left Rectangle -->
-                <Rectangle Fill="White"
-                 WidthRequest="5"
-                 HeightRequest="5"
+                <Rectangle 
+                           x:Name="topLeftRect"
+                 WidthRequest="8"
+                 HeightRequest="8"
                  AbsoluteLayout.LayoutBounds="0, 0, 0.05, 0.05"
                  AbsoluteLayout.LayoutFlags="All">
-                    <Rectangle.GestureRecognizers>
-                        <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting" DropCompleted="DragGestureRecognizer_DropCompleted" />
-                    </Rectangle.GestureRecognizers>
                 </Rectangle>
 
                 <!-- Top Right Rectangle -->
-                <Rectangle Fill="White"
-                 WidthRequest="5"
-                 HeightRequest="5"
+                <Rectangle 
+                           x:Name="topRightRect"
+                 WidthRequest="8"
+                 HeightRequest="8"
                  AbsoluteLayout.LayoutBounds="1, 0, 0.05, 0.05"
                  AbsoluteLayout.LayoutFlags="All"/>
 
                 <!-- Bottom Left Rectangle -->
-                <Rectangle Fill="White"
-                 WidthRequest="5"
-                 HeightRequest="5"
+                <Rectangle 
+                            x:Name="bottomLeftRect"
+                 WidthRequest="8"
+                 HeightRequest="8"
                  AbsoluteLayout.LayoutBounds="0, 1, 0.05, 0.05"
                  AbsoluteLayout.LayoutFlags="All"/>
 
                 <!-- Bottom Right Rectangle -->
-                <Rectangle Fill="White"
-                 WidthRequest="5"
-                 HeightRequest="5"
+                <Rectangle 
+                            x:Name="bottomRightRect"
+                 WidthRequest="8"
+                 HeightRequest="8"
                  AbsoluteLayout.LayoutBounds="1, 1, 0.05, 0.05"
                  AbsoluteLayout.LayoutFlags="All"/>
             </AbsoluteLayout>
