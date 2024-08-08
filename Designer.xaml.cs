@@ -7,13 +7,14 @@ namespace MAUIDesigner;
 public partial class Designer : ContentPage
 {
     private bool isDragging = false;
+    private bool isScaling = false;
     private View? focusedView;
     private Rectangle? scalerRect;
     private ISet<Type> nonTappableTypes = new HashSet<Type> { typeof(Editor) };
     private IList<View> nonTappableViews = new List<View>();
     private IDictionary<Guid, View> views = new Dictionary<Guid, View>();
     private SortedDictionary<string, Grid>? PropertiesForFocusedView;
-    private ICollection<string> GuiUpdatableProperties = new [] { "Margin" };
+    private ICollection<string> GuiUpdatableProperties = new [] { "Margin", "HeightRequest", "WidthRequest" };
 
     public Designer()
 	{
@@ -120,12 +121,14 @@ public partial class Designer : ContentPage
         try
         {
             View? senderView = (sender as View);
-            var location = new Point(senderView.X, senderView.Y);
 
-            gradientBorder2.HeightRequest = senderView.Height;
-            gradientBorder2.WidthRequest = senderView.Width;
+            var scaleX = 15 + (senderView.Width / designerFrame.Width) * 15;
+            var scaleY = 15 + (senderView.Height / designerFrame.Height) * 15;
+
+            gradientBorder2.HeightRequest = senderView.Height + scaleX;
+            gradientBorder2.WidthRequest = senderView.Width + scaleY;
             gradientBorder2.Opacity = 1;
-            gradientBorder2.Margin = new Thickness(senderView.X, senderView.Y);
+            gradientBorder2.Margin = new Thickness(senderView.Margin.Left - scaleX/2, senderView.Margin.Top - scaleY/2);
         }catch(Exception)
         {
 
@@ -136,28 +139,88 @@ public partial class Designer : ContentPage
     {
         Point location = e.GetPosition(designerFrame).Value;
 
-        if (!isDragging || focusedView == null) return;
+        if ((!isDragging && !isScaling) || focusedView == null) return;
 
         gradientBorder2.Opacity = 1;
         // Update margin property for the focusedView using Update function
         location.X = (int)location.X;
         location.Y = (int)location.Y;
-        UpdatePropertyForFocusedView("Margin", new Thickness(location.X, location.Y));
+        
+        if (isScaling)
+        {
+            Thickness scalingFactor;
+            if (scalerRect == topLeftRect)
+            {
+                scalingFactor = new Thickness(focusedView.Margin.Left - location.X, focusedView.Margin.Top - location.Y);
+            }
+            else if (scalerRect == topRightRect)
+            {
+                scalingFactor = new Thickness(location.X - focusedView.Margin.Right, focusedView.Margin.Top - location.Y);
+
+                // Set location X to be same as focused view's margin so it doesn't get updated.
+                location.X = focusedView.Margin.Left;
+            }
+            else if (scalerRect == bottomLeftRect)
+            {
+                scalingFactor = new Thickness(focusedView.Margin.Left - location.X, location.Y - focusedView.Margin.Bottom);
+                location.Y = focusedView.Margin.Top;
+            }
+            else
+            {
+                scalingFactor = new Thickness(location.X - focusedView.Margin.Right, location.Y - focusedView.Margin.Bottom);
+                location.X = focusedView.Margin.Left;
+                location.Y = focusedView.Margin.Top;
+            }
+
+            UpdatePropertyForFocusedView("WidthRequest", Math.Max(focusedView.WidthRequest + scalingFactor.Left, 20));
+            UpdatePropertyForFocusedView("HeightRequest", Math.Max(focusedView.HeightRequest + scalingFactor.Top, 20));
+        }
+        
+        UpdatePropertyForFocusedView("Margin", new Thickness(location.X, location.Y, location.X + focusedView.WidthRequest, location.Y + focusedView.HeightRequest));
     }
 
     private async void PointerGestureRecognizer_PointerPressed(object sender, PointerEventArgs e)
     {
+        var location = e.GetPosition(gradientBorder2).Value;
+
+
+        if (topLeftRect.Frame.Contains(location))
+        {
+            scalerRect = topLeftRect;
+            isScaling = true;
+            return;
+        }
+        else if (topRightRect.Frame.Contains(location))
+        {
+            scalerRect = topRightRect;
+            isScaling = true;
+            return;
+        }
+        else if (bottomLeftRect.Frame.Contains(location))
+        {
+            scalerRect = bottomLeftRect;
+            isScaling = true;
+            return;
+        }
+        else if (bottomRightRect.Frame.Contains(location))
+        {
+            scalerRect = bottomRightRect;
+            isScaling = true;
+            return;
+        }
+
         isDragging = true;
     }
 
     private void PointerGestureRecognizer_PointerReleased(object sender, PointerEventArgs e)
     {
         isDragging = false;
+        isScaling = false;
+        scalerRect = null;
     }
 
     private void DragGestureRecognizer_DragStarting(object? sender, DragStartingEventArgs e)
     {
-        scalerRect = sender as Rectangle;
     }
 
     private void DragGestureRecognizer_DropCompleted(object? sender, DropCompletedEventArgs e)
