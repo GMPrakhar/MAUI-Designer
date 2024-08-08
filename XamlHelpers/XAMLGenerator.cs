@@ -31,13 +31,17 @@ namespace MAUIDesigner.XamlHelpers
 
             xamlBuilder.AppendLine($"<{element.GetType().Name}");
 
+            var defaultElement = Activator.CreateInstance(element.GetType());
+
             foreach (var property in element.GetType().GetProperties())
             {
                 if (property.CanRead && property.CanWrite && property.GetIndexParameters().Length == 0)
                 {
                     var value = property.GetValue(element);
+                    var defaultValue = property.GetValue(defaultElement);
                     var valueType = value?.GetType();
-                    if (value != null && IsSupportedType(valueType) && value.ToString() != "∞")
+
+                    if (value != null && IsSupportedType(valueType) && value.ToString() != "∞" && (defaultValue == null || !defaultValue.Equals(value)))
                     {
                         if (valueType == typeof(Color))
                         {
