@@ -6,6 +6,7 @@ A small project to be able to preview XAML changes into MAUI view, and later add
 ## Current capabilities:
 - Write XAML into the text editor, click on Render button, and corresponding view will be rendered in the frame.
 - Select views from toolbox and perform drag+drop across the right side frame. Currently only supports AbsoluteLayout.
+- Scale the views using anchors on the border of the view.
 - Properties menu for selected element so that the properties can be updated and applied directly to the view, including color, margin, padding and text/font manipulations.
 - Generate XAML for the current view. This XAML can be pasted directly into the MainView for verification.
 
@@ -21,6 +22,8 @@ A small project to be able to preview XAML changes into MAUI view, and later add
 ## XAML Generator
 ![image](https://github.com/user-attachments/assets/64cbd604-ce17-4ead-868e-8b3398878ab6)
 
+## Scale Example
+![{68091961-CD0D-4969-A94D-FF8B42C41FB3}](https://github.com/user-attachments/assets/7cb46ccb-5ccc-4d81-b81b-0f18ee53cd3c)
 
 
 
