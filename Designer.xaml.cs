@@ -2,6 +2,7 @@
 
 using MAUIDesigner.XamlHelpers;
 using Microsoft.Maui.Controls.Shapes;
+using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
 namespace MAUIDesigner;
 
 public partial class Designer : ContentPage
@@ -30,9 +31,28 @@ public partial class Designer : ContentPage
             };
             var gestureRecognizer = new TapGestureRecognizer();
             gestureRecognizer.Tapped += CreateElementInDesignerFrame;
+            var pointerGestureRecognizer = new PointerGestureRecognizer();
+            pointerGestureRecognizer.PointerEntered += RaiseLabel;
+            pointerGestureRecognizer.PointerExited += MakeLabelDefault;
             label.GestureRecognizers.Add(gestureRecognizer);
+            label.GestureRecognizers.Add(pointerGestureRecognizer);
             Toolbox.Children.Add(label);
         }
+    }
+
+    private void RaiseLabel(object? sender, PointerEventArgs e)
+    {
+        var senderView = sender as Label;
+        var animation = new Animation(s => senderView.FontSize = s, 10, 15);
+        senderView.Animate("FontSize", animation, 16, 100);
+    }
+
+    private void MakeLabelDefault(object? sender, PointerEventArgs e)
+    {
+        var senderView = sender as Label;
+        // Animate Font size for senderView
+        var animation = new Animation(s => senderView.FontSize = s, 15, 10);
+        senderView.Animate("FontSize", animation, 16, 100);
     }
 
     private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
@@ -69,15 +89,11 @@ public partial class Designer : ContentPage
         try
         {
             var newElement = ElementCreator.Create((sender as Label).Text);
-            newElement.PropertyChanged += ElementPropertyChanged;
-            var tapGestureRecognizer = new TapGestureRecognizer();
-            tapGestureRecognizer.Tapped += EnableElementForOperations;
-            tapGestureRecognizer.Buttons = ButtonsMask.Primary | ButtonsMask.Secondary;
-            newElement.GestureRecognizers.Add(tapGestureRecognizer);
+            AddDesignerGestureControls(newElement);
             designerFrame.Add(newElement);
             views.Add(newElement.Id, newElement);
 
-            if(nonTappableTypes.Contains(newElement.GetType()))
+            if (nonTappableTypes.Contains(newElement.GetType()))
             {
                 nonTappableViews.Add(newElement);
             }
@@ -90,6 +106,15 @@ public partial class Designer : ContentPage
             Console.WriteLine(et);
             // Do nothing
         }
+    }
+
+    private void AddDesignerGestureControls(View newElement)
+    {
+        newElement.PropertyChanged += ElementPropertyChanged;
+        var tapGestureRecognizer = new TapGestureRecognizer();
+        tapGestureRecognizer.Tapped += EnableElementForOperations;
+        tapGestureRecognizer.Buttons = ButtonsMask.Primary | ButtonsMask.Secondary;
+        newElement.GestureRecognizers.Add(tapGestureRecognizer);
     }
 
     private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -231,15 +256,7 @@ public partial class Designer : ContentPage
     private void GenerateXamlForTheView(object sender, EventArgs e)
     {
         var xaml = XAMLGenerator.GetXamlForElement(designerFrame);
-        Properties.Clear();
-
-        // create a new label with text as xaml and add it to the Properties
-        var label = new Editor
-        {
-            Text = xaml,
-            FontSize = 10,
-        };
-        Properties.Children.Add(label);
+        XAMLHolder.Text = xaml;
     }
 
     private void PopulatePropertyGridField()
@@ -307,6 +324,40 @@ public partial class Designer : ContentPage
             top.Text = thickness.Top.ToString();
             right.Text = thickness.Right.ToString();
             bottom.Text = thickness.Bottom.ToString();
+        }
+    }
+
+    private void LoadViewFromXaml(object sender, EventArgs e)
+    {
+        var xaml = XAMLHolder.Text;
+        //xaml = this.RemoveContentPageFromXaml(xaml);
+        focusedView = null;
+        foreach(View view in designerFrame.Children.Where(x => x != gradientBorder2 && x is View).ToList())
+        {
+            designerFrame.Remove(view);
+            views.Remove(view.Id);
+            nonTappableViews.Remove(view);
+        }
+
+        var newLayout = new AbsoluteLayout();
+
+        try
+        {
+            var xamlLoaded = Extensions.LoadFromXaml(newLayout, xaml);
+            var loadedLayout = newLayout.Children[0] as AbsoluteLayout;
+
+            foreach (View loadedView in loadedLayout.Children)
+            {
+                designerFrame.Add(loadedView);
+                views.Add(loadedView.Id, loadedView);
+                AddDesignerGestureControls(loadedView);
+            }
+
+            RemoveBorder(sender, null);
+        }
+        catch
+        {
+            Application.Current.MainPage.DisplayAlert("Error", "Invalid XAML", "OK");
         }
     }
 }

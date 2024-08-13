@@ -4,19 +4,23 @@
              x:Class="MAUIDesigner.Designer"
              Title="Designer">
 
-    <Grid VerticalOptions="FillAndExpand">
+    <Grid VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="150"/>
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="300" />
         </Grid.ColumnDefinitions>
-        <ScrollView>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="150"/>
+        </Grid.RowDefinitions>
+        <ScrollView Grid.Row="0">
             <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
-                <Button Text="Generate XAML" Clicked="GenerateXamlForTheView">
-                </Button>
+                <Button Text="Generate XAML" Clicked="GenerateXamlForTheView" HeightRequest="30" Margin="2"/>
+                <Button Text="Load from XAML" Clicked="LoadViewFromXaml" Margin="2"/>
             </VerticalStackLayout>
         </ScrollView>
-        <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1">
+        <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1" Grid.Row="0">
             <AbsoluteLayout x:Name="gradientBorder2">
                 <!-- Frame in the center -->
                 <Border Stroke="#C49B33"
@@ -66,9 +70,12 @@
             </AbsoluteLayout.GestureRecognizers>
 
         </AbsoluteLayout>
-        <ScrollView Grid.Column="2">
+        <ScrollView Grid.Column="2" Grid.Row="0">
             <VerticalStackLayout x:Name="Properties">
             </VerticalStackLayout>
+        </ScrollView>
+        <ScrollView Grid.Row="1" Grid.ColumnSpan="3">
+            <Editor x:Name="XAMLHolder" MaximumHeightRequest="150"/>
         </ScrollView>
     </Grid>
 </ContentPage>
