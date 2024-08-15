@@ -14,12 +14,18 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="150"/>
         </Grid.RowDefinitions>
-        <ScrollView Grid.Row="0">
-            <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
-                <Button Text="Generate XAML" Clicked="GenerateXamlForTheView" HeightRequest="30" Margin="2"/>
-                <Button Text="Load from XAML" Clicked="LoadViewFromXaml" Margin="2"/>
-            </VerticalStackLayout>
-        </ScrollView>
+        <Border
+                StrokeThickness="2"
+                AbsoluteLayout.LayoutBounds="0, 0, 1, 1"
+                AbsoluteLayout.LayoutFlags="All"
+                >
+            <ScrollView Grid.Row="0">
+                <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
+                    <Button Text="Generate XAML" Clicked="GenerateXamlForTheView" HeightRequest="30" Margin="2"/>
+                    <Button Text="Load from XAML" Clicked="LoadViewFromXaml" Margin="2"/>
+                </VerticalStackLayout>
+            </ScrollView>
+        </Border>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1" Grid.Row="0">
             <AbsoluteLayout x:Name="gradientBorder2">
                 <!-- Frame in the center -->

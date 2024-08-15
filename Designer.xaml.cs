@@ -1,6 +1,7 @@
 ﻿
 
 using MAUIDesigner.XamlHelpers;
+using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Shapes;
 using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
 namespace MAUIDesigner;
@@ -16,40 +17,66 @@ public partial class Designer : ContentPage
     private IDictionary<Guid, View> views = new Dictionary<Guid, View>();
     private SortedDictionary<string, Grid>? PropertiesForFocusedView;
     private ICollection<string> GuiUpdatableProperties = new [] { "Margin", "HeightRequest", "WidthRequest" };
+    private const string defaultXaml = "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<ContentPage xmlns=\"http://schemas.microsoft.com/dotnet/2021/maui\"\r\n             xmlns:x=\"http://schemas.microsoft.com/winfx/2009/xaml\"\r\n>\r\n<AbsoluteLayout\r\n    Margin=\"20,20,20,20\"\r\n    IsPlatformEnabled=\"True\"\r\n    StyleId=\"designerFrame\"\r\n>\r\n\r\n<Button\r\n    Text=\"Login\"\r\n    Margin=\"114,150,205,195\"\r\n    HeightRequest=\"45\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"91\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<BoxView\r\n    Margin=\"5,-16,329,249\"\r\n    BackgroundColor=\"#17FFFFFF\"\r\n    HeightRequest=\"265\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"324\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Label\r\n    Text=\"Username \"\r\n    Margin=\"26,21,25,20\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Label\r\n    Text=\"Password \"\r\n    Margin=\"26,70,25,69\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Line\r\n    Margin=\"14,378,13,377\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Editor\r\n    Text=\"Type here\"\r\n    TextColor=\"#FF404040\"\r\n    Margin=\"110,16,305,48\"\r\n    HeightRequest=\"32\"\r\n    IsEnabled=\"False\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"195\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Editor\r\n    Text=\"Type here\"\r\n    TextColor=\"#FF404040\"\r\n    Margin=\"111,67,311,97\"\r\n    HeightRequest=\"30\"\r\n    IsEnabled=\"False\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"200\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n</AbsoluteLayout>\r\n\r\n</ContentPage>\r\n";
 
     public Designer()
 	{
 		InitializeComponent();
         var allVisualElements = ToolBox.GetAllVisualElementsAlongWithType();
-        foreach (var element in allVisualElements)
+
+        foreach (var viewType in allVisualElements.Keys)
         {
+            var viewsForType = allVisualElements[viewType];
+
             var label = new Label
             {
-                Text = element.Key,
+                Text = viewType.ToString(),
                 FontSize = 10,
                 Margin = new Thickness(10),
+                HorizontalOptions = LayoutOptions.Start,
+                FontAttributes = FontAttributes.Bold,
             };
-            var gestureRecognizer = new TapGestureRecognizer();
-            gestureRecognizer.Tapped += CreateElementInDesignerFrame;
-            var pointerGestureRecognizer = new PointerGestureRecognizer();
-            pointerGestureRecognizer.PointerEntered += RaiseLabel;
-            pointerGestureRecognizer.PointerExited += MakeLabelDefault;
-            label.GestureRecognizers.Add(gestureRecognizer);
-            label.GestureRecognizers.Add(pointerGestureRecognizer);
             Toolbox.Children.Add(label);
+
+            foreach (var view in viewsForType)
+            {
+                var labelView = new Button
+                {
+                    Text = view.Item1,
+                    FontSize = 10,
+                    TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
+                    BackgroundColor = Color.FromRgba(0,0,0,0),
+                    Padding = new Thickness(0),
+                    Margin = new Thickness(0),
+                    HorizontalOptions = LayoutOptions.CenterAndExpand,
+                };
+
+                var gestureRecognizer = new TapGestureRecognizer();
+                gestureRecognizer.Tapped += CreateElementInDesignerFrame;
+                var pointerGestureRecognizer = new PointerGestureRecognizer();
+                pointerGestureRecognizer.PointerEntered += RaiseLabel;
+                pointerGestureRecognizer.PointerExited += MakeLabelDefault;
+                labelView.GestureRecognizers.Add(gestureRecognizer);
+                labelView.GestureRecognizers.Add(pointerGestureRecognizer);
+
+                Toolbox.Children.Add(labelView);
+            }
         }
+
+        XAMLHolder.Text = defaultXaml;
+        this.LoadViewFromXaml(XAMLHolder, null);
     }
 
     private void RaiseLabel(object? sender, PointerEventArgs e)
     {
-        var senderView = sender as Label;
+        var senderView = sender as Button;
         var animation = new Animation(s => senderView.FontSize = s, 10, 15);
         senderView.Animate("FontSize", animation, 16, 100);
     }
 
     private void MakeLabelDefault(object? sender, PointerEventArgs e)
     {
-        var senderView = sender as Label;
+        var senderView = sender as Button;
         // Animate Font size for senderView
         var animation = new Animation(s => senderView.FontSize = s, 15, 10);
         senderView.Animate("FontSize", animation, 16, 100);
@@ -88,7 +115,7 @@ public partial class Designer : ContentPage
     {
         try
         {
-            var newElement = ElementCreator.Create((sender as Label).Text);
+            var newElement = ElementCreator.Create((sender as Button).Text);
             AddDesignerGestureControls(newElement);
             designerFrame.Add(newElement);
             views.Add(newElement.Id, newElement);
