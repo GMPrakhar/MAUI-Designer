@@ -1,4 +1,5 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,15 +11,20 @@ namespace MAUIDesigner
 {
     internal class ToolBox
     {
-        internal static IDictionary<string, Type> GetAllVisualElementsAlongWithType()
+        internal static IDictionary<ViewType, List<(string, Type)>> GetAllVisualElementsAlongWithType()
         {
-            var visualElements = typeof(Microsoft.Maui.Controls.View).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)));
-            var visualElementsWithType = new Dictionary<string, Type>();
-            foreach (var visualElement in visualElements)
+            var visualElements = typeof(Microsoft.Maui.Controls.View).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) && !t.IsAbstract);
+            var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type)>>();
+            Parallel.ForEach(visualElements, visualElement =>
             {
-                visualElementsWithType[visualElement.Name] = visualElement;
-            }
+                var viewType = GetViewTypeForType(visualElement);
+                if (!visualElementsWithType.ContainsKey(viewType))
+                {
+                    visualElementsWithType[viewType] = [];
+                }
 
+                visualElementsWithType[viewType].Add((visualElement.Name, visualElement));
+            });
             return visualElementsWithType;
         }
 
@@ -51,7 +57,7 @@ namespace MAUIDesigner
                         var finalValue = Convert.ChangeType((s as Entry)!.Text, propertyType);
                         property.SetValue(view, finalValue);
                     }
-                    catch 
+                    catch
                     {
 
                     }
@@ -94,7 +100,7 @@ namespace MAUIDesigner
                 var blue = new Entry();
                 var alpha = new Entry();
 
-                if(value.GetType() == typeof(Color))
+                if (value.GetType() == typeof(Color))
                 {
                     var color = (Color)value;
                     red.Text = color.Red.ToString();
@@ -168,5 +174,29 @@ namespace MAUIDesigner
         {
             throw new NotImplementedException();
         }
+
+        public static ViewType GetViewTypeForType(Type type)
+        {
+            return type switch
+            {
+                Type _ when type.IsSubclassOf(typeof(Microsoft.Maui.Controls.ContentView)) => ViewType.ContentView,
+                Type _ when type.IsSubclassOf(typeof(Microsoft.Maui.Controls.ItemsView)) => ViewType.ItemsView,
+                Type _ when type.IsSubclassOf(typeof(Microsoft.Maui.Controls.TemplatedView)) => ViewType.TemplatedView,
+                Type _ when type.IsSubclassOf(typeof(Microsoft.Maui.Controls.Shapes.Shape)) => ViewType.Shape,
+                Type _ when type.IsSubclassOf(typeof(Microsoft.Maui.Controls.Layout)) || type.ToString().Contains("Layout") => ViewType.Layout,
+                Type _ when type.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) => ViewType.View,
+                _ => ViewType.Other,
+            };
+        }
+    }
+    public enum ViewType
+    {
+        View,
+        ContentView,
+        ItemsView,
+        TemplatedView,
+        Shape,
+        Layout,
+        Other,
     }
 }
