@@ -9,6 +9,7 @@ namespace MAUIDesigner;
 public partial class Designer : ContentPage
 {
     private bool isDragging = false;
+    private bool dragStarted = false;
     private bool isScaling = false;
     private View? focusedView;
     private Rectangle? scalerRect;
@@ -180,7 +181,9 @@ public partial class Designer : ContentPage
             gradientBorder2.HeightRequest = senderView.Height + scaleX;
             gradientBorder2.WidthRequest = senderView.Width + scaleY;
             gradientBorder2.Opacity = 1;
-            gradientBorder2.Margin = new Thickness(senderView.Margin.Left - scaleX/2, senderView.Margin.Top - scaleY/2);
+            var viewParentMargin = (senderView.Parent as View)?.Margin ?? Thickness.Zero;
+            gradientBorder2.Margin = new Thickness(senderView.Margin.Left - scaleX/2 + viewParentMargin.Left, senderView.Margin.Top - scaleY/2 + viewParentMargin.Top);
+
         }catch(Exception)
         {
 
@@ -191,7 +194,9 @@ public partial class Designer : ContentPage
     {
         Point location = e.GetPosition(designerFrame).Value;
 
-        if ((!isDragging && !isScaling) || focusedView == null) return;
+        if ((!dragStarted && !isScaling) || focusedView == null) return;
+
+        if(dragStarted) isDragging = true;
 
         gradientBorder2.Opacity = 1;
         // Update margin property for the focusedView using Update function
@@ -235,7 +240,6 @@ public partial class Designer : ContentPage
     {
         var location = e.GetPosition(gradientBorder2).Value;
 
-
         if (topLeftRect.Frame.Contains(location))
         {
             scalerRect = topLeftRect;
@@ -261,11 +265,35 @@ public partial class Designer : ContentPage
             return;
         }
 
-        isDragging = true;
+        dragStarted = true;
     }
 
     private void PointerGestureRecognizer_PointerReleased(object sender, PointerEventArgs e)
     {
+        if (focusedView != null && isDragging)
+        {
+            var location = e.GetPosition(designerFrame).Value;
+            var droppedOnLayout = views.Values.Where(x => x is Layout && x != focusedView).FirstOrDefault(x => x.Frame.Contains(location));
+
+            if (droppedOnLayout is Layout layout)
+            {
+                var margin = focusedView.Margin;
+                var layoutMargin = layout.Margin;
+                if (layout is AbsoluteLayout)
+                {
+                    focusedView.Margin = new Thickness(layoutMargin.Left - margin.Left, layoutMargin.Top - margin.Top, layoutMargin.Right - margin.Right, layoutMargin.Bottom - margin.Bottom);
+                }
+                else
+                {
+                    focusedView.Margin = 0;
+                }
+
+                (focusedView.Parent as Layout).Children.Remove(focusedView);
+                layout.Add(focusedView);
+            }
+        }
+
+        dragStarted = false;
         isDragging = false;
         isScaling = false;
         scalerRect = null;
