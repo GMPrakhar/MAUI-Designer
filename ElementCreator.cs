@@ -27,6 +27,12 @@ namespace MAUIDesigner
                 // disable editor text edit
                 element.IsEnabled = false;
             }
+            else if (newElement is Layout layout)
+            {
+                layout.HeightRequest = 50;
+                layout.WidthRequest = 50;
+                layout.BackgroundColor = Colors.Coral;
+            }
 
             return newElement;
         }

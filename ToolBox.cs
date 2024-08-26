@@ -33,14 +33,20 @@ namespace MAUIDesigner
         {
             var viewProperties = view.GetType().GetProperties().Where(x => x.CanWrite);
             var properties = new ConcurrentDictionary<string, View>();
-            Parallel.ForEach(viewProperties, property => properties[property.Name] = GetViewForPropertyType(view, property, property.GetValue(view)));
+            Parallel.ForEach(viewProperties, property =>
+            {
+                if (property.GetIndexParameters().Length == 0)
+                {
+                    properties[property.Name] = GetViewForPropertyType(view, property, property.GetValue(view));
+                }
+            });
 
             return properties;
         }
 
         internal static View GetViewForPropertyType(View view, PropertyInfo property, object value)
         {
-
+            
             // Get the view according to the type of the value. If it is primitive type or string, it should be an editor, if it's enum it should be a picker
             if (value is string || value == null || value.GetType().IsPrimitive)
             {
@@ -85,12 +91,12 @@ namespace MAUIDesigner
                 var colorGrid = new Grid
                 {
                     ColumnDefinitions = new ColumnDefinitionCollection
-                    {
-                        new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
-                        new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
-                        new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
-                        new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) }
-                    },
+                {
+                    new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
+                    new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
+                    new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
+                    new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) }
+                },
                     InputTransparent = true,
                     CascadeInputTransparent = false,
                 };
@@ -156,7 +162,6 @@ namespace MAUIDesigner
 
                 return colorGrid;
             }
-
             var label = new Label
             {
                 Text = value.ToString()
