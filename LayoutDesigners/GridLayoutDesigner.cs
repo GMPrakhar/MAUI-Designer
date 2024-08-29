@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace MAUIDesigner.LayoutDesigners
 {
-    class AbsoluteLayoutDesigner : ILayoutDesigner
+    class GridLayoutDesigner : ILayoutDesigner
     {
     }
 }

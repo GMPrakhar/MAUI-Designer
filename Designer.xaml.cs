@@ -1,8 +1,11 @@
 ﻿
 
+using MAUIDesigner.HelperViews;
 using MAUIDesigner.XamlHelpers;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Controls.Shapes;
+using Microsoft.Maui.Devices.Sensors;
+using System.Collections.ObjectModel;
 using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
 namespace MAUIDesigner;
 
@@ -14,15 +17,22 @@ public partial class Designer : ContentPage
     private View? focusedView;
     private Rectangle? scalerRect;
     private ISet<Type> nonTappableTypes = new HashSet<Type> { typeof(Editor) };
-    private IList<View> nonTappableViews = new List<View>();
+    private IList<View> nonTappableViews = new ObservableCollection<View>();
     private IDictionary<Guid, View> views = new Dictionary<Guid, View>();
     private SortedDictionary<string, Grid>? PropertiesForFocusedView;
     private ICollection<string> GuiUpdatableProperties = new [] { "Margin", "HeightRequest", "WidthRequest" };
+    private ContextMenu contextMenu = new ContextMenu()
+    {
+        IsVisible = false
+    };
     private const string defaultXaml = "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<ContentPage xmlns=\"http://schemas.microsoft.com/dotnet/2021/maui\"\r\n             xmlns:x=\"http://schemas.microsoft.com/winfx/2009/xaml\"\r\n>\r\n<AbsoluteLayout\r\n    Margin=\"20,20,20,20\"\r\n    IsPlatformEnabled=\"True\"\r\n    StyleId=\"designerFrame\"\r\n>\r\n\r\n<Button\r\n    Text=\"Login\"\r\n    Margin=\"114,150,205,195\"\r\n    HeightRequest=\"45\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"91\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<BoxView\r\n    Margin=\"5,-16,329,249\"\r\n    BackgroundColor=\"#17FFFFFF\"\r\n    HeightRequest=\"265\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"324\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Label\r\n    Text=\"Username \"\r\n    Margin=\"26,21,25,20\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Label\r\n    Text=\"Password \"\r\n    Margin=\"26,70,25,69\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Line\r\n    Margin=\"14,378,13,377\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Editor\r\n    Text=\"Type here\"\r\n    TextColor=\"#FF404040\"\r\n    Margin=\"110,16,305,48\"\r\n    HeightRequest=\"32\"\r\n    IsEnabled=\"False\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"195\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Editor\r\n    Text=\"Type here\"\r\n    TextColor=\"#FF404040\"\r\n    Margin=\"111,67,311,97\"\r\n    HeightRequest=\"30\"\r\n    IsEnabled=\"False\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"200\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n</AbsoluteLayout>\r\n\r\n</ContentPage>\r\n";
 
     public Designer()
 	{
 		InitializeComponent();
+        UpdateContextMenuWithRandomProperties();
+        contextMenu.UpdateCollectionView();
+
         var allVisualElements = ToolBox.GetAllVisualElementsAlongWithType();
 
         foreach (var viewType in allVisualElements.Keys)
@@ -66,6 +76,72 @@ public partial class Designer : ContentPage
 
         XAMLHolder.Text = defaultXaml;
         this.LoadViewFromXaml(XAMLHolder, null);
+    }
+
+    private void UpdateContextMenuWithRandomProperties()
+    {
+        contextMenu.ActionList.Clear();
+        var hoverRecognizer = new PointerGestureRecognizer();
+        hoverRecognizer.PointerEntered += (s, e) => (s as View).BackgroundColor = Colors.DarkGray.WithLuminosity(0.2f);
+        hoverRecognizer.PointerExited += (s, e) => (s as View).BackgroundColor = Colors.Black;
+
+        contextMenu.ActionList.Add(new PropertyViewer()
+        {
+            View = new Button()
+            {
+                Text = "Send to Back ( Disabled )",
+                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+                CornerRadius = 0,
+                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+                Padding = new Thickness(5, 0),
+                Margin = new Thickness(0, 0),
+                FontSize = 10
+            }
+        });
+        contextMenu.ActionList.Add(new PropertyViewer()
+        {
+            View = new Button()
+            {
+                Text = "Bring to Front ( Disabled )",
+                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+                CornerRadius = 0,
+                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+                Padding = new Thickness(5, 0),
+                Margin = new Thickness(0, 0),
+                FontSize = 10
+            }
+        });
+        contextMenu.ActionList.Add(new PropertyViewer()
+        {
+            View = new Button()
+            {
+                Text = "Lock in place ( Disabled )",
+                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+                CornerRadius = 0,
+                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+                Padding = new Thickness(5, 0),
+                Margin = new Thickness(0, 0),
+                FontSize = 10
+            }
+        });
+        contextMenu.ActionList.Add(new PropertyViewer()
+        {
+            View = new Button()
+            {
+                Text = "Detach from parent ( Disabled )",
+                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+                CornerRadius = 0,
+                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+                Padding = new Thickness(5, 0),
+                Margin = new Thickness(0,0),
+                FontSize = 10
+            }
+        });
+
+        foreach(var x in contextMenu.ActionList)
+        {
+            x.View.GestureRecognizers.Add(hoverRecognizer);
+        }
     }
 
     private void RaiseLabel(object? sender, PointerEventArgs e)
@@ -125,9 +201,6 @@ public partial class Designer : ContentPage
             {
                 nonTappableViews.Add(newElement);
             }
-
-            // Get the XAML from the new element
-            var xaml = XAMLGenerator.GetXamlForElement(designerFrame);
         }
         catch (Exception et)
         {
@@ -142,7 +215,19 @@ public partial class Designer : ContentPage
         var tapGestureRecognizer = new TapGestureRecognizer();
         tapGestureRecognizer.Tapped += EnableElementForOperations;
         tapGestureRecognizer.Buttons = ButtonsMask.Primary | ButtonsMask.Secondary;
+        var rightClickRecognizer = new TapGestureRecognizer();
+        rightClickRecognizer.Tapped += ShowContextMenu;
+        rightClickRecognizer.Buttons = ButtonsMask.Secondary;
         newElement.GestureRecognizers.Add(tapGestureRecognizer);
+        newElement.GestureRecognizers.Add(rightClickRecognizer);
+    }
+
+    private void ShowContextMenu(object? sender, TappedEventArgs e)
+    {
+        var location = e.GetPosition(designerFrame).Value;
+        // set margin of the context menu to current mouse position
+        contextMenu.Margin = new Thickness(location.X, 20);
+        contextMenu.IsVisible = true;
     }
 
     private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -158,6 +243,10 @@ public partial class Designer : ContentPage
     private void EnableElementForOperations(object? sender, TappedEventArgs e)
     {
         var senderView = sender as View;
+        if(senderView is Layout layout)
+        {
+            senderView = layout.Children.FirstOrDefault(x => x.Frame.Contains(e.GetPosition(senderView).Value)) as View ?? senderView;
+        }
         focusedView = senderView;
         AddBorder(senderView, null);
         PopulatePropertyGridField();
@@ -182,6 +271,13 @@ public partial class Designer : ContentPage
             gradientBorder2.WidthRequest = senderView.Width + scaleY;
             gradientBorder2.Opacity = 1;
             var viewParentMargin = (senderView.Parent as View)?.Margin ?? Thickness.Zero;
+
+            if (senderView.Parent == designerFrame) viewParentMargin = Thickness.Zero;
+            else
+            {
+                viewParentMargin +=  new Thickness(senderView.X, senderView.Y);
+            }
+
             gradientBorder2.Margin = new Thickness(senderView.Margin.Left - scaleX/2 + viewParentMargin.Left, senderView.Margin.Top - scaleY/2 + viewParentMargin.Top);
 
         }catch(Exception)
@@ -270,26 +366,20 @@ public partial class Designer : ContentPage
 
     private void PointerGestureRecognizer_PointerReleased(object sender, PointerEventArgs e)
     {
-        if (focusedView != null && isDragging)
+        if (focusedView != null)
         {
             var location = e.GetPosition(designerFrame).Value;
-            var droppedOnLayout = views.Values.Where(x => x is Layout && x != focusedView).FirstOrDefault(x => x.Frame.Contains(location));
-
-            if (droppedOnLayout is Layout layout)
+            if (isDragging)
             {
-                var margin = focusedView.Margin;
-                var layoutMargin = layout.Margin;
-                if (layout is AbsoluteLayout)
-                {
-                    focusedView.Margin = new Thickness(layoutMargin.Left - margin.Left, layoutMargin.Top - margin.Top, layoutMargin.Right - margin.Right, layoutMargin.Bottom - margin.Bottom);
-                }
-                else
+                var droppedOnLayout = views.Values.Where(x => x is Layout && x != focusedView).FirstOrDefault(x => x.Frame.Contains(location)) ?? designerFrame;
+
+                if (droppedOnLayout != designerFrame)
                 {
                     focusedView.Margin = 0;
                 }
-
-                (focusedView.Parent as Layout).Children.Remove(focusedView);
-                layout.Add(focusedView);
+                
+                (focusedView.Parent as Layout).Remove(focusedView);
+                (droppedOnLayout as Layout).Add(focusedView);
             }
         }
 
@@ -297,6 +387,7 @@ public partial class Designer : ContentPage
         isDragging = false;
         isScaling = false;
         scalerRect = null;
+        contextMenu.IsVisible = false;
     }
 
     private void DragGestureRecognizer_DragStarting(object? sender, DragStartingEventArgs e)
@@ -342,8 +433,8 @@ public partial class Designer : ContentPage
                 CascadeInputTransparent = false,
             };
 
-            grid.Children.Add(label);
-            grid.Children.Add(value);
+            grid.Add(label);
+            grid.Add(value);
 
             grid.SetColumn(label, 0);
             grid.SetColumn(value, 1);
@@ -387,7 +478,7 @@ public partial class Designer : ContentPage
         var xaml = XAMLHolder.Text;
         //xaml = this.RemoveContentPageFromXaml(xaml);
         focusedView = null;
-        foreach(View view in designerFrame.Children.Where(x => x != gradientBorder2 && x is View).ToList())
+        foreach(View view in designerFrame.Where(x => x != gradientBorder2 && x is View).ToList())
         {
             designerFrame.Remove(view);
             views.Remove(view.Id);
@@ -400,19 +491,41 @@ public partial class Designer : ContentPage
         {
             var xamlLoaded = Extensions.LoadFromXaml(newLayout, xaml);
             var loadedLayout = newLayout.Children[0] as AbsoluteLayout;
+            LoadLayoutRecursively(loadedLayout);
 
-            foreach (View loadedView in loadedLayout.Children)
-            {
-                designerFrame.Add(loadedView);
-                views.Add(loadedView.Id, loadedView);
-                AddDesignerGestureControls(loadedView);
-            }
+            AddDirectChildrenOfAbsoluteLayout(loadedLayout);
+
+            designerFrame.Add(contextMenu);
 
             RemoveBorder(sender, null);
         }
-        catch
+        catch(Exception ex)
         {
             Application.Current.MainPage.DisplayAlert("Error", "Invalid XAML", "OK");
+        }
+    }
+
+    private void AddDirectChildrenOfAbsoluteLayout(AbsoluteLayout? loadedLayout)
+    {
+
+        foreach (View loadedView in loadedLayout.Children.Where(x => x is not Microsoft.Maui.Controls.Layout))
+        {
+            designerFrame.Add(loadedView);
+        }
+    }
+
+    private void LoadLayoutRecursively(Layout? loadedLayout)
+    {
+        foreach (View loadedView in loadedLayout.Children)
+        {
+            if(loadedView is Layout internalLayout)
+            {
+                designerFrame.Add(loadedView);
+                LoadLayoutRecursively(internalLayout);
+            }
+
+            views.Add(loadedView.Id, loadedView);
+            AddDesignerGestureControls(loadedView);
         }
     }
 }

@@ -27,7 +27,7 @@
             </ScrollView>
         </Border>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1" Grid.Row="0">
-            <AbsoluteLayout x:Name="gradientBorder2">
+            <AbsoluteLayout x:Name="gradientBorder2" >
                 <!-- Frame in the center -->
                 <Border Stroke="#C49B33"
                 StrokeThickness="4"

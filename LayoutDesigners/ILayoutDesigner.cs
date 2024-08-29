@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace MAUIDesigner.LayoutDesigners
 {
-    class AbsoluteLayoutDesigner : ILayoutDesigner
+    public interface ILayoutDesigner
     {
+
     }
 }

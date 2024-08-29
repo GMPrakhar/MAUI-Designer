@@ -1,4 +1,5 @@
 ﻿
+using MAUIDesigner.LayoutDesigners;
 using Microsoft.Extensions.Logging;
 
 namespace MAUIDesigner
@@ -19,6 +20,9 @@ namespace MAUIDesigner
 #if DEBUG
     		builder.Logging.AddDebug();
 #endif
+
+            builder.Services.AddKeyedSingleton<ILayoutDesigner, GridLayoutDesigner>(typeof(Grid));
+            builder.Services.AddKeyedSingleton<ILayoutDesigner, AbsoluteLayoutDesigner>(typeof(AbsoluteLayout));
 
 
             return builder.Build();

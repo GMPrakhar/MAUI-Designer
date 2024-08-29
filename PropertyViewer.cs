@@ -4,9 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MAUIDesigner.LayoutDesigners
+namespace MAUIDesigner
 {
-    class AbsoluteLayoutDesigner : ILayoutDesigner
+    public class PropertyViewer
     {
+        public View View { get; set; } 
     }
 }
