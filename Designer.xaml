@@ -2,9 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MAUIDesigner.Designer"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              Title="Designer">
 
-    <Grid VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand">
+    <Grid VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" x:Name="MainGrid">
+        <Grid.GestureRecognizers>
+            <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_Drop"/>
+            <PointerGestureRecognizer PointerMoved="GridPointerMoved"/>
+        </Grid.GestureRecognizers>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="150"/>
             <ColumnDefinition Width="*" />
@@ -14,17 +19,29 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="150"/>
         </Grid.RowDefinitions>
-        <Border
+        <Border Grid.Row="0"
                 StrokeThickness="2"
                 AbsoluteLayout.LayoutBounds="0, 0, 1, 1"
                 AbsoluteLayout.LayoutFlags="All"
                 >
-            <ScrollView Grid.Row="0">
-                <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
-                    <Button Text="Generate XAML" Clicked="GenerateXamlForTheView" HeightRequest="30" Margin="2"/>
-                    <Button Text="Load from XAML" Clicked="LoadViewFromXaml" Margin="2"/>
-                </VerticalStackLayout>
-            </ScrollView>
+            <Grid x:Name="ToolBoxFrame">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="5"/>
+                </Grid.ColumnDefinitions>
+                <ScrollView Grid.Column="0">
+                    <VerticalStackLayout x:Name="Toolbox" Grid.Column="0">
+                        <Button Text="Generate XAML" Clicked="GenerateXamlForTheView" HeightRequest="30" Margin="2"/>
+                        <Button Text="Load from XAML" Clicked="LoadViewFromXaml" Margin="2"/>
+                    </VerticalStackLayout>
+                </ScrollView>
+                <BoxView BackgroundColor="Gray" Grid.Column="1" x:Name="TabDraggerLeft">
+                    <BoxView.GestureRecognizers>
+                        <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
+                        <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
+                    </BoxView.GestureRecognizers>
+                </BoxView>
+            </Grid>
         </Border>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1" Grid.Row="0">
             <AbsoluteLayout x:Name="gradientBorder2" >
@@ -76,12 +93,37 @@
             </AbsoluteLayout.GestureRecognizers>
 
         </AbsoluteLayout>
-        <ScrollView Grid.Column="2" Grid.Row="0">
-            <VerticalStackLayout x:Name="Properties">
-            </VerticalStackLayout>
-        </ScrollView>
-        <ScrollView Grid.Row="1" Grid.ColumnSpan="3">
-            <Editor x:Name="XAMLHolder" MaximumHeightRequest="150"/>
-        </ScrollView>
+        <Grid  Grid.Column="2" Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="5"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <BoxView BackgroundColor="Gray" Grid.Column="0" x:Name="TabDraggerRight">
+                <BoxView.GestureRecognizers>
+                    <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
+                    <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
+                </BoxView.GestureRecognizers>
+            </BoxView>
+            <ScrollView Grid.Column="1">
+            
+                <VerticalStackLayout x:Name="Properties"  Grid.Column="1">
+                </VerticalStackLayout>
+            </ScrollView>
+        </Grid>
+        <Grid Grid.Row="1" Grid.ColumnSpan="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="5"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <BoxView BackgroundColor="Gray" Grid.Row="0" x:Name="TabDraggerBottom">
+                <BoxView.GestureRecognizers>
+                    <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
+                    <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
+                </BoxView.GestureRecognizers>
+            </BoxView>
+            <ScrollView Grid.Row="1">
+                <Editor x:Name="XAMLHolder" MinimumHeightRequest="150"/>
+            </ScrollView>
+        </Grid>
     </Grid>
 </ContentPage>

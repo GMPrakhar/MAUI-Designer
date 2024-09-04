@@ -7,6 +7,8 @@ using Microsoft.Maui.Controls.Shapes;
 using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
 using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
+using Inputs = Microsoft.UI.Input;
+using Xamls = Microsoft.UI.Xaml;
 namespace MAUIDesigner;
 
 public partial class Designer : ContentPage
@@ -20,6 +22,7 @@ public partial class Designer : ContentPage
     private IList<View> nonTappableViews = new ObservableCollection<View>();
     private IDictionary<Guid, View> views = new Dictionary<Guid, View>();
     private SortedDictionary<string, Grid>? PropertiesForFocusedView;
+    private View? MenuDraggerView = null;
     private ICollection<string> GuiUpdatableProperties = new [] { "Margin", "HeightRequest", "WidthRequest" };
     private ContextMenu contextMenu = new ContextMenu()
     {
@@ -31,6 +34,7 @@ public partial class Designer : ContentPage
 	{
 		InitializeComponent();
         UpdateContextMenuWithRandomProperties();
+        
         contextMenu.UpdateCollectionView();
 
         var allVisualElements = ToolBox.GetAllVisualElementsAlongWithType();
@@ -332,6 +336,11 @@ public partial class Designer : ContentPage
         UpdatePropertyForFocusedView("Margin", new Thickness(location.X, location.Y, location.X + focusedView.WidthRequest, location.Y + focusedView.HeightRequest));
     }
 
+    private void GridPointerMoved(object sender, PointerEventArgs e)
+    {
+
+    }
+
     private async void PointerGestureRecognizer_PointerPressed(object sender, PointerEventArgs e)
     {
         var location = e.GetPosition(gradientBorder2).Value;
@@ -527,5 +536,43 @@ public partial class Designer : ContentPage
             views.Add(loadedView.Id, loadedView);
             AddDesignerGestureControls(loadedView);
         }
+    }
+
+    private void DragGestureRecognizer_DragStarting_1(object sender, DragStartingEventArgs e)
+    {
+        MenuDraggerView = (sender as GestureRecognizer).Parent as View;
+    }
+
+    private void DropGestureRecognizer_Drop(object sender, DropEventArgs e)
+    {
+        var pointerPosition = e.GetPosition(MainGrid).Value;
+
+        if (MenuDraggerView == TabDraggerLeft)
+        {
+            //(TabDragger.Parent as Layout).WidthRequest = pointerPosition.X;
+            MainGrid.ColumnDefinitions.First().Width = pointerPosition.X;
+        }
+        else if (MenuDraggerView == TabDraggerRight)
+        {
+            //(TabDragger.Parent as Layout).WidthRequest = pointerPosition.X;
+            MainGrid.ColumnDefinitions.Last().Width = MainGrid.Width - pointerPosition.X;
+        }
+        else if (MenuDraggerView == TabDraggerBottom)
+        {
+            //(TabDragger.Parent as Layout).WidthRequest = pointerPosition.X;
+            MainGrid.RowDefinitions.Last().Height = MainGrid.Height - pointerPosition.Y;
+        }
+
+        MenuDraggerView = null;
+    }
+
+    private void TabDraggerEntered(object sender, PointerEventArgs e)
+    {
+        ((sender as View).Handler.PlatformView as Xamls.UIElement).ChangeCursor(Inputs.InputSystemCursor.Create(Inputs.InputSystemCursorShape.SizeAll));
+    }
+
+    private void TabDraggerExited(object sender, PointerEventArgs e)
+    {
+        ((sender as View).Handler.PlatformView as Xamls.UIElement).ChangeCursor(Inputs.InputSystemCursor.Create(Inputs.InputSystemCursorShape.UpArrow));
     }
 }
