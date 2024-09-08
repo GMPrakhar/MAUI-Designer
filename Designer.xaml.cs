@@ -47,7 +47,7 @@ public partial class Designer : ContentPage
             {
                 Text = viewType.ToString(),
                 FontSize = 10,
-                Margin = new Thickness(10),
+                Margin = new Thickness(0,10),
                 HorizontalOptions = LayoutOptions.Start,
                 FontAttributes = FontAttributes.Bold,
             };
@@ -55,16 +55,24 @@ public partial class Designer : ContentPage
 
             foreach (var view in viewsForType)
             {
+                var tmpGrid = new Grid()
+                {
+                    RowDefinitions = new RowDefinitionCollection { new RowDefinition() { Height = new GridLength(1, GridUnitType.Star) } },
+                    ColumnDefinitions = new ColumnDefinitionCollection { new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) } },
+                    HorizontalOptions = LayoutOptions.Start
+                };
+
                 var labelView = new Button
                 {
                     Text = view.Item1,
                     FontSize = 10,
                     TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
-                    BackgroundColor = Color.FromRgba(0,0,0,0),
-                    Padding = new Thickness(0),
-                    Margin = new Thickness(0),
-                    HorizontalOptions = LayoutOptions.CenterAndExpand,
+                    BackgroundColor = Color.FromRgba(0,0,0,0)
                 };
+
+                tmpGrid.Add(labelView);
+
+                tmpGrid.SetColumn(labelView, 0);
 
                 var gestureRecognizer = new TapGestureRecognizer();
                 gestureRecognizer.Tapped += CreateElementInDesignerFrame;
@@ -74,12 +82,13 @@ public partial class Designer : ContentPage
                 labelView.GestureRecognizers.Add(gestureRecognizer);
                 labelView.GestureRecognizers.Add(pointerGestureRecognizer);
 
-                Toolbox.Children.Add(labelView);
+                Toolbox.Children.Add(tmpGrid);
             }
         }
 
         XAMLHolder.Text = defaultXaml;
         this.LoadViewFromXaml(XAMLHolder, null);
+        //PropertiesFrame.IsVisible = false;
     }
 
     private void UpdateContextMenuWithRandomProperties()
@@ -172,6 +181,7 @@ public partial class Designer : ContentPage
 
         if (focusedView != null)
         {
+            PropertiesFrame.IsVisible = true;
             AddBorder(focusedView, null);
             PopulatePropertyGridField();
             UpdateActualPropertyView();
@@ -426,7 +436,9 @@ public partial class Designer : ContentPage
             {
                 Text = property.Key,
                 FontSize = 10,
+                VerticalTextAlignment = TextAlignment.Center,
             };
+
             var value = property.Value;
             // Put the label and value in a grid layout
             var grid = new Grid()
@@ -436,17 +448,22 @@ public partial class Designer : ContentPage
                     new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) },
                     new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) }
                 },
-                HeightRequest = 30,
-                Margin = new Thickness(0, 0, 0, 10),
+                Padding = 8,
                 InputTransparent = true,
                 CascadeInputTransparent = false,
+
             };
+
+            grid.VerticalOptions = LayoutOptions.Start;
 
             grid.Add(label);
             grid.Add(value);
 
             grid.SetColumn(label, 0);
             grid.SetColumn(value, 1);
+
+            grid.SetRow(label, 0);
+            grid.SetRow(value, 0);
 
             gridList[property.Key] = grid;
         }
@@ -480,6 +497,7 @@ public partial class Designer : ContentPage
             right.Text = thickness.Right.ToString();
             bottom.Text = thickness.Bottom.ToString();
         }
+        Properties.IsVisible = true;
     }
 
     private void LoadViewFromXaml(object sender, EventArgs e)

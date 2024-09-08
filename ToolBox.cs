@@ -15,7 +15,7 @@ namespace MAUIDesigner
         {
             var visualElements = typeof(Microsoft.Maui.Controls.View).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) && !t.IsAbstract);
             var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type)>>();
-            Parallel.ForEach(visualElements, visualElement =>
+            foreach(var visualElement in visualElements)
             {
                 var viewType = GetViewTypeForType(visualElement);
                 if (!visualElementsWithType.ContainsKey(viewType))
@@ -24,7 +24,7 @@ namespace MAUIDesigner
                 }
 
                 visualElementsWithType[viewType].Add((visualElement.Name, visualElement));
-            });
+            }
             return visualElementsWithType;
         }
 
@@ -52,8 +52,12 @@ namespace MAUIDesigner
             {
                 var editor = new Entry
                 {
-                    Text = value?.ToString() ?? "0"
+                    Text = value?.ToString() ?? "0",
+                    FontSize = 10,
+                    VerticalOptions = LayoutOptions.Center,
                 };
+
+                editor.HeightRequest = 10;
 
                 editor.TextChanged += (s, e) =>
                 {
@@ -101,18 +105,18 @@ namespace MAUIDesigner
                     CascadeInputTransparent = false,
                 };
 
-                var red = new Entry();
-                var green = new Entry();
-                var blue = new Entry();
-                var alpha = new Entry();
+                var red = new Entry() { HeightRequest = 10, FontSize = 10 };
+                var green = new Entry() { HeightRequest = 10, FontSize = 10 };
+                var blue = new Entry() { HeightRequest = 10, FontSize = 10 };
+                var alpha = new Entry() { HeightRequest = 10, FontSize = 10 };
 
                 if (value.GetType() == typeof(Color))
                 {
-                    var color = (Color)value;
-                    red.Text = color.Red.ToString();
-                    green.Text = color.Green.ToString();
-                    blue.Text = color.Blue.ToString();
-                    alpha.Text = color.Alpha.ToString();
+                    ((Color)value).ToRgba(out var r,out var g,out var b,out var a);
+                    red.Text = r.ToString();
+                    green.Text = g.ToString();
+                    blue.Text = b.ToString();
+                    alpha.Text = a.ToString();
                 }
                 else
                 {
@@ -164,7 +168,8 @@ namespace MAUIDesigner
             }
             var label = new Label
             {
-                Text = value.ToString()
+                Text = value.ToString(),
+                FontSize = 10,
             };
 
             return label;
