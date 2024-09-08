@@ -13,14 +13,8 @@ A small project to be able to preview XAML changes into MAUI view, and later add
 ## Current UI
 ![image](https://github.com/user-attachments/assets/5e728838-6d0c-4648-b13e-f09e748ae886)
 
-## Renderer
-![image](https://github.com/user-attachments/assets/7aabe77f-8bfa-48b0-be58-150e8c352018)
-
 ## Designer
 ![image](https://github.com/user-attachments/assets/f8c0437b-0be7-483f-8f2d-1ed8a4c42322)
-
-## Property View
-![image](https://github.com/user-attachments/assets/73c3a71d-4521-4d57-8b0b-1430ecb752f7)
 
 ## XAML Generator
 ![image](https://github.com/user-attachments/assets/64cbd604-ce17-4ead-868e-8b3398878ab6)
