@@ -10,6 +10,9 @@ A small project to be able to preview XAML changes into MAUI view, and later add
 - Properties menu for selected element so that the properties can be updated and applied directly to the view, including color, margin, padding and text/font manipulations.
 - Generate XAML from the design, and load design from XAML. Currently only supports Absolute Layout as the base element ( after ContentPage ).
 
+# Current UI
+![image](https://github.com/user-attachments/assets/5e728838-6d0c-4648-b13e-f09e748ae886)
+
 ## Renderer
 ![image](https://github.com/user-attachments/assets/7aabe77f-8bfa-48b0-be58-150e8c352018)
 
