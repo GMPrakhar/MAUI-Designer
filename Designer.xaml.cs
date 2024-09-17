@@ -162,7 +162,11 @@ public partial class Designer : ContentPage
     {
         if (focusedView != null && focusedView.Parent is Layout parentLayout)
         {
+            
+            Button button = sender as Button;
+            button.BackgroundColor = Colors.Gray;
             //parentLayout.LowerChild(focusedView);
+            contextMenu.Close();
             Debug.WriteLine("DetachFromparent: Detached Focused view Parent");
         }
         else
@@ -175,7 +179,10 @@ public partial class Designer : ContentPage
     {
         if (focusedView != null && focusedView.Parent is Layout parentLayout)
         {
+            Button button = sender as Button;
+            button.BackgroundColor = Colors.Gray;
             //parentLayout.LowerChild(focusedView);
+            contextMenu.Close();
             Debug.WriteLine("LockInPlace: Locked View in place");
         }
         else
@@ -188,7 +195,10 @@ public partial class Designer : ContentPage
     {
         if (focusedView != null && focusedView.Parent is Layout parentLayout)
         {
+            Button button = sender as Button;
+            button.BackgroundColor = Colors.Gray;
             //parentLayout.LowerChild(focusedView);
+            contextMenu.Close();
             Debug.WriteLine("BringToFrontButton: Moved the focused view to the Front.");
         }
         else
@@ -201,7 +211,10 @@ public partial class Designer : ContentPage
     {
         if (focusedView != null && focusedView.Parent is Layout parentLayout)
         {
+            Button button = sender as Button;
+            button.BackgroundColor = Colors.Gray;
             //parentLayout.LowerChild(focusedView);
+            contextMenu.Close();
             Debug.WriteLine("SendToBack: Moved the focused view to the back.");
         }
         else

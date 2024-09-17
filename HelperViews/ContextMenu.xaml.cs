@@ -14,4 +14,9 @@ public partial class ContextMenu : ContentView
     {
         PropertySource.ItemsSource = ActionList;
     }
+
+    public void Close()
+    {
+        this.IsVisible = false;
+    }
 }
