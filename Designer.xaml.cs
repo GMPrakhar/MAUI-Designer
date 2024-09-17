@@ -10,6 +10,7 @@ using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
 using Inputs = Microsoft.UI.Input;
 using Xamls = Microsoft.UI.Xaml;
 namespace MAUIDesigner;
+using System.Diagnostics;
 
 public partial class Designer : ContentPage
 {
@@ -98,62 +99,114 @@ public partial class Designer : ContentPage
         hoverRecognizer.PointerEntered += (s, e) => (s as View).BackgroundColor = Colors.DarkGray.WithLuminosity(0.2f);
         hoverRecognizer.PointerExited += (s, e) => (s as View).BackgroundColor = Colors.Black;
 
-        contextMenu.ActionList.Add(new PropertyViewer()
+
+        var sendToBackButton = new Button()
         {
-            View = new Button()
-            {
-                Text = "Send to Back ( Disabled )",
-                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-                CornerRadius = 0,
-                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-                Padding = new Thickness(5, 0),
-                Margin = new Thickness(0, 0),
-                FontSize = 10
-            }
-        });
-        contextMenu.ActionList.Add(new PropertyViewer()
+            Text = "Send to Back",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        sendToBackButton.Clicked += SendToBackButton_Clicked;
+        contextMenu.ActionList.Add(new PropertyViewer(){ View = sendToBackButton });
+
+        var bringToFrontButton = new Button()
         {
-            View = new Button()
-            {
-                Text = "Bring to Front ( Disabled )",
-                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-                CornerRadius = 0,
-                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-                Padding = new Thickness(5, 0),
-                Margin = new Thickness(0, 0),
-                FontSize = 10
-            }
-        });
-        contextMenu.ActionList.Add(new PropertyViewer()
+            Text = "Bring to Front",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        bringToFrontButton.Clicked += BringToFrontButton_Clicked;
+        contextMenu.ActionList.Add(new PropertyViewer() { View = bringToFrontButton });
+
+        var lockInPlace = new Button()
         {
-            View = new Button()
-            {
-                Text = "Lock in place ( Disabled )",
-                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-                CornerRadius = 0,
-                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-                Padding = new Thickness(5, 0),
-                Margin = new Thickness(0, 0),
-                FontSize = 10
-            }
-        });
-        contextMenu.ActionList.Add(new PropertyViewer()
+            Text = "Lock in place",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        lockInPlace.Clicked += LockInPlace_Clicked;
+        contextMenu.ActionList.Add(new PropertyViewer() { View = lockInPlace });
+
+        var detachFromParent = new Button()
         {
-            View = new Button()
-            {
-                Text = "Detach from parent ( Disabled )",
-                TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-                CornerRadius = 0,
-                BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-                Padding = new Thickness(5, 0),
-                Margin = new Thickness(0,0),
-                FontSize = 10
-            }
-        });
+            Text = "Detach from parent",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        detachFromParent.Clicked += DetachFromParent_Clicked;
+        contextMenu.ActionList.Add(new PropertyViewer() { View = detachFromParent });
 
         foreach(var x in contextMenu.ActionList)
         {
             x.View.GestureRecognizers.Add(hoverRecognizer);
+        }
+    }
+
+    private void DetachFromParent_Clicked(object? sender, EventArgs e)
+    {
+        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        {
+            //parentLayout.LowerChild(focusedView);
+            Debug.WriteLine("DetachFromparent: Detached Focused view Parent");
+        }
+        else
+        {
+            Debug.WriteLine("DetachFromParent: No focused view or parent layout found.");
+        }
+    }
+
+    private void LockInPlace_Clicked(object? sender, EventArgs e)
+    {
+        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        {
+            //parentLayout.LowerChild(focusedView);
+            Debug.WriteLine("LockInPlace: Locked View in place");
+        }
+        else
+        {
+            Debug.WriteLine("LockInPlace: No focused view or parent layout found.");
+        }
+    }
+
+    private void BringToFrontButton_Clicked(object? sender, EventArgs e)
+    {
+        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        {
+            //parentLayout.LowerChild(focusedView);
+            Debug.WriteLine("BringToFrontButton: Moved the focused view to the Front.");
+        }
+        else
+        {
+            Debug.WriteLine("BringToFrontButton: No focused view or parent layout found.");
+        }
+    }
+
+    private void SendToBackButton_Clicked(object? sender, EventArgs e)
+    {
+        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        {
+            //parentLayout.LowerChild(focusedView);
+            Debug.WriteLine("SendToBack: Moved the focused view to the back.");
+        }
+        else
+        {
+            Debug.WriteLine("SendToBack: No focused view or parent layout found.");
         }
     }
 
