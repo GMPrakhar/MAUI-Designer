@@ -34,7 +34,7 @@ public partial class Designer : ContentPage
     public Designer()
 	{
 		InitializeComponent();
-        UpdateContextMenuWithRandomProperties();
+        //UpdateContextMenuWithRandomProperties();
         
         contextMenu.UpdateCollectionView();
 
@@ -92,7 +92,7 @@ public partial class Designer : ContentPage
         //PropertiesFrame.IsVisible = false;
     }
 
-    private void UpdateContextMenuWithRandomProperties()
+    private void UpdateContextMenuWithRandomProperties(View targetElement)
     {
         contextMenu.ActionList.Clear();
         var hoverRecognizer = new PointerGestureRecognizer();
@@ -110,7 +110,7 @@ public partial class Designer : ContentPage
             Margin = new Thickness(0, 0),
             FontSize = 10
         };
-        sendToBackButton.Clicked += SendToBackButton_Clicked;
+        sendToBackButton.Clicked += (s, e) => SendToBackButton_Clicked(targetElement, e);
         contextMenu.ActionList.Add(new PropertyViewer(){ View = sendToBackButton });
 
         var bringToFrontButton = new Button()
@@ -123,7 +123,7 @@ public partial class Designer : ContentPage
             Margin = new Thickness(0, 0),
             FontSize = 10
         };
-        bringToFrontButton.Clicked += BringToFrontButton_Clicked;
+        bringToFrontButton.Clicked += (s, e) => BringToFrontButton_Clicked(targetElement, e);
         contextMenu.ActionList.Add(new PropertyViewer() { View = bringToFrontButton });
 
         var lockInPlace = new Button()
@@ -136,7 +136,7 @@ public partial class Designer : ContentPage
             Margin = new Thickness(0, 0),
             FontSize = 10
         };
-        lockInPlace.Clicked += LockInPlace_Clicked;
+        lockInPlace.Clicked += (s, e) => LockInPlace_Clicked(targetElement, e);
         contextMenu.ActionList.Add(new PropertyViewer() { View = lockInPlace });
 
         var detachFromParent = new Button()
@@ -149,7 +149,7 @@ public partial class Designer : ContentPage
             Margin = new Thickness(0, 0),
             FontSize = 10
         };
-        detachFromParent.Clicked += DetachFromParent_Clicked;
+        detachFromParent.Clicked += (s, e) => DetachFromParent_Clicked(targetElement, e);
         contextMenu.ActionList.Add(new PropertyViewer() { View = detachFromParent });
 
         foreach(var x in contextMenu.ActionList)
@@ -158,68 +158,53 @@ public partial class Designer : ContentPage
         }
     }
 
-    private void DetachFromParent_Clicked(object? sender, EventArgs e)
+    private void DetachFromParent_Clicked(View targetElement, EventArgs e)
     {
-        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        if (targetElement?.Parent is Layout parentLayout)
         {
-            
-            Button button = sender as Button;
-            button.BackgroundColor = Colors.Gray;
-            //parentLayout.LowerChild(focusedView);
+            // Remove the target element from its parent
+            parentLayout.Children.Remove(targetElement);
             contextMenu.Close();
             Debug.WriteLine("DetachFromparent: Detached Focused view Parent");
         }
-        else
-        {
-            Debug.WriteLine("DetachFromParent: No focused view or parent layout found.");
-        }
     }
 
-    private void LockInPlace_Clicked(object? sender, EventArgs e)
+    private void LockInPlace_Clicked(View targetElement, EventArgs e)
     {
-        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        if (targetElement != null)
         {
-            Button button = sender as Button;
-            button.BackgroundColor = Colors.Gray;
-            //parentLayout.LowerChild(focusedView);
+            // Disable all gesture recognizers to lock the element in place
+            //targetElement.GestureRecognizers.Clear();
             contextMenu.Close();
             Debug.WriteLine("LockInPlace: Locked View in place");
         }
-        else
-        {
-            Debug.WriteLine("LockInPlace: No focused view or parent layout found.");
-        }
     }
 
-    private void BringToFrontButton_Clicked(object? sender, EventArgs e)
+    private void BringToFrontButton_Clicked(View targetElement, EventArgs e)
     {
-        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        if (targetElement?.Parent is Layout parentLayout)
         {
-            Button button = sender as Button;
-            button.BackgroundColor = Colors.Gray;
-            //parentLayout.LowerChild(focusedView);
+            // Remove the target element from its parent
+            parentLayout.Children.Remove(targetElement);
+
+            // Add the target element at the end of the parent's children collection
+            parentLayout.Children.Add(targetElement);
             contextMenu.Close();
             Debug.WriteLine("BringToFrontButton: Moved the focused view to the Front.");
         }
-        else
-        {
-            Debug.WriteLine("BringToFrontButton: No focused view or parent layout found.");
-        }
     }
 
-    private void SendToBackButton_Clicked(object? sender, EventArgs e)
+    private void SendToBackButton_Clicked(View targetElement, EventArgs e)
     {
-        if (focusedView != null && focusedView.Parent is Layout parentLayout)
+        if (targetElement?.Parent is Layout parentLayout)
         {
-            Button button = sender as Button;
-            button.BackgroundColor = Colors.Gray;
-            //parentLayout.LowerChild(focusedView);
+            // Remove the target element from its parent
+            parentLayout.Children.Remove(targetElement);
+
+            // Insert the target element at the beginning of the parent's children collection
+            parentLayout.Children.Insert(0, targetElement);
             contextMenu.Close();
             Debug.WriteLine("SendToBack: Moved the focused view to the back.");
-        }
-        else
-        {
-            Debug.WriteLine("SendToBack: No focused view or parent layout found.");
         }
     }
 
@@ -308,6 +293,11 @@ public partial class Designer : ContentPage
         // set margin of the context menu to current mouse position
         contextMenu.Margin = new Thickness(location.X, 20);
         contextMenu.IsVisible = true;
+        if (sender is View targetElement)
+        {
+            UpdateContextMenuWithRandomProperties(targetElement);
+        }
+        
     }
 
     private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
