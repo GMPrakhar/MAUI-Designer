@@ -90,8 +90,22 @@
 
     <Style TargetType="Rectangle">
         <Setter Property="Fill" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}"/>
+        <Setter Property="MinimumHeightRequest" Value="44"/>
+        <Setter Property="MinimumWidthRequest" Value="88"/>
     </Style>
-    
+
+    <Style TargetType="RoundRectangle">
+        <Setter Property="Fill" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}"/>
+    </Style>
+
+    <Style TargetType="Ellipse">
+        <Setter Property="Fill" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}"/>
+    </Style>
+
+    <Style TargetType="Line">
+        <Setter Property="Fill" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}"/>
+    </Style>
+
     <Style TargetType="Editor">
         <Setter Property="TextColor" Value="{AppThemeBinding Light={StaticResource Black}, Dark={StaticResource White}}" />
         <Setter Property="BackgroundColor" Value="Transparent" />
