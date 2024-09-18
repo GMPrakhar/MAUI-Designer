@@ -87,37 +87,6 @@ namespace MAUIDesigner
         }
     }
 
-    internal class ActivityIndicatorFactory : ElementFactory
-    {
-        public override View CreateElement()
-        {
-            return Activator.CreateInstance(typeof(ActivityIndicator)) as View;
-        }
-    }
-
-    internal class IndicatorViewFactory : ElementFactory
-    {
-        public override View CreateElement()
-        {
-            return Activator.CreateInstance(typeof(IndicatorView)) as View;
-        }
-    }
-
-    internal class BorderFactory : ElementFactory
-    {
-        public override View CreateElement()
-        {
-            return Activator.CreateInstance(typeof(Border)) as View;
-        }
-    }
-
-    internal class BoxViewFactory : ElementFactory
-    {
-        public override View CreateElement()
-        {
-            return Activator.CreateInstance(typeof(BoxView)) as View;
-        }
-    }
 
     internal class ButtonFactory : ElementFactory
     {
@@ -130,23 +99,6 @@ namespace MAUIDesigner
                 MinimumWidthRequest = 44,
                 Text = "Click me!"
             };
-        }
-    }
-
-    internal class CheckBoxFactory : ElementFactory
-    {
-        public override View CreateElement()
-        {
-            return Activator.CreateInstance(typeof(CheckBox)) as View;
-
-        }
-    }
-
-    internal class DatePickerFactory : ElementFactory
-    {
-        public override View CreateElement()
-        {
-            return Activator.CreateInstance(typeof(DatePicker)) as View;
         }
     }
 
@@ -226,13 +178,7 @@ namespace MAUIDesigner
             { nameof(StackLayout), new LayoutFactory() },
             { nameof(Rectangle), new RectangleFactory() },
             { nameof(RoundRectangle), new RoundRectangleFactory() },
-            { nameof(ActivityIndicator), new ActivityIndicatorFactory() },
-            { nameof(IndicatorView), new IndicatorViewFactory() },
-            { nameof(Border), new BorderFactory() },
-            { nameof(BoxView), new BoxViewFactory() },
             { nameof(Button), new ButtonFactory() },
-            { nameof(CheckBox), new CheckBoxFactory() },
-            { nameof(DatePicker), new DatePickerFactory() },
             { nameof(Ellipse), new EllipseFactory() },
             { nameof(Line), new LineFactory() },
             { nameof(Entry), new EntryFactory() },
@@ -247,7 +193,9 @@ namespace MAUIDesigner
                 return factory.CreateElement();
             }
 
-            throw new ArgumentException($"Element type '{elementTypeName}' is not supported.");
+            var elementType = typeof(View).Assembly.GetTypes().FirstOrDefault(t => t.Name == elementTypeName);
+            var newElement = Activator.CreateInstance(elementType) as View;
+            return newElement;
         }
     }
 }
