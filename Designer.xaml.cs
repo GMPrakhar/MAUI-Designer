@@ -92,17 +92,30 @@ public partial class Designer : ContentPage
         //PropertiesFrame.IsVisible = false;
     }
 
-    private void UpdateContextMenuWithRandomProperties(View targetElement)
+    private PointerGestureRecognizer CreateHoverRecognizer()
     {
-        contextMenu.ActionList.Clear();
         var hoverRecognizer = new PointerGestureRecognizer();
         hoverRecognizer.PointerEntered += (s, e) => (s as View).BackgroundColor = Colors.DarkGray.WithLuminosity(0.2f);
         hoverRecognizer.PointerExited += (s, e) => (s as View).BackgroundColor = Colors.Black;
+        return hoverRecognizer;
+    }
 
+    private void UpdateContextMenuWithRandomProperties(View targetElement)
+    {
+        contextMenu.ActionList.Clear();
+        var hoverRecognizer = CreateHoverRecognizer();
 
-        var sendToBackButton = new Button()
+        AddContextMenuButton("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton_Clicked(targetElement,contextMenu, e), hoverRecognizer);
+        AddContextMenuButton("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton_Clicked(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuButton("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace_Clicked(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuButton("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e), hoverRecognizer);
+    }
+
+    private void AddContextMenuButton(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
+    {
+        var button = new Button()
         {
-            Text = "Send to Back",
+            Text = text,
             TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
             CornerRadius = 0,
             BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
@@ -110,102 +123,9 @@ public partial class Designer : ContentPage
             Margin = new Thickness(0, 0),
             FontSize = 10
         };
-        sendToBackButton.Clicked += (s, e) => SendToBackButton_Clicked(targetElement, e);
-        contextMenu.ActionList.Add(new PropertyViewer(){ View = sendToBackButton });
-
-        var bringToFrontButton = new Button()
-        {
-            Text = "Bring to Front",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        bringToFrontButton.Clicked += (s, e) => BringToFrontButton_Clicked(targetElement, e);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = bringToFrontButton });
-
-        var lockInPlace = new Button()
-        {
-            Text = "Lock in place",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        lockInPlace.Clicked += (s, e) => LockInPlace_Clicked(targetElement, e);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = lockInPlace });
-
-        var detachFromParent = new Button()
-        {
-            Text = "Detach from parent",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        detachFromParent.Clicked += (s, e) => DetachFromParent_Clicked(targetElement, e);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = detachFromParent });
-
-        foreach(var x in contextMenu.ActionList)
-        {
-            x.View.GestureRecognizers.Add(hoverRecognizer);
-        }
-    }
-
-    private void DetachFromParent_Clicked(View targetElement, EventArgs e)
-    {
-        if (targetElement?.Parent is Layout parentLayout)
-        {
-            // Remove the target element from its parent
-            parentLayout.Children.Remove(targetElement);
-            contextMenu.Close();
-            Debug.WriteLine("DetachFromparent: Detached Focused view Parent");
-        }
-    }
-
-    private void LockInPlace_Clicked(View targetElement, EventArgs e)
-    {
-        if (targetElement != null)
-        {
-            // Disable all gesture recognizers to lock the element in place
-            //targetElement.GestureRecognizers.Clear();
-            contextMenu.Close();
-            Debug.WriteLine("LockInPlace: Locked View in place");
-        }
-    }
-
-    private void BringToFrontButton_Clicked(View targetElement, EventArgs e)
-    {
-        if (targetElement?.Parent is Layout parentLayout)
-        {
-            // Remove the target element from its parent
-            parentLayout.Children.Remove(targetElement);
-
-            // Add the target element at the end of the parent's children collection
-            parentLayout.Children.Add(targetElement);
-            contextMenu.Close();
-            Debug.WriteLine("BringToFrontButton: Moved the focused view to the Front.");
-        }
-    }
-
-    private void SendToBackButton_Clicked(View targetElement, EventArgs e)
-    {
-        if (targetElement?.Parent is Layout parentLayout)
-        {
-            // Remove the target element from its parent
-            parentLayout.Children.Remove(targetElement);
-
-            // Insert the target element at the beginning of the parent's children collection
-            parentLayout.Children.Insert(0, targetElement);
-            contextMenu.Close();
-            Debug.WriteLine("SendToBack: Moved the focused view to the back.");
-        }
+        button.Clicked += (s, e) => clickHandler(targetElement, e);
+        button.GestureRecognizers.Add(hoverRecognizer);
+        contextMenu.ActionList.Add(new PropertyViewer() { View = button });
     }
 
     private void RaiseLabel(object? sender, PointerEventArgs e)
