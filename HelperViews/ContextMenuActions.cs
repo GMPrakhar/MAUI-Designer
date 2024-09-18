@@ -9,12 +9,13 @@ namespace MAUIDesigner.HelperViews
 {
     internal static class ContextMenuActions
     {
-        public static void DetachFromParent_Clicked(View targetElement, ContextMenu contextMenu, EventArgs e)
+        public static void DetachFromParent_Clicked(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
         {
             if (targetElement?.Parent is Layout parentLayout)
             {
                 // Remove the target element from its parent
                 parentLayout.Children.Remove(targetElement);
+                designerFrame.Children.Add(targetElement);
                 contextMenu.Close();
                 Debug.WriteLine("DetachFromparent: Detached Focused view Parent");
             }

@@ -108,7 +108,7 @@ public partial class Designer : ContentPage
         AddContextMenuButton("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton_Clicked(targetElement,contextMenu, e), hoverRecognizer);
         AddContextMenuButton("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton_Clicked(targetElement, contextMenu, e), hoverRecognizer);
         AddContextMenuButton("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace_Clicked(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuButton("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuButton("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
     }
 
     private void AddContextMenuButton(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
