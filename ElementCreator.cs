@@ -91,13 +91,7 @@ namespace MAUIDesigner
     {
         public override View CreateElement()
         {
-            return new ActivityIndicator
-            {
-                Margin = new Thickness(20),
-                MinimumHeightRequest = 20,
-                MinimumWidthRequest = 20,
-                IsRunning = true
-            };
+            return Activator.CreateInstance(typeof(ActivityIndicator)) as View;
         }
     }
 
@@ -105,12 +99,7 @@ namespace MAUIDesigner
     {
         public override View CreateElement()
         {
-            return new IndicatorView
-            {
-                Margin = new Thickness(20),
-                MinimumHeightRequest = 20,
-                MinimumWidthRequest = 20
-            };
+            return Activator.CreateInstance(typeof(IndicatorView)) as View;
         }
     }
 
@@ -118,13 +107,7 @@ namespace MAUIDesigner
     {
         public override View CreateElement()
         {
-            return new Border
-            {
-                Margin = new Thickness(20),
-                MinimumHeightRequest = 20,
-                MinimumWidthRequest = 20,
-                StrokeShape = new Rectangle()
-            };
+            return Activator.CreateInstance(typeof(Border)) as View;
         }
     }
 
@@ -132,12 +115,7 @@ namespace MAUIDesigner
     {
         public override View CreateElement()
         {
-            return new BoxView
-            {
-                Margin = new Thickness(20),
-                MinimumHeightRequest = 20,
-                MinimumWidthRequest = 20
-            };
+            return Activator.CreateInstance(typeof(BoxView)) as View;
         }
     }
 
@@ -159,12 +137,8 @@ namespace MAUIDesigner
     {
         public override View CreateElement()
         {
-            return new CheckBox
-            {
-                Margin = new Thickness(20),
-                MinimumHeightRequest = 44,
-                MinimumWidthRequest = 44
-            };
+            return Activator.CreateInstance(typeof(CheckBox)) as View;
+
         }
     }
 
@@ -172,12 +146,7 @@ namespace MAUIDesigner
     {
         public override View CreateElement()
         {
-            return new DatePicker
-            {
-                Margin = new Thickness(20),
-                MinimumHeightRequest = 44,
-                MinimumWidthRequest = 44
-            };
+            return Activator.CreateInstance(typeof(DatePicker)) as View;
         }
     }
 
