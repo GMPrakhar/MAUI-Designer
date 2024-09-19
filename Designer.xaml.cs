@@ -47,8 +47,8 @@ public partial class Designer : ContentPage
             var label = new Label
             {
                 Text = viewType.ToString(),
-                FontSize = 10,
-                Margin = new Thickness(0,10),
+                FontSize = 15,
+                Padding = new Thickness(10, 10),
                 HorizontalOptions = LayoutOptions.Start,
                 FontAttributes = FontAttributes.Bold,
             };
@@ -56,24 +56,23 @@ public partial class Designer : ContentPage
 
             foreach (var view in viewsForType)
             {
-                var tmpGrid = new Grid()
+                var tmpGrid = new Grid
                 {
-                    RowDefinitions = new RowDefinitionCollection { new RowDefinition() { Height = new GridLength(1, GridUnitType.Star) } },
-                    ColumnDefinitions = new ColumnDefinitionCollection { new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) } },
+                    RowDefinitions = new RowDefinitionCollection { new RowDefinition { Height = new GridLength(1, GridUnitType.Star) } },
+                    ColumnDefinitions = new ColumnDefinitionCollection { new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) } },
                     HorizontalOptions = LayoutOptions.Start
                 };
 
-                var labelView = new Button
+                var labelView = new Label
                 {
                     Text = view.Item1,
                     FontSize = 10,
                     TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
-                    BackgroundColor = Color.FromRgba(0,0,0,0)
+                    BackgroundColor = Color.FromRgba(0, 0, 0, 0)
                 };
 
-                tmpGrid.Add(labelView);
-
-                tmpGrid.SetColumn(labelView, 0);
+                tmpGrid.Children.Add(labelView);
+                Grid.SetColumn(labelView, 0);
 
                 var gestureRecognizer = new TapGestureRecognizer();
                 gestureRecognizer.Tapped += CreateElementInDesignerFrame;
@@ -135,14 +134,14 @@ public partial class Designer : ContentPage
 
         private void RaiseLabel(object? sender, PointerEventArgs e)
     {
-        var senderView = sender as Button;
+        var senderView = sender as Label;
         var animation = new Animation(s => senderView.FontSize = s, 10, 15);
         senderView.Animate("FontSize", animation, 16, 100);
     }
 
     private void MakeLabelDefault(object? sender, PointerEventArgs e)
     {
-        var senderView = sender as Button;
+        var senderView = sender as Label;
         // Animate Font size for senderView
         var animation = new Animation(s => senderView.FontSize = s, 15, 10);
         senderView.Animate("FontSize", animation, 16, 100);
