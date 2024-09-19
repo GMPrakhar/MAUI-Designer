@@ -109,6 +109,45 @@ public partial class Designer : ContentPage
         AddContextMenuButton("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton_Clicked(targetElement, contextMenu, e), hoverRecognizer);
         AddContextMenuButton("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace_Clicked(targetElement, contextMenu, e), hoverRecognizer);
         AddContextMenuButton("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
+
+        // Add Delete button
+        var deleteButton = new Button()
+        {
+            Text = "Delete",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        deleteButton.Clicked += DeleteElement;
+        contextMenu.ActionList.Add(new PropertyViewer() { View = deleteButton });
+
+        foreach(var x in contextMenu.ActionList)
+        {
+            x.View.GestureRecognizers.Add(hoverRecognizer);
+        }
+    }
+
+    private void DeleteElement(object? sender, EventArgs e)
+    {
+        if (focusedView != null)
+        {
+            // Remove the focused view from its parent layout
+            (focusedView.Parent as Layout)?.Remove(focusedView);
+    
+            // Remove the focused view from the views dictionary and non-tappable views list if necessary
+            views.Remove(focusedView.Id);
+            if (nonTappableTypes.Contains(focusedView.GetType()))
+            {
+                nonTappableViews.Remove(focusedView);
+            }
+    
+            // Clear the focused view and hide the properties frame
+            focusedView = null;
+        }
+        contextMenu.IsVisible = false;
     }
 
     private void AddContextMenuButton(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
