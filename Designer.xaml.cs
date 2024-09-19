@@ -387,14 +387,41 @@ public partial class Designer : ContentPage
     private void AddDesignerGestureControls(View newElement)
     {
         newElement.PropertyChanged += ElementPropertyChanged;
+
         var tapGestureRecognizer = new TapGestureRecognizer();
         tapGestureRecognizer.Tapped += EnableElementForOperations;
         tapGestureRecognizer.Buttons = ButtonsMask.Primary | ButtonsMask.Secondary;
+
         var rightClickRecognizer = new TapGestureRecognizer();
         rightClickRecognizer.Tapped += ShowContextMenu;
         rightClickRecognizer.Buttons = ButtonsMask.Secondary;
+
+        // Cursor changes to pointer on an Element
+        var pointerGestureRecognizer = new PointerGestureRecognizer();
+        pointerGestureRecognizer.PointerEntered += (s, e) => ChangeCursorToHand(s);
+        pointerGestureRecognizer.PointerExited += (s, e) => ChangeCursorToDefault(s);
+
         newElement.GestureRecognizers.Add(tapGestureRecognizer);
         newElement.GestureRecognizers.Add(rightClickRecognizer);
+        newElement.GestureRecognizers.Add(pointerGestureRecognizer);
+    }
+
+    private void ChangeCursorToHand(object sender)
+    {
+        var view = sender as View;
+        if (view != null)
+        {
+            (view.Handler.PlatformView as Xamls.UIElement).ChangeCursor(Inputs.InputSystemCursor.Create(Inputs.InputSystemCursorShape.Hand));
+        }
+    }
+
+    private void ChangeCursorToDefault(object sender)
+    {
+        var view = sender as View;
+        if (view != null)
+        {
+            (view.Handler.PlatformView as Xamls.UIElement).ChangeCursor(Inputs.InputSystemCursor.Create(Inputs.InputSystemCursorShape.Arrow));
+        }
     }
 
     private void ShowContextMenu(object? sender, TappedEventArgs e)
