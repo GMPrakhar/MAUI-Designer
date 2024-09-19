@@ -124,9 +124,110 @@ public partial class Designer : ContentPage
         deleteButton.Clicked += DeleteElement;
         contextMenu.ActionList.Add(new PropertyViewer() { View = deleteButton });
 
+        // Add Cut button
+        var cutButton = new Button()
+        {
+            Text = "Cut",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        cutButton.Clicked += CutElement;
+        contextMenu.ActionList.Add(new PropertyViewer() { View = cutButton });
+
+        // Add Copy button
+        var copyButton = new Button()
+        {
+            Text = "Copy",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        copyButton.Clicked += CopyElement;
+        contextMenu.ActionList.Add(new PropertyViewer() { View = copyButton });
+
+        // Add Paste button
+        var pasteButton = new Button()
+        {
+            Text = "Paste",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        pasteButton.Clicked += PasteElement;
+        contextMenu.ActionList.Add(new PropertyViewer() { View = pasteButton });
+
         foreach(var x in contextMenu.ActionList)
         {
             x.View.GestureRecognizers.Add(hoverRecognizer);
+        }
+    }
+
+    private View? clipboardElement = null;
+
+    private void CutElement(object? sender, EventArgs e)
+    {
+        if (focusedView != null)
+        {
+            clipboardElement = focusedView;
+            (focusedView.Parent as Layout)?.Remove(focusedView);
+            focusedView = null;
+            PropertiesFrame.IsVisible = false;
+            contextMenu.IsVisible = false;
+        }
+    }
+
+    private void CopyElement(object? sender, EventArgs e)
+    {
+        if (focusedView != null)
+        {
+            clipboardElement = focusedView;
+            contextMenu.IsVisible = false;
+        }
+    }
+
+    private void PasteElement(object sender, EventArgs e)
+    {
+        if (clipboardElement != null)
+        {
+            // Create a new element based on the clipboard element
+            var newElement = ElementCreator.Create(clipboardElement.GetType().Name);
+            
+            // Set the properties of the new element based on the clipboard element
+            newElement.Margin = new Thickness(clipboardElement.Margin.Left + 20, clipboardElement.Margin.Top + 20, clipboardElement.Margin.Right, clipboardElement.Margin.Bottom);
+            newElement.WidthRequest = clipboardElement.WidthRequest;
+            newElement.HeightRequest = clipboardElement.HeightRequest;
+            
+            // Add gesture controls to the new element
+            AddDesignerGestureControls(newElement);
+            
+            // Add the new element to the designer frame
+            designerFrame.Add(newElement);
+            
+            // Update the views dictionary and non-tappable views list if necessary
+            views.Add(newElement.Id, newElement);
+            if (nonTappableTypes.Contains(newElement.GetType()))
+            {
+                nonTappableViews.Add(newElement);
+            }
+            
+            // Set the new element as the focused view and update the properties frame
+            focusedView = newElement;
+            PropertiesFrame.IsVisible = true;
+            PopulatePropertyGridField();
+            UpdateActualPropertyView();
+            
+            // Hide the context menu
+            contextMenu.IsVisible = false;
         }
     }
 
