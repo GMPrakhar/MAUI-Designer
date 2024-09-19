@@ -55,7 +55,7 @@ namespace MAUIDesigner
         }
     }
 
-    internal class RectangleFactory : ElementFactory
+        internal class RectangleFactory : ElementFactory
     {
         public override View CreateElement()
         {
