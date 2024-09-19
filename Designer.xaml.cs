@@ -105,15 +105,15 @@ public partial class Designer : ContentPage
         contextMenu.ActionList.Clear();
         var hoverRecognizer = CreateHoverRecognizer();
 
-        AddContextMenuButton("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton_Clicked(targetElement,contextMenu, e), hoverRecognizer);
-        AddContextMenuButton("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton_Clicked(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuButton("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace_Clicked(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuButton("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
+        AddContextMenuItem("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton_Clicked(targetElement,contextMenu, e), hoverRecognizer);
+        AddContextMenuItem("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton_Clicked(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuItem("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace_Clicked(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuItem("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
     }
 
-    private void AddContextMenuButton(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
+    private void AddContextMenuItem(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
     {
-        var button = new Label()
+        var label = new Label()
         {
             Text = text,
             TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
@@ -124,14 +124,13 @@ public partial class Designer : ContentPage
             HorizontalOptions = LayoutOptions.Fill,
             HorizontalTextAlignment = TextAlignment.Start
         };
-        //button.Clicked += (s, e) => clickHandler(targetElement, e);
 
         var tapGestureRecognizer = new TapGestureRecognizer();
         tapGestureRecognizer.Tapped += (s, e) => clickHandler(targetElement, e);
-        button.GestureRecognizers.Add(tapGestureRecognizer);
+        label.GestureRecognizers.Add(tapGestureRecognizer);
 
-        button.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = button });
+        label.GestureRecognizers.Add(hoverRecognizer);
+        contextMenu.ActionList.Add(new PropertyViewer() { View = label });
     }
 
         private void RaiseLabel(object? sender, PointerEventArgs e)
