@@ -161,6 +161,13 @@ public partial class Designer : ContentPage
         {
             RemoveBorder(focusedView, null);
         }
+
+
+        if (contextMenu.IsVisible && !contextMenu.Frame.Contains(location))
+        {
+            contextMenu.Close();
+        }
+
     }
 
     private void UpdateActualPropertyView()
