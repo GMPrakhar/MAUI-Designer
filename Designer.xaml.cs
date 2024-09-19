@@ -90,6 +90,12 @@ public partial class Designer : ContentPage
         XAMLHolder.Text = defaultXaml;
         this.LoadViewFromXaml(XAMLHolder, null);
         //PropertiesFrame.IsVisible = false;
+
+        // // Add right-click gesture recognizer to the designer frame
+        var rightClickRecognizer = new TapGestureRecognizer();
+        rightClickRecognizer.Tapped += ShowContextMenu;
+        rightClickRecognizer.Buttons = ButtonsMask.Secondary;
+        designerFrame.GestureRecognizers.Add(rightClickRecognizer);
     }
 
     private PointerGestureRecognizer CreateHoverRecognizer()
@@ -111,20 +117,47 @@ public partial class Designer : ContentPage
         AddContextMenuButton("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
 
         // Add Delete button
-        var deleteButton = new Button()
-        {
-            Text = "Delete",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        deleteButton.Clicked += DeleteElement;
-        contextMenu.ActionList.Add(new PropertyViewer() { View = deleteButton });
+        AddDeleteButton(contextMenu, hoverRecognizer);
 
         // Add Cut button
+        AddCutButton(contextMenu, hoverRecognizer);
+
+        // Add Copy button
+        AddCopyButton(contextMenu, hoverRecognizer);
+
+        // Add Paste button
+        AddPasteButton(contextMenu, hoverRecognizer);
+
+        foreach (var x in contextMenu.ActionList)
+        {
+            x.View.GestureRecognizers.Add(hoverRecognizer);
+        }
+    }
+
+    private void UpdateContextMenuForNonElement()
+    {
+        contextMenu.ActionList.Clear();
+        var hoverRecognizer = CreateHoverRecognizer();
+
+        // Add Cut button (disabled)
+        AddCutButton(contextMenu, hoverRecognizer, isEnabled: false);
+
+        // Add Copy button (disabled)
+        AddCopyButton(contextMenu, hoverRecognizer, isEnabled: false);
+
+        // Add Paste button
+        AddPasteButton(contextMenu, hoverRecognizer);
+
+        foreach (var x in contextMenu.ActionList)
+        {
+            x.View.GestureRecognizers.Add(hoverRecognizer);
+        }
+    }
+
+    private View? clipboardElement = null;
+
+    private void AddCutButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer, bool isEnabled = true)
+    {
         var cutButton = new Button()
         {
             Text = "Cut",
@@ -133,47 +166,13 @@ public partial class Designer : ContentPage
             BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
             Padding = new Thickness(5, 0),
             Margin = new Thickness(0, 0),
-            FontSize = 10
+            FontSize = 10,
+            IsEnabled = isEnabled
         };
         cutButton.Clicked += CutElement;
+        cutButton.GestureRecognizers.Add(hoverRecognizer);
         contextMenu.ActionList.Add(new PropertyViewer() { View = cutButton });
-
-        // Add Copy button
-        var copyButton = new Button()
-        {
-            Text = "Copy",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        copyButton.Clicked += CopyElement;
-        contextMenu.ActionList.Add(new PropertyViewer() { View = copyButton });
-
-        // Add Paste button
-        var pasteButton = new Button()
-        {
-            Text = "Paste",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        pasteButton.Clicked += PasteElement;
-        contextMenu.ActionList.Add(new PropertyViewer() { View = pasteButton });
-
-        foreach(var x in contextMenu.ActionList)
-        {
-            x.View.GestureRecognizers.Add(hoverRecognizer);
-        }
     }
-
-    private View? clipboardElement = null;
-
     private void CutElement(object? sender, EventArgs e)
     {
         if (focusedView != null)
@@ -186,6 +185,23 @@ public partial class Designer : ContentPage
         }
     }
 
+    private void AddCopyButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer, bool isEnabled = true)
+    {
+        var copyButton = new Button()
+        {
+            Text = "Copy",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10,
+            IsEnabled = isEnabled
+        };
+        copyButton.Clicked += CopyElement;
+        copyButton.GestureRecognizers.Add(hoverRecognizer);
+        contextMenu.ActionList.Add(new PropertyViewer() { View = copyButton });
+    }
     private void CopyElement(object? sender, EventArgs e)
     {
         if (focusedView != null)
@@ -195,6 +211,23 @@ public partial class Designer : ContentPage
         }
     }
 
+    private void AddPasteButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer)
+    {
+        var pasteButton = new Button()
+        {
+            Text = "Paste",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10,
+            IsEnabled = clipboardElement != null
+        };
+        pasteButton.Clicked += PasteElement;
+        pasteButton.GestureRecognizers.Add(hoverRecognizer);
+        contextMenu.ActionList.Add(new PropertyViewer() { View = pasteButton });
+    }
     private void PasteElement(object sender, EventArgs e)
     {
         if (clipboardElement != null)
@@ -229,6 +262,23 @@ public partial class Designer : ContentPage
             // Hide the context menu
             contextMenu.IsVisible = false;
         }
+    }
+
+    private void AddDeleteButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer)
+    {
+        var deleteButton = new Button()
+        {
+            Text = "Delete",
+            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
+            CornerRadius = 0,
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            Padding = new Thickness(5, 0),
+            Margin = new Thickness(0, 0),
+            FontSize = 10
+        };
+        deleteButton.Clicked += DeleteElement;
+        deleteButton.GestureRecognizers.Add(hoverRecognizer);
+        contextMenu.ActionList.Add(new PropertyViewer() { View = deleteButton });
     }
 
     private void DeleteElement(object? sender, EventArgs e)
@@ -350,14 +400,21 @@ public partial class Designer : ContentPage
     private void ShowContextMenu(object? sender, TappedEventArgs e)
     {
         var location = e.GetPosition(designerFrame).Value;
-        // set margin of the context menu to current mouse position
-        contextMenu.Margin = new Thickness(location.X, 20);
+        // Set margin of the context menu to current mouse position
+        contextMenu.Margin = new Thickness(location.X, location.Y, 0, 0);
         contextMenu.IsVisible = true;
-        if (sender is View targetElement)
+
+        // Check if the click is on any element
+        var targetElement = views.Values.FirstOrDefault(view => view.Frame.Contains(location));
+
+        if (targetElement != null)
         {
             UpdateContextMenuWithRandomProperties(targetElement);
         }
-        
+        else
+        {
+            UpdateContextMenuForNonElement();
+        }
     }
 
     private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
