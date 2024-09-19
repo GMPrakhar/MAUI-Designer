@@ -94,9 +94,9 @@ namespace MAUIDesigner
         {
             return new Button
             {
-                Margin = new Thickness(20),
-                MinimumHeightRequest = 44,
-                MinimumWidthRequest = 44,
+                Margin = new Thickness(10),
+                MinimumHeightRequest = 20,
+                MinimumWidthRequest = 20,
                 Text = "Click me!"
             };
         }

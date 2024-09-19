@@ -113,22 +113,28 @@ public partial class Designer : ContentPage
 
     private void AddContextMenuButton(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
     {
-        var button = new Button()
+        var button = new Label()
         {
             Text = text,
             TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
             BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
+            Padding = new Thickness(10, 10, 10, 10),
+            Margin = new Thickness(0),
+            FontSize = 10,
+            HorizontalOptions = LayoutOptions.Fill,
+            HorizontalTextAlignment = TextAlignment.Start
         };
-        button.Clicked += (s, e) => clickHandler(targetElement, e);
+        //button.Clicked += (s, e) => clickHandler(targetElement, e);
+
+        var tapGestureRecognizer = new TapGestureRecognizer();
+        tapGestureRecognizer.Tapped += (s, e) => clickHandler(targetElement, e);
+        button.GestureRecognizers.Add(tapGestureRecognizer);
+
         button.GestureRecognizers.Add(hoverRecognizer);
         contextMenu.ActionList.Add(new PropertyViewer() { View = button });
     }
 
-    private void RaiseLabel(object? sender, PointerEventArgs e)
+        private void RaiseLabel(object? sender, PointerEventArgs e)
     {
         var senderView = sender as Button;
         var animation = new Animation(s => senderView.FontSize = s, 10, 15);
@@ -219,7 +225,7 @@ public partial class Designer : ContentPage
         var location = e.GetPosition(designerFrame).Value;
         // set margin of the context menu to current mouse position
         contextMenu.Show();
-        contextMenu.Margin = new Thickness(location.X, 20);
+        contextMenu.Margin = new Thickness(location.X, location.Y, 0 , 0);
         if (sender is View targetElement)
         {
             UpdateContextMenuWithRandomProperties(targetElement);

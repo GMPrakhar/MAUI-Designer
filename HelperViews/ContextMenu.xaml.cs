@@ -5,12 +5,12 @@ namespace MAUIDesigner.HelperViews;
 
 public partial class ContextMenu : ContentView
 {
-	public ObservableCollection<PropertyViewer> ActionList { get; set; } = new();
+    public ObservableCollection<PropertyViewer> ActionList { get; set; } = new();
     public ContextMenu()
-	{
-		InitializeComponent();
+    {
+        InitializeComponent();
         this.IsVisible = false;
-	}
+    }
 
     internal void UpdateCollectionView()
     {
