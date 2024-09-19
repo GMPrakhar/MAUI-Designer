@@ -1,3 +1,4 @@
+using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
 
 namespace MAUIDesigner.HelperViews;
@@ -8,6 +9,7 @@ public partial class ContextMenu : ContentView
     public ContextMenu()
 	{
 		InitializeComponent();
+        this.IsVisible = false;
 	}
 
     internal void UpdateCollectionView()
@@ -18,5 +20,12 @@ public partial class ContextMenu : ContentView
     public void Close()
     {
         this.IsVisible = false;
+    }
+
+    public void Show()
+    {
+        this.IsVisible = true;
+        this.Focus();
+        this.ZIndex = int.MaxValue;
     }
 }

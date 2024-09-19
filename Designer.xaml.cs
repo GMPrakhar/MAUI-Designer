@@ -211,8 +211,8 @@ public partial class Designer : ContentPage
     {
         var location = e.GetPosition(designerFrame).Value;
         // set margin of the context menu to current mouse position
+        contextMenu.Show();
         contextMenu.Margin = new Thickness(location.X, 20);
-        contextMenu.IsVisible = true;
         if (sender is View targetElement)
         {
             UpdateContextMenuWithRandomProperties(targetElement);
@@ -382,7 +382,6 @@ public partial class Designer : ContentPage
         isDragging = false;
         isScaling = false;
         scalerRect = null;
-        contextMenu.IsVisible = false;
     }
 
     private void DragGestureRecognizer_DragStarting(object? sender, DragStartingEventArgs e)
