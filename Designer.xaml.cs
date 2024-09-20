@@ -50,7 +50,7 @@ public partial class Designer : ContentPage
             {
                 Text = viewType.ToString(),
                 FontSize = 15,
-                Padding = new Thickness(10, 10),
+                Padding = new Thickness(10, 10, 0 ,0),
                 HorizontalOptions = LayoutOptions.Start,
                 FontAttributes = FontAttributes.Bold,
             };
@@ -70,6 +70,7 @@ public partial class Designer : ContentPage
                     Text = view.Item1,
                     FontSize = 10,
                     TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
+                    Padding = new Thickness(3),
                     BackgroundColor = Color.FromRgba(0, 0, 0, 0)
                 };
 
