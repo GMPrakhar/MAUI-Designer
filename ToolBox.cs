@@ -6,16 +6,17 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
+using MauiIcons.Fluent;
 
 namespace MAUIDesigner
 {
     internal class ToolBox
     {
-        internal static IDictionary<ViewType, List<(string, Type)>> GetAllVisualElementsAlongWithType()
+        internal static IDictionary<ViewType, List<(string, Type, FluentIcons)>> GetAllVisualElementsAlongWithType()
         {
             var visualElements = typeof(Microsoft.Maui.Controls.View).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) && !t.IsAbstract);
-            var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type)>>();
-            foreach(var visualElement in visualElements)
+            var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type, FluentIcons)>>();
+            foreach (var visualElement in visualElements)
             {
                 var viewType = GetViewTypeForType(visualElement);
                 if (!visualElementsWithType.ContainsKey(viewType))
@@ -23,9 +24,33 @@ namespace MAUIDesigner
                     visualElementsWithType[viewType] = [];
                 }
 
-                visualElementsWithType[viewType].Add((visualElement.Name, visualElement));
+                var icon = GetIconForElement(viewType.GetType().ToString());
+
+                visualElementsWithType[viewType].Add((visualElement.Name, visualElement, icon));
             }
             return visualElementsWithType;
+        }
+
+        private static FluentIcons GetIconForElement(string elementName)
+        {
+            return elementName switch
+            {
+                "Button" => FluentIcons.ControlButton20,
+                //"CheckBox" => FluentIcons.Checkbox,
+                //"ComboBox" => FluentIcons.ComboBox,
+                //"DataGrid" => FluentIcons.DataGrid,
+                //"Grid" => FluentIcons.Grid,
+                //"Image" => FluentIcons.Image,
+                //"Label" => FluentIcons.Label,
+                //"ListBox" => FluentIcons.ListBox,
+                //"RadioButton" => FluentIcons.RadioButton,
+                //"Rectangle" => FluentIcons.Rectangle,
+                //"StackPanel" => FluentIcons.StackPanel,
+                //"TabControl" => FluentIcons.TabControl,
+                //"TextBlock" => FluentIcons.TextBlock,
+                //"TextBox" => FluentIcons.TextBox,
+                _ => FluentIcons.GlanceDefault12 // Default icon if no match is found
+            };
         }
 
         // Get all properties for a given View

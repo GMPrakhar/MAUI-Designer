@@ -10,6 +10,8 @@ using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
 using Inputs = Microsoft.UI.Input;
 using Xamls = Microsoft.UI.Xaml;
 namespace MAUIDesigner;
+
+using MauiIcons.Core;
 using System.Diagnostics;
 
 public partial class Designer : ContentPage
@@ -65,25 +67,41 @@ public partial class Designer : ContentPage
                     HorizontalOptions = LayoutOptions.Start
                 };
 
-                var labelView = new Label
+                Debug.WriteLine(view.Item3.ToImageSource());
+
+                var iconImage = new Image
                 {
-                    Text = view.Item1,
+                    Source = view.Item3.ToString(),
+                    WidthRequest = 20,
+                    HeightRequest = 20,
+                    VerticalOptions = LayoutOptions.Center
+                };
+
+                var textLabel = new Label
+                {
                     FontSize = 10,
                     TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
                     Padding = new Thickness(3),
-                    BackgroundColor = Color.FromRgba(0, 0, 0, 0)
+                    BackgroundColor = Color.FromRgba(0, 0, 0, 0),
+                    Text = " " + view.Item1,
+                    VerticalOptions = LayoutOptions.Center
                 };
 
-                tmpGrid.Children.Add(labelView);
-                Grid.SetColumn(labelView, 0);
+                var horizontalStack = new HorizontalStackLayout
+                {
+                    Children = { iconImage, textLabel }
+                };
+
+                tmpGrid.Children.Add(horizontalStack);
+                Grid.SetColumn(horizontalStack, 0);
 
                 var gestureRecognizer = new TapGestureRecognizer();
                 gestureRecognizer.Tapped += CreateElementInDesignerFrame;
                 var pointerGestureRecognizer = new PointerGestureRecognizer();
                 pointerGestureRecognizer.PointerEntered += RaiseLabel;
                 pointerGestureRecognizer.PointerExited += MakeLabelDefault;
-                labelView.GestureRecognizers.Add(gestureRecognizer);
-                labelView.GestureRecognizers.Add(pointerGestureRecognizer);
+                horizontalStack.GestureRecognizers.Add(gestureRecognizer);
+                horizontalStack.GestureRecognizers.Add(pointerGestureRecognizer);
 
                 Toolbox.Children.Add(tmpGrid);
             }
@@ -102,17 +120,30 @@ public partial class Designer : ContentPage
 
         private void RaiseLabel(object? sender, PointerEventArgs e)
     {
-        var senderView = sender as Label;
-        var animation = new Animation(s => senderView.FontSize = s, 10, 15);
-        senderView.Animate("FontSize", animation, 16, 100);
+        var senderView = sender as HorizontalStackLayout;
+        if (senderView != null && senderView.Children.Count > 1)
+        {
+            var label = senderView.Children[1] as Label;
+            if (label != null)
+            {
+                var animation = new Animation(s => label.FontSize = s, 10, 15);
+                label.Animate("FontSize", animation, 16, 100);
+            }
+        }
     }
 
     private void MakeLabelDefault(object? sender, PointerEventArgs e)
     {
-        var senderView = sender as Label;
-        // Animate Font size for senderView
-        var animation = new Animation(s => senderView.FontSize = s, 15, 10);
-        senderView.Animate("FontSize", animation, 16, 100);
+        var senderView = sender as HorizontalStackLayout;
+        if (senderView != null && senderView.Children.Count > 1)
+        {
+            var label = senderView.Children[1] as Label;
+            if (label != null)
+            {
+                var animation = new Animation(s => label.FontSize = s, 15, 10);
+                label.Animate("FontSize", animation, 16, 100);
+            }
+        }
     }
 
     private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
@@ -156,7 +187,8 @@ public partial class Designer : ContentPage
     {
         try
         {
-            var newElement = ElementCreator.Create((sender as Label).Text);
+            var senderView = sender as HorizontalStackLayout;
+            var newElement = ElementCreator.Create((senderView.Children[1] as Label).Text.Trim());
             AddDesignerGestureControls(newElement);
             designerFrame.Add(newElement);
             views.Add(newElement.Id, newElement);
