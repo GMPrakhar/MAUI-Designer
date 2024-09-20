@@ -39,7 +39,7 @@ namespace MAUIDesigner
             return elementName switch
             {
                 //"Button" => FluentIcons.ControlButton20,
-                //"CheckBox" => "\ue73e",
+                "CheckBox" => "\uf28d",
                 //"DataGrid" => FluentIcons.DataArea20,
                 //"Grid" => FluentIcons.Grid16,
                 //"Image" => FluentIcons.Image16,
