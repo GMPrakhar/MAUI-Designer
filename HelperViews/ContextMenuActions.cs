@@ -114,5 +114,16 @@ namespace MAUIDesigner.HelperViews
             }
             contextMenu.Close();
         }
+
+        public static void Undo(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+
+        }
+
+        public static void Redo(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+
+        }
+
     }
 }

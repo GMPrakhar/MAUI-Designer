@@ -11,9 +11,9 @@
             <PointerGestureRecognizer PointerMoved="GridPointerMoved"/>
         </Grid.GestureRecognizers>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="150"/>
+            <ColumnDefinition Width="200"/>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="300" />
+            <ColumnDefinition Width="350" />
         </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -33,14 +33,14 @@
                     <RowDefinition Height="20"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Label Text="Toolbox" Padding="5,0" FontSize="10" Grid.Row="0" Grid.Column="0" BackgroundColor="#10000000" HorizontalOptions="FillAndExpand" TextColor="LightSlateGrey"/>
+                <Label Text="Toolbox" Padding="5,0" FontSize="14" Grid.Row="0" Grid.Column="0" BackgroundColor="#10000000" HorizontalOptions="FillAndExpand" TextColor="LightSlateGrey"/>
                 <BoxView BackgroundColor="Transparent" Grid.Column="1" Grid.Row="1" x:Name="TabDraggerLeft">
                     <BoxView.GestureRecognizers>
                         <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
                         <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
                     </BoxView.GestureRecognizers>
                 </BoxView>
-                <ScrollView  Grid.Column="0" Grid.Row="1" >
+                <ScrollView  Grid.Column="0" Grid.Row="1" Padding="5,0" >
                     <VerticalStackLayout x:Name="Toolbox" Margin="10">
                     </VerticalStackLayout>
                 </ScrollView>
@@ -107,17 +107,17 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="25"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Label Text="Properties" Padding="5,0" FontSize="10" Grid.Row="0" Grid.Column="1" BackgroundColor="#10000000" TextColor="LightSlateGrey" HorizontalOptions="FillAndExpand"/>
+                <Label Text="Properties" Padding="5,0" FontSize="14" Grid.Row="0" Grid.Column="1" BackgroundColor="#10000000" TextColor="LightSlateGrey" HorizontalOptions="FillAndExpand"/>
                 <BoxView BackgroundColor="Transparent" Grid.Column="0" Grid.Row="1" x:Name="TabDraggerRight">
                     <BoxView.GestureRecognizers>
                         <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
                         <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
                     </BoxView.GestureRecognizers>
                 </BoxView>
-                <ScrollView Grid.Column="1" Grid.Row="1">
+                <ScrollView Grid.Column="1" Grid.Row="1" Padding="10,0,10,0">
                     <VerticalStackLayout x:Name="Properties">
                     </VerticalStackLayout>
                 </ScrollView>

@@ -25,6 +25,8 @@ public partial class Designer : ContentPage
     private SortedDictionary<string, Grid>? PropertiesForFocusedView;
     private View? MenuDraggerView = null;
     private ICollection<string> GuiUpdatableProperties = new [] { "Margin", "HeightRequest", "WidthRequest" };
+    private Stack<Action> undoStack = new Stack<Action>();
+    private Stack<Action> redoStack = new Stack<Action>();
     private ContextMenu contextMenu = new ContextMenu()
     {
         IsVisible = false
@@ -95,66 +97,6 @@ public partial class Designer : ContentPage
         rightClickRecognizer.Tapped += ShowContextMenu;
         rightClickRecognizer.Buttons = ButtonsMask.Secondary;
         designerFrame.GestureRecognizers.Add(rightClickRecognizer);
-    }
-
-    private PointerGestureRecognizer CreateHoverRecognizer()
-    {
-        var hoverRecognizer = new PointerGestureRecognizer();
-        hoverRecognizer.PointerEntered += (s, e) => (s as View).BackgroundColor = Colors.DarkGray.WithLuminosity(0.2f);
-        hoverRecognizer.PointerExited += (s, e) => (s as View).BackgroundColor = Colors.Black;
-        return hoverRecognizer;
-    }
-
-    private void UpdateContextMenuWithRandomProperties(View targetElement)
-    {
-        contextMenu.ActionList.Clear();
-        var hoverRecognizer = CreateHoverRecognizer();
-
-        AddContextMenuItem("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton(targetElement,contextMenu, e), hoverRecognizer);
-        AddContextMenuItem("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuItem("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuItem("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
-        AddContextMenuItem("Cut", targetElement, contextMenu, (s, e) => ContextMenuActions.CutElement(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
-        AddContextMenuItem("Copy", targetElement, contextMenu, (s, e) => ContextMenuActions.CopyElement(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuItem("Paste", targetElement, contextMenu, (s, e) => ContextMenuActions.PasteElement(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
-        AddContextMenuItem("Delete", targetElement, contextMenu, (s, e) => ContextMenuActions.DeleteElement(targetElement, contextMenu, e), hoverRecognizer);
-
-        foreach (var x in contextMenu.ActionList)
-        {
-            x.View.GestureRecognizers.Add(hoverRecognizer);
-        }
-    }
-
-    private void UpdateContextMenuForNonElement()
-    {
-        contextMenu.ActionList.Clear();
-        var hoverRecognizer = CreateHoverRecognizer();
-        foreach (var x in contextMenu.ActionList)
-        {
-            x.View.GestureRecognizers.Add(hoverRecognizer);
-        }
-    }
-
-    private void AddContextMenuItem(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
-    {
-        var label = new Label()
-        {
-            Text = text,
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(10, 10, 10, 10),
-            Margin = new Thickness(0),
-            FontSize = 10,
-            HorizontalOptions = LayoutOptions.Fill,
-            HorizontalTextAlignment = TextAlignment.Start
-        };
-
-        var tapGestureRecognizer = new TapGestureRecognizer();
-        tapGestureRecognizer.Tapped += (s, e) => clickHandler(targetElement, e);
-        label.GestureRecognizers.Add(tapGestureRecognizer);
-
-        label.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = label });
     }
 
         private void RaiseLabel(object? sender, PointerEventArgs e)
@@ -272,18 +214,7 @@ public partial class Designer : ContentPage
 
     private void ShowContextMenu(object? sender, TappedEventArgs e)
     {
-        var location = e.GetPosition(designerFrame).Value;
-        // set margin of the context menu to current mouse position
-        contextMenu.Show();
-        contextMenu.Margin = new Thickness(location.X, location.Y, 0 , 0);
-        if (sender is View targetElement)
-        {
-            UpdateContextMenuWithRandomProperties(targetElement);
-        }
-        else
-        {
-            UpdateContextMenuForNonElement();
-        }
+        contextMenu.Show(e, views, designerFrame);
     }
 
     private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -339,6 +270,36 @@ public partial class Designer : ContentPage
         }catch(Exception)
         {
 
+        }
+    }
+
+    private void UndoButton_Clicked(object sender, EventArgs e)
+    {
+        Undo();
+    }
+
+    private void RedoButton_Clicked(object sender, EventArgs e)
+    {
+        Redo();
+    }
+
+    private void Undo()
+    {
+        if (undoStack.Count > 0)
+        {
+            var action = undoStack.Pop();
+            action.Invoke();
+            redoStack.Push(action);
+        }
+    }
+
+    private void Redo()
+    {
+        if (redoStack.Count > 0)
+        {
+            var action = redoStack.Pop();
+            action.Invoke();
+            undoStack.Push(action);
         }
     }
 
