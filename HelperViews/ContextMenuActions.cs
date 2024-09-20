@@ -9,7 +9,8 @@ namespace MAUIDesigner.HelperViews
 {
     internal static class ContextMenuActions
     {
-        public static void DetachFromParent_Clicked(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
+        public static View? ClipboardElement { get; set; }
+        public static void DetachFromParent(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
         {
             if (targetElement?.Parent is Layout parentLayout)
             {
@@ -21,7 +22,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
-        public static void LockInPlace_Clicked(View targetElement, ContextMenu contextMenu, EventArgs e)
+        public static void LockInPlace(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement != null)
             {
@@ -32,7 +33,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
-        public static void BringToFrontButton_Clicked(View targetElement, ContextMenu contextMenu, EventArgs e)
+        public static void BringToFrontButton(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement?.Parent is Layout parentLayout)
             {
@@ -46,7 +47,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
-        public static void SendToBackButton_Clicked(View targetElement, ContextMenu contextMenu, EventArgs e)
+        public static void SendToBackButton(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement?.Parent is Layout parentLayout)
             {
@@ -58,6 +59,60 @@ namespace MAUIDesigner.HelperViews
                 contextMenu.Close();
                 Debug.WriteLine("SendToBack: Moved the focused view to the back.");
             }
+        }
+
+        public static void CutElement(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
+        {
+            if (targetElement != null)
+            {
+                ClipboardElement = targetElement;
+                designerFrame.Children.Remove(targetElement);
+                contextMenu.Close();
+            }
+        }
+
+
+        public static void CopyElement(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+            if (targetElement != null)
+            {
+                ClipboardElement = targetElement;
+                contextMenu.Close();
+            }
+        }
+
+        public static void PasteElement(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
+        {
+            if (ClipboardElement != null)
+            {
+                var newElement = CloneView(ClipboardElement);
+                designerFrame.Children.Add(newElement);
+                ClipboardElement = null;
+
+                //TODO: fix to paste where the pointer is clicked
+            }
+            contextMenu.Close();
+        }
+
+        private static View CloneView(View originalView)
+        {
+            
+            var newView = ElementCreator.Create(originalView.GetType().Name);
+
+            newView.BindingContext = originalView.BindingContext;
+            newView.Style = originalView.Style;
+
+            return newView;
+        }
+
+        public static void DeleteElement(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+            if (targetElement != null)
+            {
+                // Remove the focused view from its parent layout
+                (targetElement.Parent as Layout)?.Remove(targetElement);
+            }
+            contextMenu.Close();
         }
     }
 }

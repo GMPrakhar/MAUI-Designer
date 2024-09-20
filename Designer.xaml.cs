@@ -110,23 +110,14 @@ public partial class Designer : ContentPage
         contextMenu.ActionList.Clear();
         var hoverRecognizer = CreateHoverRecognizer();
 
-        AddContextMenuItem("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton_Clicked(targetElement,contextMenu, e), hoverRecognizer);
-        AddContextMenuItem("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton_Clicked(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuItem("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace_Clicked(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuItem("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
-
-
-        // Add Delete button
-        AddDeleteButton(contextMenu, hoverRecognizer);
-
-        // Add Cut button
-        AddCutButton(contextMenu, hoverRecognizer);
-
-        // Add Copy button
-        AddCopyButton(contextMenu, hoverRecognizer);
-
-        // Add Paste button
-        AddPasteButton(contextMenu, hoverRecognizer);
+        AddContextMenuItem("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton(targetElement,contextMenu, e), hoverRecognizer);
+        AddContextMenuItem("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuItem("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuItem("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
+        AddContextMenuItem("Cut", targetElement, contextMenu, (s, e) => ContextMenuActions.CutElement(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
+        AddContextMenuItem("Copy", targetElement, contextMenu, (s, e) => ContextMenuActions.CopyElement(targetElement, contextMenu, e), hoverRecognizer);
+        AddContextMenuItem("Paste", targetElement, contextMenu, (s, e) => ContextMenuActions.PasteElement(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
+        AddContextMenuItem("Delete", targetElement, contextMenu, (s, e) => ContextMenuActions.DeleteElement(targetElement, contextMenu, e), hoverRecognizer);
 
         foreach (var x in contextMenu.ActionList)
         {
@@ -138,167 +129,10 @@ public partial class Designer : ContentPage
     {
         contextMenu.ActionList.Clear();
         var hoverRecognizer = CreateHoverRecognizer();
-
-        // Add Cut button (disabled)
-        AddCutButton(contextMenu, hoverRecognizer, isEnabled: false);
-
-        // Add Copy button (disabled)
-        AddCopyButton(contextMenu, hoverRecognizer, isEnabled: false);
-
-        // Add Paste button
-        AddPasteButton(contextMenu, hoverRecognizer);
-
         foreach (var x in contextMenu.ActionList)
         {
             x.View.GestureRecognizers.Add(hoverRecognizer);
         }
-    }
-
-    private View? clipboardElement = null;
-
-    private void AddCutButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer, bool isEnabled = true)
-    {
-        var cutButton = new Button()
-        {
-            Text = "Cut",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10,
-            IsEnabled = isEnabled
-        };
-        cutButton.Clicked += CutElement;
-        cutButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = cutButton });
-    }
-    private void CutElement(object? sender, EventArgs e)
-    {
-        if (focusedView != null)
-        {
-            clipboardElement = focusedView;
-            (focusedView.Parent as Layout)?.Remove(focusedView);
-            focusedView = null;
-            PropertiesFrame.IsVisible = false;
-            contextMenu.IsVisible = false;
-        }
-    }
-
-    private void AddCopyButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer, bool isEnabled = true)
-    {
-        var copyButton = new Button()
-        {
-            Text = "Copy",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10,
-            IsEnabled = isEnabled
-        };
-        copyButton.Clicked += CopyElement;
-        copyButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = copyButton });
-    }
-    private void CopyElement(object? sender, EventArgs e)
-    {
-        if (focusedView != null)
-        {
-            clipboardElement = focusedView;
-            contextMenu.IsVisible = false;
-        }
-    }
-
-    private void AddPasteButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer)
-    {
-        var pasteButton = new Button()
-        {
-            Text = "Paste",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10,
-            IsEnabled = clipboardElement != null
-        };
-        pasteButton.Clicked += PasteElement;
-        pasteButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = pasteButton });
-    }
-    private void PasteElement(object sender, EventArgs e)
-    {
-        if (clipboardElement != null)
-        {
-            // Create a new element based on the clipboard element
-            var newElement = ElementCreator.Create(clipboardElement.GetType().Name);
-            
-            // Set the properties of the new element based on the clipboard element
-            newElement.Margin = new Thickness(clipboardElement.Margin.Left + 20, clipboardElement.Margin.Top + 20, clipboardElement.Margin.Right, clipboardElement.Margin.Bottom);
-            newElement.WidthRequest = clipboardElement.WidthRequest;
-            newElement.HeightRequest = clipboardElement.HeightRequest;
-            
-            // Add gesture controls to the new element
-            AddDesignerGestureControls(newElement);
-            
-            // Add the new element to the designer frame
-            designerFrame.Add(newElement);
-            
-            // Update the views dictionary and non-tappable views list if necessary
-            views.Add(newElement.Id, newElement);
-            if (nonTappableTypes.Contains(newElement.GetType()))
-            {
-                nonTappableViews.Add(newElement);
-            }
-            
-            // Set the new element as the focused view and update the properties frame
-            focusedView = newElement;
-            PropertiesFrame.IsVisible = true;
-            PopulatePropertyGridField();
-            UpdateActualPropertyView();
-            
-            // Hide the context menu
-            contextMenu.IsVisible = false;
-        }
-    }
-
-    private void AddDeleteButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer)
-    {
-        var deleteButton = new Button()
-        {
-            Text = "Delete",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        deleteButton.Clicked += DeleteElement;
-        deleteButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = deleteButton });
-    }
-
-    private void DeleteElement(object? sender, EventArgs e)
-    {
-        if (focusedView != null)
-        {
-            // Remove the focused view from its parent layout
-            (focusedView.Parent as Layout)?.Remove(focusedView);
-    
-            // Remove the focused view from the views dictionary and non-tappable views list if necessary
-            views.Remove(focusedView.Id);
-            if (nonTappableTypes.Contains(focusedView.GetType()))
-            {
-                nonTappableViews.Remove(focusedView);
-            }
-    
-            // Clear the focused view and hide the properties frame
-            focusedView = null;
-        }
-        contextMenu.IsVisible = false;
     }
 
     private void AddContextMenuItem(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
