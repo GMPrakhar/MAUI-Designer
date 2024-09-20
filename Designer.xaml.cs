@@ -68,12 +68,16 @@ public partial class Designer : ContentPage
                     HorizontalOptions = LayoutOptions.Start
                 };
 
-                Debug.WriteLine(view.Item3.ToString());
-
-                FluentIcons item3 = view.Item3;
                 var iconImage = new Image
                 {
-                    Source = item3.ToImageSource(),
+                    Source = new FontImageSource
+                    {
+                        FontFamily = "FluentIcons", // Ensure this matches the font family name in your project
+                        //Glyph = item3, // Use the specific icon name
+                        Glyph = view.Item3,
+                        Size = 20,
+                        Color = Colors.White
+                    },
                     WidthRequest = 10,
                     HeightRequest = 10,
                     VerticalOptions = LayoutOptions.Center

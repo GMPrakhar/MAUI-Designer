@@ -13,10 +13,10 @@ namespace MAUIDesigner
 {
     internal class ToolBox
     {
-        internal static IDictionary<ViewType, List<(string, Type, FluentIcons)>> GetAllVisualElementsAlongWithType()
+        internal static IDictionary<ViewType, List<(string, Type, string)>> GetAllVisualElementsAlongWithType()
         {
             var visualElements = typeof(Microsoft.Maui.Controls.View).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) && !t.IsAbstract);
-            var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type, FluentIcons)>>();
+            var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type, string)>>();
             foreach (var visualElement in visualElements)
             {
                 //Debug.WriteLine("Visual Element: " + visualElement.Name);
@@ -33,25 +33,25 @@ namespace MAUIDesigner
             return visualElementsWithType;
         }
 
-        private static FluentIcons GetIconForElement(string elementName)
+        private static string GetIconForElement(string elementName)
         {
             Debug.WriteLine("Element Name: " + elementName);
             return elementName switch
             {
-                "Button" => FluentIcons.ControlButton20,
-                "CheckBox" => FluentIcons.Checkbox120,
-                "DataGrid" => FluentIcons.DataArea20,
-                "Grid" => FluentIcons.Grid16,
-                "Image" => FluentIcons.Image16,
-                //"Label" => FluentIcons.Label,
-                "ListBox" => FluentIcons.List16,
-                "RadioButton" => FluentIcons.RadioButton20,
-                "Rectangle" => FluentIcons.RectangleLandscape12,
+                //"Button" => FluentIcons.ControlButton20,
+                //"CheckBox" => "\ue73e",
+                //"DataGrid" => FluentIcons.DataArea20,
+                //"Grid" => FluentIcons.Grid16,
+                //"Image" => FluentIcons.Image16,
+                ////"Label" => FluentIcons.Label,
+                //"ListBox" => FluentIcons.List16,
+                //"RadioButton" => FluentIcons.RadioButton20,
+                //"Rectangle" => FluentIcons.RectangleLandscape12,
                 //"StackPanel" => FluentIcons.StackPanel,
                 //"TabControl" => FluentIcons.TabControl,
                 //"TextBlock" => FluentIcons.TextBlock,
                 //"TextBox" => FluentIcons.TextBox,
-                _ => FluentIcons.GlanceDefault12 // Default icon if no match is found
+                _ => "\ue724" // Default icon if no match is found
             };
         }
 
