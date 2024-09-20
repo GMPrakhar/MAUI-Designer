@@ -75,17 +75,17 @@ public partial class Designer : ContentPage
                         FontFamily = "FluentIcons", // Ensure this matches the font family name in your project
                         //Glyph = item3, // Use the specific icon name
                         Glyph = view.Item3,
-                        Size = 20,
+                        //Size = Constants.ToolBoxItemImageSize,
                         Color = Colors.White
                     },
-                    WidthRequest = 10,
-                    HeightRequest = 10,
+                    WidthRequest = Constants.ToolBoxItemImageWidth,
+                    HeightRequest = Constants.ToolBoxItemImageHeight,
                     VerticalOptions = LayoutOptions.Center
                 };
 
                 var textLabel = new Label
                 {
-                    FontSize = 10,
+                    FontSize = Constants.ToolBoxItemLabelSize,
                     TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
                     Padding = new Thickness(3),
                     BackgroundColor = Color.FromRgba(0, 0, 0, 0),
@@ -132,7 +132,7 @@ public partial class Designer : ContentPage
             var label = senderView.Children[1] as Label;
             if (label != null)
             {
-                var animation = new Animation(s => label.FontSize = s, 10, 15);
+                var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelSize, Constants.ToolBoxItemLabelAnimateSize);
                 label.Animate("FontSize", animation, 16, 100);
             }
         }
@@ -146,7 +146,7 @@ public partial class Designer : ContentPage
             var label = senderView.Children[1] as Label;
             if (label != null)
             {
-                var animation = new Animation(s => label.FontSize = s, 15, 10);
+                var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelAnimateSize, Constants.ToolBoxItemLabelSize);
                 label.Animate("FontSize", animation, 16, 100);
             }
         }

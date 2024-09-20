@@ -38,14 +38,14 @@ namespace MAUIDesigner
             Debug.WriteLine("Element Name: " + elementName);
             return elementName switch
             {
-                //"Button" => FluentIcons.ControlButton20,
+                "Button" => "\ue41b",
                 "CheckBox" => "\uf28d",
                 //"DataGrid" => FluentIcons.DataArea20,
                 //"Grid" => FluentIcons.Grid16,
                 //"Image" => FluentIcons.Image16,
                 ////"Label" => FluentIcons.Label,
                 //"ListBox" => FluentIcons.List16,
-                //"RadioButton" => FluentIcons.RadioButton20,
+                "RadioButton" => "\uf645",
                 //"Rectangle" => FluentIcons.RectangleLandscape12,
                 //"StackPanel" => FluentIcons.StackPanel,
                 //"TabControl" => FluentIcons.TabControl,
