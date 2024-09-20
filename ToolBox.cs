@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -18,13 +19,14 @@ namespace MAUIDesigner
             var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type, FluentIcons)>>();
             foreach (var visualElement in visualElements)
             {
+                //Debug.WriteLine("Visual Element: " + visualElement.Name);
                 var viewType = GetViewTypeForType(visualElement);
                 if (!visualElementsWithType.ContainsKey(viewType))
                 {
                     visualElementsWithType[viewType] = [];
                 }
 
-                var icon = GetIconForElement(viewType.GetType().ToString());
+                var icon = GetIconForElement(visualElement.Name);
 
                 visualElementsWithType[viewType].Add((visualElement.Name, visualElement, icon));
             }
@@ -33,18 +35,18 @@ namespace MAUIDesigner
 
         private static FluentIcons GetIconForElement(string elementName)
         {
+            Debug.WriteLine("Element Name: " + elementName);
             return elementName switch
             {
                 "Button" => FluentIcons.ControlButton20,
-                //"CheckBox" => FluentIcons.Checkbox,
-                //"ComboBox" => FluentIcons.ComboBox,
-                //"DataGrid" => FluentIcons.DataGrid,
-                //"Grid" => FluentIcons.Grid,
-                //"Image" => FluentIcons.Image,
+                "CheckBox" => FluentIcons.Checkbox120,
+                "DataGrid" => FluentIcons.DataArea20,
+                "Grid" => FluentIcons.Grid16,
+                "Image" => FluentIcons.Image16,
                 //"Label" => FluentIcons.Label,
-                //"ListBox" => FluentIcons.ListBox,
-                //"RadioButton" => FluentIcons.RadioButton,
-                //"Rectangle" => FluentIcons.Rectangle,
+                "ListBox" => FluentIcons.List16,
+                "RadioButton" => FluentIcons.RadioButton20,
+                "Rectangle" => FluentIcons.RectangleLandscape12,
                 //"StackPanel" => FluentIcons.StackPanel,
                 //"TabControl" => FluentIcons.TabControl,
                 //"TextBlock" => FluentIcons.TextBlock,

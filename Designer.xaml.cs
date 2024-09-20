@@ -12,6 +12,7 @@ using Xamls = Microsoft.UI.Xaml;
 namespace MAUIDesigner;
 
 using MauiIcons.Core;
+using MauiIcons.Fluent;
 using System.Diagnostics;
 
 public partial class Designer : ContentPage
@@ -67,13 +68,14 @@ public partial class Designer : ContentPage
                     HorizontalOptions = LayoutOptions.Start
                 };
 
-                Debug.WriteLine(view.Item3.ToImageSource());
+                Debug.WriteLine(view.Item3.ToString());
 
+                FluentIcons item3 = view.Item3;
                 var iconImage = new Image
                 {
-                    Source = view.Item3.ToString(),
-                    WidthRequest = 20,
-                    HeightRequest = 20,
+                    Source = item3.ToImageSource(),
+                    WidthRequest = 10,
+                    HeightRequest = 10,
                     VerticalOptions = LayoutOptions.Center
                 };
 
