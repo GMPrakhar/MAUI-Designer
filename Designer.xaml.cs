@@ -188,7 +188,7 @@ public partial class Designer : ContentPage
     {
         try
         {
-            var newElement = ElementCreator.Create((sender as Button).Text);
+            var newElement = ElementCreator.Create((sender as Label).Text);
             AddDesignerGestureControls(newElement);
             designerFrame.Add(newElement);
             views.Add(newElement.Id, newElement);
