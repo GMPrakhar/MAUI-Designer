@@ -3,9 +3,11 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using MauiIcons.Fluent;
 
@@ -13,10 +15,22 @@ namespace MAUIDesigner
 {
     internal class ToolBox
     {
+        private static readonly IDictionary<string, string> IconMapping;
+
+        static ToolBox()
+        {
+            var projectRoot = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..","..");
+            var filePath = Path.Combine(projectRoot, "Resources", "Mappings", "iconMapping.json");
+
+            var json = File.ReadAllText(filePath);
+            IconMapping = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+        }
+
         internal static IDictionary<ViewType, List<(string, Type, string)>> GetAllVisualElementsAlongWithType()
         {
             var visualElements = typeof(Microsoft.Maui.Controls.View).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) && !t.IsAbstract);
             var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type, string)>>();
+
             foreach (var visualElement in visualElements)
             {
                 //Debug.WriteLine("Visual Element: " + visualElement.Name);
@@ -36,23 +50,7 @@ namespace MAUIDesigner
         private static string GetIconForElement(string elementName)
         {
             Debug.WriteLine("Element Name: " + elementName);
-            return elementName switch
-            {
-                "Button" => "\ue41b",
-                "CheckBox" => "\uf28d",
-                //"DataGrid" => FluentIcons.DataArea20,
-                //"Grid" => FluentIcons.Grid16,
-                //"Image" => FluentIcons.Image16,
-                ////"Label" => FluentIcons.Label,
-                //"ListBox" => FluentIcons.List16,
-                "RadioButton" => "\uf645",
-                //"Rectangle" => FluentIcons.RectangleLandscape12,
-                //"StackPanel" => FluentIcons.StackPanel,
-                //"TabControl" => FluentIcons.TabControl,
-                //"TextBlock" => FluentIcons.TextBlock,
-                //"TextBox" => FluentIcons.TextBox,
-                _ => "\ue724" // Default icon if no match is found
-            };
+            return IconMapping.TryGetValue(elementName, out var icon) ? icon : IconMapping["Default"];
         }
 
         // Get all properties for a given View
