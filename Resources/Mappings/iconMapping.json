@@ -54,5 +54,15 @@
   "Polygon": "\ueaa4",
   "Polyline": "\ue76f",
   "RelativeLayout": "",
-  "AndExpandGrid": ""
+  "AndExpandGrid": "",
+  "cut": "\uf33a",
+  "paste": "\ue35a",
+  "copy": "\uf32a",
+  "undo": "\ue126",
+  "redo": "\ue0e4",
+  "delete": "\uf34c",
+  "send to back": "\ue9a8",
+  "bring to front": "\ue9aa",
+  "detach from parent": "\uf3a2",
+  "lock in place": "\uead0"
 }

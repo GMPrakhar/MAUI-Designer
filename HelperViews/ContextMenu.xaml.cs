@@ -1,16 +1,27 @@
 using Microsoft.Maui.Devices.Sensors;
 using System.Collections.ObjectModel;
 using MAUIDesigner.HelperViews;
+using System.Diagnostics;
+using System.Globalization;
+using System.Text.Json;
+using Microsoft.Maui.Controls;
 
 namespace MAUIDesigner.HelperViews;
 
 public partial class ContextMenu : ContentView
 {
     public ObservableCollection<PropertyViewer> ActionList { get; set; } = new();
+    private readonly IDictionary<string, string> IconMapping;
+
     public ContextMenu()
     {
         InitializeComponent();
         this.IsVisible = false;
+        var projectRoot = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..");
+        var filePath = Path.Combine(projectRoot, "Resources", "Mappings", "iconMapping.json");
+
+        var json = File.ReadAllText(filePath);
+        IconMapping = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
     }
 
     internal void UpdateCollectionView()
@@ -89,32 +100,62 @@ public partial class ContextMenu : ContentView
         }
     }
 
+    private string GetIconForElement(string elementName)
+    {
+        elementName = elementName.ToLower();
+        Debug.WriteLine("Context Element Name: " + elementName);
+        return IconMapping.TryGetValue(elementName, out var icon) ? icon : IconMapping["Default"];
+    }
+
     private void AddContextMenuItem(string text, View targetElement, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
     {
+        var iconImage = new Image
+        {
+            Source = new FontImageSource
+            {
+                FontFamily = "FluentIcons", // Ensure this matches the font family name in your project
+                                            //Glyph = item3, // Use the specific icon name
+                Glyph = GetIconForElement(text),
+                //Size = Constants.ToolBoxItemImageSize,
+                Color = Colors.White
+            },
+            WidthRequest = 10,
+            HeightRequest = 10,
+            VerticalOptions = LayoutOptions.Center,
+            
+        };
+
         var label = new Label()
         {
             Text = text,
             TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
+            //BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
             Padding = new Thickness(5, 5, 5, 5),
             FontSize = 10,
             HorizontalOptions = LayoutOptions.Fill,
             HorizontalTextAlignment = TextAlignment.Start
         };
 
+        var horizontalStack = new HorizontalStackLayout
+        {
+            Children = { iconImage, label },
+            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Gray : Colors.White,
+            Padding = new Thickness(1)
+        };
+
         var tapGestureRecognizer = new TapGestureRecognizer();
         tapGestureRecognizer.Tapped += (s, e) => clickHandler(targetElement, e);
-        label.GestureRecognizers.Add(tapGestureRecognizer);
+        horizontalStack.GestureRecognizers.Add(tapGestureRecognizer);
 
-        label.GestureRecognizers.Add(hoverRecognizer);
-        this.ActionList.Add(new PropertyViewer() { View = label });
+        horizontalStack.GestureRecognizers.Add(hoverRecognizer);
+        this.ActionList.Add(new PropertyViewer() { View = horizontalStack });
     }
 
     private PointerGestureRecognizer CreateHoverRecognizer()
     {
         var hoverRecognizer = new PointerGestureRecognizer();
-        hoverRecognizer.PointerEntered += (s, e) => (s as View).BackgroundColor = Colors.DarkGray.WithLuminosity(0.2f);
-        hoverRecognizer.PointerExited += (s, e) => (s as View).BackgroundColor = Colors.Black;
+        hoverRecognizer.PointerEntered += (s, e) => (s as View).BackgroundColor = Colors.LightGray.WithLuminosity(0.1f);
+        hoverRecognizer.PointerExited += (s, e) => (s as View).BackgroundColor = Colors.Gray;
         return hoverRecognizer;
     }
 }
