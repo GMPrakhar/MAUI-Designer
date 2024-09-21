@@ -33,7 +33,6 @@ namespace MAUIDesigner
 
             foreach (var visualElement in visualElements)
             {
-                //Debug.WriteLine("Visual Element: " + visualElement.Name);
                 var viewType = GetViewTypeForType(visualElement);
                 if (!visualElementsWithType.ContainsKey(viewType))
                 {
