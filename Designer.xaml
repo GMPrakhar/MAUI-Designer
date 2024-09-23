@@ -34,16 +34,16 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <Label Text="Toolbox" Padding="5,0" FontSize="14" Grid.Row="0" Grid.Column="0" BackgroundColor="#10000000" HorizontalOptions="FillAndExpand" TextColor="LightSlateGrey"/>
-                <BoxView BackgroundColor="Transparent" Grid.Column="1" Grid.Row="1" x:Name="TabDraggerLeft">
-                    <BoxView.GestureRecognizers>
-                        <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
-                        <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
-                    </BoxView.GestureRecognizers>
-                </BoxView>
                 <ScrollView  Grid.Column="0" Grid.Row="1" Padding="5,0" >
                     <VerticalStackLayout x:Name="Toolbox" Margin="10">
                     </VerticalStackLayout>
                 </ScrollView>
+                <Rectangle Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" x:Name="TabDraggerLeft" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" >
+                    <Rectangle.GestureRecognizers>
+                        <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
+                        <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
+                    </Rectangle.GestureRecognizers>
+                </Rectangle>
             </Grid>
         </Border>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1" Grid.Row="0">
@@ -111,12 +111,12 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <Label Text="Properties" Padding="5,0" FontSize="14" Grid.Row="0" Grid.Column="1" BackgroundColor="#10000000" TextColor="LightSlateGrey" HorizontalOptions="FillAndExpand"/>
-                <BoxView BackgroundColor="Transparent" Grid.Column="0" Grid.Row="1" x:Name="TabDraggerRight">
-                    <BoxView.GestureRecognizers>
+                <Rectangle BackgroundColor="Transparent" Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" x:Name="TabDraggerRight">
+                    <Rectangle.GestureRecognizers>
                         <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
                         <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
-                    </BoxView.GestureRecognizers>
-                </BoxView>
+                    </Rectangle.GestureRecognizers>
+                </Rectangle>
                 <ScrollView Grid.Column="1" Grid.Row="1" Padding="10,0,10,0">
                     <VerticalStackLayout x:Name="Properties">
                     </VerticalStackLayout>
@@ -130,16 +130,16 @@
                 >
             <Grid>
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="20"/>
+                    <RowDefinition Height="3"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
                 <VerticalStackLayout Grid.Row="0">
-                    <BoxView BackgroundColor="Transparent" x:Name="TabDraggerBottom" HeightRequest="3">
-                        <BoxView.GestureRecognizers>
+                    <Rectangle BackgroundColor="Transparent" x:Name="TabDraggerBottom">
+                        <Rectangle.GestureRecognizers>
                             <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
                             <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
-                        </BoxView.GestureRecognizers>
-                    </BoxView>
+                        </Rectangle.GestureRecognizers>
+                    </Rectangle>
                     <Label Text="XAML Editor" Margin="10,0" FontSize="10" TextColor="LightSlateGrey"/>
                 </VerticalStackLayout>
                 <Grid Grid.Row="1">
