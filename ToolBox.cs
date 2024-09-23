@@ -2,20 +2,36 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
+using MauiIcons.Fluent;
 
 namespace MAUIDesigner
 {
     internal class ToolBox
     {
-        internal static IDictionary<ViewType, List<(string, Type)>> GetAllVisualElementsAlongWithType()
+        private static readonly IDictionary<string, string> IconMapping;
+
+        static ToolBox()
+        {
+            var projectRoot = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..","..");
+            var filePath = Path.Combine(projectRoot, "Resources", "Mappings", "iconMapping.json");
+
+            var json = File.ReadAllText(filePath);
+            IconMapping = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>();
+        }
+
+        internal static IDictionary<ViewType, List<(string, Type, string)>> GetAllVisualElementsAlongWithType()
         {
             var visualElements = typeof(Microsoft.Maui.Controls.View).Assembly.GetTypes().Where(t => t.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) && !t.IsAbstract);
-            var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type)>>();
-            foreach(var visualElement in visualElements)
+            var visualElementsWithType = new ConcurrentDictionary<ViewType, List<(string, Type, string)>>();
+
+            foreach (var visualElement in visualElements)
             {
                 var viewType = GetViewTypeForType(visualElement);
                 if (!visualElementsWithType.ContainsKey(viewType))
@@ -23,9 +39,17 @@ namespace MAUIDesigner
                     visualElementsWithType[viewType] = [];
                 }
 
-                visualElementsWithType[viewType].Add((visualElement.Name, visualElement));
+                var icon = GetIconForElement(visualElement.Name);
+
+                visualElementsWithType[viewType].Add((visualElement.Name, visualElement, icon));
             }
             return visualElementsWithType;
+        }
+
+        private static string GetIconForElement(string elementName)
+        {
+            Debug.WriteLine("Element Name: " + elementName);
+            return IconMapping.TryGetValue(elementName, out var icon) ? icon : IconMapping["Default"];
         }
 
         // Get all properties for a given View

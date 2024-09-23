@@ -10,6 +10,9 @@ using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
 using Inputs = Microsoft.UI.Input;
 using Xamls = Microsoft.UI.Xaml;
 namespace MAUIDesigner;
+
+using MauiIcons.Core;
+using MauiIcons.Fluent;
 using System.Diagnostics;
 
 public partial class Designer : ContentPage
@@ -25,6 +28,8 @@ public partial class Designer : ContentPage
     private SortedDictionary<string, Grid>? PropertiesForFocusedView;
     private View? MenuDraggerView = null;
     private ICollection<string> GuiUpdatableProperties = new [] { "Margin", "HeightRequest", "WidthRequest" };
+    private Stack<Action> undoStack = new Stack<Action>();
+    private Stack<Action> redoStack = new Stack<Action>();
     private ContextMenu contextMenu = new ContextMenu()
     {
         IsVisible = false
@@ -47,8 +52,8 @@ public partial class Designer : ContentPage
             var label = new Label
             {
                 Text = viewType.ToString(),
-                FontSize = 10,
-                Margin = new Thickness(0,10),
+                FontSize = 15,
+                Padding = new Thickness(10, 10, 0 ,0),
                 HorizontalOptions = LayoutOptions.Start,
                 FontAttributes = FontAttributes.Bold,
             };
@@ -56,32 +61,53 @@ public partial class Designer : ContentPage
 
             foreach (var view in viewsForType)
             {
-                var tmpGrid = new Grid()
+                var tmpGrid = new Grid
                 {
-                    RowDefinitions = new RowDefinitionCollection { new RowDefinition() { Height = new GridLength(1, GridUnitType.Star) } },
-                    ColumnDefinitions = new ColumnDefinitionCollection { new ColumnDefinition() { Width = new GridLength(1, GridUnitType.Star) } },
+                    RowDefinitions = new RowDefinitionCollection { new RowDefinition { Height = new GridLength(1, GridUnitType.Star) } },
+                    ColumnDefinitions = new ColumnDefinitionCollection { new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) } },
                     HorizontalOptions = LayoutOptions.Start
                 };
 
-                var labelView = new Button
+                var iconImage = new Image
                 {
-                    Text = view.Item1,
-                    FontSize = 10,
-                    TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
-                    BackgroundColor = Color.FromRgba(0,0,0,0)
+                    Source = new FontImageSource
+                    {
+                        FontFamily = "FluentIcons", // Ensure this matches the font family name in your project
+                        //Glyph = item3, // Use the specific icon name
+                        Glyph = view.Item3,
+                        //Size = Constants.ToolBoxItemImageSize,
+                        Color = Colors.White
+                    },
+                    WidthRequest = Constants.ToolBoxItemImageWidth,
+                    HeightRequest = Constants.ToolBoxItemImageHeight,
+                    VerticalOptions = LayoutOptions.Center
                 };
 
-                tmpGrid.Add(labelView);
+                var textLabel = new Label
+                {
+                    FontSize = Constants.ToolBoxItemLabelSize,
+                    TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
+                    Padding = new Thickness(3),
+                    BackgroundColor = Color.FromRgba(0, 0, 0, 0),
+                    Text = " " + view.Item1,
+                    VerticalOptions = LayoutOptions.Center
+                };
 
-                tmpGrid.SetColumn(labelView, 0);
+                var horizontalStack = new HorizontalStackLayout
+                {
+                    Children = { iconImage, textLabel }
+                };
+
+                tmpGrid.Children.Add(horizontalStack);
+                Grid.SetColumn(horizontalStack, 0);
 
                 var gestureRecognizer = new TapGestureRecognizer();
                 gestureRecognizer.Tapped += CreateElementInDesignerFrame;
                 var pointerGestureRecognizer = new PointerGestureRecognizer();
                 pointerGestureRecognizer.PointerEntered += RaiseLabel;
                 pointerGestureRecognizer.PointerExited += MakeLabelDefault;
-                labelView.GestureRecognizers.Add(gestureRecognizer);
-                labelView.GestureRecognizers.Add(pointerGestureRecognizer);
+                horizontalStack.GestureRecognizers.Add(gestureRecognizer);
+                horizontalStack.GestureRecognizers.Add(pointerGestureRecognizer);
 
                 Toolbox.Children.Add(tmpGrid);
             }
@@ -98,239 +124,32 @@ public partial class Designer : ContentPage
         designerFrame.GestureRecognizers.Add(rightClickRecognizer);
     }
 
-    private PointerGestureRecognizer CreateHoverRecognizer()
+        private void RaiseLabel(object? sender, PointerEventArgs e)
     {
-        var hoverRecognizer = new PointerGestureRecognizer();
-        hoverRecognizer.PointerEntered += (s, e) => (s as View).BackgroundColor = Colors.DarkGray.WithLuminosity(0.2f);
-        hoverRecognizer.PointerExited += (s, e) => (s as View).BackgroundColor = Colors.Black;
-        return hoverRecognizer;
-    }
-
-    private void UpdateContextMenuWithRandomProperties(View targetElement)
-    {
-        contextMenu.ActionList.Clear();
-        var hoverRecognizer = CreateHoverRecognizer();
-
-        AddContextMenuButton("Send to Back", targetElement, contextMenu, (s, e) => ContextMenuActions.SendToBackButton_Clicked(targetElement,contextMenu, e), hoverRecognizer);
-        AddContextMenuButton("Bring to Front", targetElement, contextMenu, (s, e) => ContextMenuActions.BringToFrontButton_Clicked(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuButton("Lock in place", targetElement, contextMenu, (s, e) => ContextMenuActions.LockInPlace_Clicked(targetElement, contextMenu, e), hoverRecognizer);
-        AddContextMenuButton("Detach from parent", targetElement, contextMenu, (s, e) => ContextMenuActions.DetachFromParent_Clicked(targetElement, contextMenu, e, designerFrame), hoverRecognizer);
-
-        // Add Delete button
-        AddDeleteButton(contextMenu, hoverRecognizer);
-
-        // Add Cut button
-        AddCutButton(contextMenu, hoverRecognizer);
-
-        // Add Copy button
-        AddCopyButton(contextMenu, hoverRecognizer);
-
-        // Add Paste button
-        AddPasteButton(contextMenu, hoverRecognizer);
-
-        foreach (var x in contextMenu.ActionList)
+        var senderView = sender as HorizontalStackLayout;
+        if (senderView != null && senderView.Children.Count > 1)
         {
-            x.View.GestureRecognizers.Add(hoverRecognizer);
-        }
-    }
-
-    private void UpdateContextMenuForNonElement()
-    {
-        contextMenu.ActionList.Clear();
-        var hoverRecognizer = CreateHoverRecognizer();
-
-        // Add Cut button (disabled)
-        AddCutButton(contextMenu, hoverRecognizer, isEnabled: false);
-
-        // Add Copy button (disabled)
-        AddCopyButton(contextMenu, hoverRecognizer, isEnabled: false);
-
-        // Add Paste button
-        AddPasteButton(contextMenu, hoverRecognizer);
-
-        foreach (var x in contextMenu.ActionList)
-        {
-            x.View.GestureRecognizers.Add(hoverRecognizer);
-        }
-    }
-
-    private View? clipboardElement = null;
-
-    private void AddCutButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer, bool isEnabled = true)
-    {
-        var cutButton = new Button()
-        {
-            Text = "Cut",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10,
-            IsEnabled = isEnabled
-        };
-        cutButton.Clicked += CutElement;
-        cutButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = cutButton });
-    }
-    private void CutElement(object? sender, EventArgs e)
-    {
-        if (focusedView != null)
-        {
-            clipboardElement = focusedView;
-            (focusedView.Parent as Layout)?.Remove(focusedView);
-            focusedView = null;
-            PropertiesFrame.IsVisible = false;
-            contextMenu.IsVisible = false;
-        }
-    }
-
-    private void AddCopyButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer, bool isEnabled = true)
-    {
-        var copyButton = new Button()
-        {
-            Text = "Copy",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10,
-            IsEnabled = isEnabled
-        };
-        copyButton.Clicked += CopyElement;
-        copyButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = copyButton });
-    }
-    private void CopyElement(object? sender, EventArgs e)
-    {
-        if (focusedView != null)
-        {
-            clipboardElement = focusedView;
-            contextMenu.IsVisible = false;
-        }
-    }
-
-    private void AddPasteButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer)
-    {
-        var pasteButton = new Button()
-        {
-            Text = "Paste",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10,
-            IsEnabled = clipboardElement != null
-        };
-        pasteButton.Clicked += PasteElement;
-        pasteButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = pasteButton });
-    }
-    private void PasteElement(object sender, EventArgs e)
-    {
-        if (clipboardElement != null)
-        {
-            // Create a new element based on the clipboard element
-            var newElement = ElementCreator.Create(clipboardElement.GetType().Name);
-            
-            // Set the properties of the new element based on the clipboard element
-            newElement.Margin = new Thickness(clipboardElement.Margin.Left + 20, clipboardElement.Margin.Top + 20, clipboardElement.Margin.Right, clipboardElement.Margin.Bottom);
-            newElement.WidthRequest = clipboardElement.WidthRequest;
-            newElement.HeightRequest = clipboardElement.HeightRequest;
-            
-            // Add gesture controls to the new element
-            AddDesignerGestureControls(newElement);
-            
-            // Add the new element to the designer frame
-            designerFrame.Add(newElement);
-            
-            // Update the views dictionary and non-tappable views list if necessary
-            views.Add(newElement.Id, newElement);
-            if (nonTappableTypes.Contains(newElement.GetType()))
+            var label = senderView.Children[1] as Label;
+            if (label != null)
             {
-                nonTappableViews.Add(newElement);
+                var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelSize, Constants.ToolBoxItemLabelAnimateSize);
+                label.Animate("FontSize", animation, 16, 100);
             }
-            
-            // Set the new element as the focused view and update the properties frame
-            focusedView = newElement;
-            PropertiesFrame.IsVisible = true;
-            PopulatePropertyGridField();
-            UpdateActualPropertyView();
-            
-            // Hide the context menu
-            contextMenu.IsVisible = false;
         }
-    }
-
-    private void AddDeleteButton(ContextMenu contextMenu, PointerGestureRecognizer hoverRecognizer)
-    {
-        var deleteButton = new Button()
-        {
-            Text = "Delete",
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        deleteButton.Clicked += DeleteElement;
-        deleteButton.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = deleteButton });
-    }
-
-    private void DeleteElement(object? sender, EventArgs e)
-    {
-        if (focusedView != null)
-        {
-            // Remove the focused view from its parent layout
-            (focusedView.Parent as Layout)?.Remove(focusedView);
-    
-            // Remove the focused view from the views dictionary and non-tappable views list if necessary
-            views.Remove(focusedView.Id);
-            if (nonTappableTypes.Contains(focusedView.GetType()))
-            {
-                nonTappableViews.Remove(focusedView);
-            }
-    
-            // Clear the focused view and hide the properties frame
-            focusedView = null;
-        }
-        contextMenu.IsVisible = false;
-    }
-
-    private void AddContextMenuButton(string text, View targetElement, ContextMenu contextMenu, EventHandler<EventArgs> clickHandler, PointerGestureRecognizer hoverRecognizer)
-    {
-        var button = new Button()
-        {
-            Text = text,
-            TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.LightGray : Colors.DarkGray,
-            CornerRadius = 0,
-            BackgroundColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.Black : Colors.White,
-            Padding = new Thickness(5, 0),
-            Margin = new Thickness(0, 0),
-            FontSize = 10
-        };
-        button.Clicked += (s, e) => clickHandler(targetElement, e);
-        button.GestureRecognizers.Add(hoverRecognizer);
-        contextMenu.ActionList.Add(new PropertyViewer() { View = button });
-    }
-
-    private void RaiseLabel(object? sender, PointerEventArgs e)
-    {
-        var senderView = sender as Button;
-        var animation = new Animation(s => senderView.FontSize = s, 10, 15);
-        senderView.Animate("FontSize", animation, 16, 100);
     }
 
     private void MakeLabelDefault(object? sender, PointerEventArgs e)
     {
-        var senderView = sender as Button;
-        // Animate Font size for senderView
-        var animation = new Animation(s => senderView.FontSize = s, 15, 10);
-        senderView.Animate("FontSize", animation, 16, 100);
+        var senderView = sender as HorizontalStackLayout;
+        if (senderView != null && senderView.Children.Count > 1)
+        {
+            var label = senderView.Children[1] as Label;
+            if (label != null)
+            {
+                var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelAnimateSize, Constants.ToolBoxItemLabelSize);
+                label.Animate("FontSize", animation, 16, 100);
+            }
+        }
     }
 
     private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
@@ -351,6 +170,13 @@ public partial class Designer : ContentPage
         {
             RemoveBorder(focusedView, null);
         }
+
+
+        if (contextMenu.IsVisible && !contextMenu.Frame.Contains(location))
+        {
+            contextMenu.Close();
+        }
+
     }
 
     private void UpdateActualPropertyView()
@@ -367,7 +193,8 @@ public partial class Designer : ContentPage
     {
         try
         {
-            var newElement = ElementCreator.Create((sender as Button).Text);
+            var senderView = sender as HorizontalStackLayout;
+            var newElement = ElementCreator.Create((senderView.Children[1] as Label).Text.Trim());
             AddDesignerGestureControls(newElement);
             designerFrame.Add(newElement);
             views.Add(newElement.Id, newElement);
@@ -426,22 +253,7 @@ public partial class Designer : ContentPage
 
     private void ShowContextMenu(object? sender, TappedEventArgs e)
     {
-        var location = e.GetPosition(designerFrame).Value;
-        // Set margin of the context menu to current mouse position
-        contextMenu.Margin = new Thickness(location.X, location.Y, 0, 0);
-        contextMenu.IsVisible = true;
-
-        // Check if the click is on any element
-        var targetElement = views.Values.FirstOrDefault(view => view.Frame.Contains(location));
-
-        if (targetElement != null)
-        {
-            UpdateContextMenuWithRandomProperties(targetElement);
-        }
-        else
-        {
-            UpdateContextMenuForNonElement();
-        }
+        contextMenu.Show(e, views, designerFrame);
     }
 
     private void ElementPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -497,6 +309,36 @@ public partial class Designer : ContentPage
         }catch(Exception)
         {
 
+        }
+    }
+
+    private void UndoButton_Clicked(object sender, EventArgs e)
+    {
+        Undo();
+    }
+
+    private void RedoButton_Clicked(object sender, EventArgs e)
+    {
+        Redo();
+    }
+
+    private void Undo()
+    {
+        if (undoStack.Count > 0)
+        {
+            var action = undoStack.Pop();
+            action.Invoke();
+            redoStack.Push(action);
+        }
+    }
+
+    private void Redo()
+    {
+        if (redoStack.Count > 0)
+        {
+            var action = redoStack.Pop();
+            action.Invoke();
+            undoStack.Push(action);
         }
     }
 
@@ -606,7 +448,6 @@ public partial class Designer : ContentPage
         isDragging = false;
         isScaling = false;
         scalerRect = null;
-        contextMenu.IsVisible = false;
     }
 
     private void DragGestureRecognizer_DragStarting(object? sender, DragStartingEventArgs e)
