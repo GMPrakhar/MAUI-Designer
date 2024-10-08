@@ -1,19 +1,15 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="MAUIDesigner.MainPage">
-    <StackLayout>
-        <Button Text="Render" Clicked="RenderXAML"></Button>
-        <Grid HeightRequest="800">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-
-
-            <Editor Grid.Column="0" x:Name="Editor" Text="Enter your text here"/>
-            <Frame Grid.Column="1" x:Name="Shower" Padding="10">
-            </Frame>
-        </Grid>
-    </StackLayout>
+             x:Class="MAUIDesigner.MainPage"
+             xmlns:cv="clr-namespace:MAUIDesigner.HelperViews">
+    <AbsoluteLayout>
+        <cv:ElementDesignerView x:Name="DesignerView">
+        </cv:ElementDesignerView>
+        <cv:ElementDesignerView x:Name="DesignerView2">
+        </cv:ElementDesignerView>
+        <AbsoluteLayout.GestureRecognizers>
+            <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_Drop"/>
+        </AbsoluteLayout.GestureRecognizers>
+    </AbsoluteLayout>
 </ContentPage>

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MAUIDesigner.HelperViews;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -29,6 +30,12 @@ namespace MAUIDesigner.XamlHelpers
                 return string.Empty;
             }
 
+            if(element is ElementDesignerView designerView)
+            {
+                element = designerView.View;
+                (element as View).Margin = designerView.EncapsulatingViewProperty.Margin;
+            }
+
             xamlBuilder.AppendLine($"<{element.GetType().Name}");
 
             var defaultElement = Activator.CreateInstance(element.GetType());
@@ -57,6 +64,8 @@ namespace MAUIDesigner.XamlHelpers
                     }
                 }
             }
+
+            (element as View).Margin = 0;
 
             // Check if element can contain children
             if (element is Layout layout)

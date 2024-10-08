@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MAUIDesigner.HelperViews.ElementDesignerView"
+             x:Name="DesignerView">
+    <AbsoluteLayout MinimumWidthRequest="100" MinimumHeightRequest="100" x:Name="EncapsulatingView" HorizontalOptions="CenterAndExpand" VerticalOptions="CenterAndExpand">
+        <!-- Frame in the center -->
+        <Border Stroke="#C49B33"
+            StrokeThickness="4"
+                Padding="0,0"
+                Margin="0,0"
+                VerticalOptions="FillAndExpand"
+                HorizontalOptions="FillAndExpand"
+                x:Name="ElementBorder"
+                Content="{Binding View, Source={x:Reference DesignerView}}" InputTransparent="True" 
+        >
+        </Border>
+
+        <!-- Top Left Rectangle -->
+        <Rectangle 
+               x:Name="topLeftRect"
+     WidthRequest="8"
+     HeightRequest="8"
+     AbsoluteLayout.LayoutBounds="0, 0, 0.05, 0.05"
+     AbsoluteLayout.LayoutFlags="PositionProportional">
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="TopLeftScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <!-- Top Right Rectangle -->
+        <Rectangle 
+               x:Name="topRightRect"
+     WidthRequest="8"
+     HeightRequest="8"
+     AbsoluteLayout.LayoutBounds="1, 0, 0.05, 0.05"
+     AbsoluteLayout.LayoutFlags="PositionProportional">
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="TopRightScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <!-- Bottom Left Rectangle -->
+        <Rectangle 
+                x:Name="bottomLeftRect"
+     WidthRequest="8"
+     HeightRequest="8"
+     AbsoluteLayout.LayoutBounds="0, 1, 0.05, 0.05"
+     AbsoluteLayout.LayoutFlags="PositionProportional">
+
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="BottomLeftScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <!-- Bottom Right Rectangle -->
+        <Rectangle 
+                x:Name="bottomRightRect"
+     WidthRequest="8"
+     HeightRequest="8"
+     AbsoluteLayout.LayoutBounds="1, 1, 0.05, 0.05"
+     AbsoluteLayout.LayoutFlags="PositionProportional">
+
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="BottomRightScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <AbsoluteLayout.GestureRecognizers>
+            <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting"/>
+            <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped"/>
+        </AbsoluteLayout.GestureRecognizers>
+    </AbsoluteLayout>
+</ContentView>

@@ -47,12 +47,12 @@ public partial class ContextMenu : ContentView
         UpdateCollectionView();
     }
 
-    public void Show(TappedEventArgs e, IDictionary<Guid, View> views, AbsoluteLayout designerFrame)
+    public void Show(TappedEventArgs e, Layout designerFrame)
     {
         var location = e.GetPosition(designerFrame).Value;
         this.Margin = new Thickness(location.X, location.Y, 0, 0);
         // Check if the click is on any element
-        var targetElement = views.Values.FirstOrDefault(view => view.Frame.Contains(location));
+        var targetElement = designerFrame.GetVisualTreeDescendants().FirstOrDefault(desc => desc is ElementDesignerView view && view.Frame.Contains(location)) as ElementDesignerView;
         if (targetElement != null)
         {
             UpdateContextMenuWithElementProperties(targetElement, designerFrame);
@@ -64,7 +64,7 @@ public partial class ContextMenu : ContentView
         Show();
     }
 
-    private void UpdateContextMenuForNonElement(AbsoluteLayout designerFrame)
+    private void UpdateContextMenuForNonElement(Layout designerFrame)
     {
         Reset();
         var hoverRecognizer = CreateHoverRecognizer();
@@ -78,7 +78,7 @@ public partial class ContextMenu : ContentView
         }
     }
 
-    private void UpdateContextMenuWithElementProperties(View targetElement, AbsoluteLayout designerFrame)
+    private void UpdateContextMenuWithElementProperties(View targetElement, Layout designerFrame)
     {
         this.ActionList.Clear();
         var hoverRecognizer = CreateHoverRecognizer();
