@@ -1,6 +1,6 @@
-﻿using Microsoft.Maui.Platform;
-using System.Runtime.CompilerServices;
-using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;
+﻿using MAUIDesigner.DnDHelper;
+using MAUIDesigner.HelperViews;
+using static MAUIDesigner.DnDHelper.ScalingHelper;
 
 namespace MAUIDesigner
 {
@@ -13,19 +13,12 @@ namespace MAUIDesigner
         public MainPage()
         {
             InitializeComponent();
+
         }
 
-        private void RenderXAML(object sender, EventArgs e)
+        private void DropGestureRecognizer_Drop(object sender, DropEventArgs e)
         {
-            var xaml = Editor.Text;
-            try
-            {
-                Extensions.LoadFromXaml(Shower, xaml);
-            }
-            catch (Exception)
-            {
-                Application.Current.MainPage.DisplayAlert("Error", "Invalid XAML", "OK");
-            }
+            DragAndDropOperations.OnDrop(sender, e);
         }
     }
 

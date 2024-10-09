@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MAUIDesigner.HelperViews;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -21,12 +22,18 @@ namespace MAUIDesigner.XamlHelpers
             return finalXamlBuilder.ToString();
         }
 
-        private static string GetInternalXAML(VisualElement element)
+        internal static string GetInternalXAML(VisualElement element)
         {
             StringBuilder xamlBuilder = new StringBuilder();
             if (element.StyleId == Constants.DraggingViewName)
             {
                 return string.Empty;
+            }
+
+            if(element is ElementDesignerView designerView)
+            {
+                element = designerView.View;
+                (element as View).Margin = designerView.EncapsulatingViewProperty.Margin;
             }
 
             xamlBuilder.AppendLine($"<{element.GetType().Name}");
@@ -57,6 +64,8 @@ namespace MAUIDesigner.XamlHelpers
                     }
                 }
             }
+
+            (element as View).Margin = 0;
 
             // Check if element can contain children
             if (element is Layout layout)

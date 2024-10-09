@@ -8,7 +8,6 @@
     <Grid VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" x:Name="MainGrid" Margin="5">
         <Grid.GestureRecognizers>
             <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_Drop"/>
-            <PointerGestureRecognizer PointerMoved="GridPointerMoved"/>
         </Grid.GestureRecognizers>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="200"/>
@@ -47,52 +46,9 @@
             </Grid>
         </Border>
         <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1" Grid.Row="0">
-            <AbsoluteLayout x:Name="gradientBorder2" >
-                <!-- Frame in the center -->
-                <Border Stroke="#C49B33"
-                StrokeThickness="4"
-                AbsoluteLayout.LayoutBounds="0.5, 0.5, 0.98, 0.98"
-                AbsoluteLayout.LayoutFlags="All"
-                Padding="16,8"
-                >
-                </Border>
-
-                <!-- Top Left Rectangle -->
-                <Rectangle 
-                           x:Name="topLeftRect"
-                 WidthRequest="8"
-                 HeightRequest="8"
-                 AbsoluteLayout.LayoutBounds="0, 0, 0.05, 0.05"
-                 AbsoluteLayout.LayoutFlags="All">
-                </Rectangle>
-
-                <!-- Top Right Rectangle -->
-                <Rectangle 
-                           x:Name="topRightRect"
-                 WidthRequest="8"
-                 HeightRequest="8"
-                 AbsoluteLayout.LayoutBounds="1, 0, 0.05, 0.05"
-                 AbsoluteLayout.LayoutFlags="All"/>
-
-                <!-- Bottom Left Rectangle -->
-                <Rectangle 
-                            x:Name="bottomLeftRect"
-                 WidthRequest="8"
-                 HeightRequest="8"
-                 AbsoluteLayout.LayoutBounds="0, 1, 0.05, 0.05"
-                 AbsoluteLayout.LayoutFlags="All"/>
-
-                <!-- Bottom Right Rectangle -->
-                <Rectangle 
-                            x:Name="bottomRightRect"
-                 WidthRequest="8"
-                 HeightRequest="8"
-                 AbsoluteLayout.LayoutBounds="1, 1, 0.05, 0.05"
-                 AbsoluteLayout.LayoutFlags="All"/>
-            </AbsoluteLayout>
             <AbsoluteLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" Buttons="Secondary,Primary"/>
-                <PointerGestureRecognizer PointerMoved="PointerGestureRecognizer_PointerMoved" PointerPressed="PointerGestureRecognizer_PointerPressed" PointerReleased="PointerGestureRecognizer_PointerReleased"/>
+                <DropGestureRecognizer Drop="DropGestureRecognizer_Drop_1"/>
             </AbsoluteLayout.GestureRecognizers>
 
         </AbsoluteLayout>
@@ -152,7 +108,7 @@
                         <Button Text="Load from XAML" Clicked="LoadViewFromXaml" Margin="2" Padding="2"/>
                     </VerticalStackLayout>
                     <ScrollView Grid.Column="1">
-                        <Editor x:Name="XAMLHolder" MinimumHeightRequest="150"/>
+                        <Editor x:Name="XAMLHolder" MinimumHeightRequest="150" FontAutoScalingEnabled="True"/>
                     </ScrollView>
                 </Grid>
             </Grid>

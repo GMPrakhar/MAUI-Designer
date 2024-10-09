@@ -10,7 +10,7 @@ namespace MAUIDesigner.HelperViews
     internal static class ContextMenuActions
     {
         public static View? ClipboardElement { get; set; }
-        public static void DetachFromParent(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
+        public static void DetachFromParent(View targetElement, ContextMenu contextMenu, EventArgs e, Layout designerFrame)
         {
             if (targetElement?.Parent is Layout parentLayout)
             {
@@ -61,7 +61,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
-        public static void CutElement(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
+        public static void CutElement(View targetElement, ContextMenu contextMenu, EventArgs e, Layout designerFrame)
         {
             if (targetElement != null)
             {
@@ -81,7 +81,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
-        public static void PasteElement(View targetElement, ContextMenu contextMenu, EventArgs e, AbsoluteLayout designerFrame)
+        public static void PasteElement(View targetElement, ContextMenu contextMenu, EventArgs e, Layout designerFrame)
         {
             if (ClipboardElement != null)
             {

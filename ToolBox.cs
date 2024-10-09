@@ -9,13 +9,25 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using MAUIDesigner.HelperViews;
 using MauiIcons.Fluent;
+using Microsoft.Maui;
+using Microsoft.Maui.Controls;
+using Microsoft.Maui.Graphics;
+using Xamls = Microsoft.UI.Xaml;
 
 namespace MAUIDesigner
 {
     internal class ToolBox
     {
         private static readonly IDictionary<string, string> IconMapping;
+
+        internal static Layout MainDesignerView;
+
+        public static ContextMenu contextMenu = new ContextMenu()
+        {
+            IsVisible = false
+        };
 
         static ToolBox()
         {
@@ -199,14 +211,9 @@ namespace MAUIDesigner
             return label;
         }
 
-        private static void GestureRecognizer_Tapped(object? sender, TappedEventArgs e)
+        internal static void ShowContextMenu(object? sender, TappedEventArgs e)
         {
-            Application.Current.MainPage.DisplayAlert("Error", "Invalid XAML", "OK");
-        }
-
-        private static void Editor_TextChanged(object? sender, TextChangedEventArgs e)
-        {
-            throw new NotImplementedException();
+            contextMenu.Show(e, MainDesignerView);
         }
 
         public static ViewType GetViewTypeForType(Type type)
@@ -221,6 +228,108 @@ namespace MAUIDesigner
                 Type _ when type.IsSubclassOf(typeof(Microsoft.Maui.Controls.View)) => ViewType.View,
                 _ => ViewType.Other,
             };
+        }
+
+        public static void AddElementsForToolbox(Layout toolbox)
+        {
+            var allVisualElements = ToolBox.GetAllVisualElementsAlongWithType();
+
+            foreach (var viewType in allVisualElements.Keys)
+            {
+                var viewsForType = allVisualElements[viewType];
+
+                var label = new Label
+                {
+                    Text = viewType.ToString(),
+                    FontSize = 15,
+                    Padding = new Thickness(10, 10, 0, 0),
+                    HorizontalOptions = LayoutOptions.Start,
+                    FontAttributes = FontAttributes.Bold,
+                };
+
+                toolbox.Add(label);
+
+                foreach (var view in viewsForType)
+                {
+                    var tmpGrid = new Grid
+                    {
+                        RowDefinitions = new RowDefinitionCollection { new RowDefinition { Height = new GridLength(1, GridUnitType.Star) } },
+                        ColumnDefinitions = new ColumnDefinitionCollection { new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) } },
+                        HorizontalOptions = LayoutOptions.Start
+                    };
+
+                    var iconImage = new Image
+                    {
+                        Source = new FontImageSource
+                        {
+                            FontFamily = "FluentIcons", // Ensure this matches the font family name in your project
+                                                        //Glyph = item3, // Use the specific icon name
+                            Glyph = view.Item3,
+                            //Size = Constants.ToolBoxItemImageSize,
+                            Color = Colors.White
+                        },
+                        WidthRequest = Constants.ToolBoxItemImageWidth,
+                        HeightRequest = Constants.ToolBoxItemImageHeight,
+                        VerticalOptions = LayoutOptions.Center
+                    };
+
+                    var textLabel = new Label
+                    {
+                        FontSize = Constants.ToolBoxItemLabelSize,
+                        TextColor = Application.Current.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
+                        Padding = new Thickness(3),
+                        BackgroundColor = Color.FromRgba(0, 0, 0, 0),
+                        Text = " " + view.Item1,
+                        VerticalOptions = LayoutOptions.Center
+                    };
+
+                    var horizontalStack = new HorizontalStackLayout
+                    {
+                        Children = { iconImage, textLabel }
+                    };
+
+                    tmpGrid.Children.Add(horizontalStack);
+                    Grid.SetColumn(horizontalStack, 0);
+
+                    var gestureRecognizer = new TapGestureRecognizer();
+                    gestureRecognizer.Tapped += (s,e) => ElementOperations.CreateElementInDesignerFrame(MainDesignerView, s);
+                    var pointerGestureRecognizer = new PointerGestureRecognizer();
+                    pointerGestureRecognizer.PointerEntered += RaiseLabel;
+                    pointerGestureRecognizer.PointerExited += MakeLabelDefault;
+                    horizontalStack.GestureRecognizers.Add(gestureRecognizer);
+                    horizontalStack.GestureRecognizers.Add(pointerGestureRecognizer);
+
+                    toolbox.Add(tmpGrid);
+                }
+            }
+        }
+
+        private static void RaiseLabel(object? sender, PointerEventArgs e)
+        {
+            var senderView = sender as HorizontalStackLayout;
+            if (senderView != null && senderView.Children.Count > 1)
+            {
+                var label = senderView.Children[1] as Label;
+                if (label != null)
+                {
+                    var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelSize, Constants.ToolBoxItemLabelAnimateSize);
+                    label.Animate("FontSize", animation, 16, 100);
+                }
+            }
+        }
+
+        private static void MakeLabelDefault(object? sender, PointerEventArgs e)
+        {
+            var senderView = sender as HorizontalStackLayout;
+            if (senderView != null && senderView.Children.Count > 1)
+            {
+                var label = senderView.Children[1] as Label;
+                if (label != null)
+                {
+                    var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelAnimateSize, Constants.ToolBoxItemLabelSize);
+                    label.Animate("FontSize", animation, 16, 100);
+                }
+            }
         }
     }
     public enum ViewType
