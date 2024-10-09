@@ -1,4 +1,5 @@
-﻿using Microsoft.Maui.Controls.Shapes;
+﻿using Microsoft.Maui.Controls.Compatibility.Platform.UWP;
+using Microsoft.Maui.Controls.Shapes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -43,13 +44,9 @@ namespace MAUIDesigner.DnDHelper
                 location.Y = draggingView.Margin.Top;
             }
 
-            var draggingBorderView = draggingView.GetVisualTreeDescendants().First(x => x is Border) as Border;
-
-            draggingBorderView.Content.WidthRequest = Math.Max(draggingView.WidthRequest + scalingFactor.Left, 20);
-            draggingBorderView.Content.HeightRequest = Math.Max(draggingView.HeightRequest + scalingFactor.Top, 20);
-            (draggingView as AbsoluteLayout).Arrange(draggingView.Bounds);
+            draggingView.WidthRequest = Math.Max(draggingView.WidthRequest + scalingFactor.Left, 20);
+            draggingView.HeightRequest = Math.Max(draggingView.HeightRequest + scalingFactor.Top, 20);
             draggingView.Margin = new Thickness(location.X, location.Y, location.X + draggingView.WidthRequest, location.Y + draggingView.HeightRequest);
-            
         }
 
         public enum ScaleDirection

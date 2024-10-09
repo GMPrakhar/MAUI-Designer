@@ -3,14 +3,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MAUIDesigner.HelperViews.ElementDesignerView"
              x:Name="DesignerView">
-    <AbsoluteLayout MinimumWidthRequest="100" MinimumHeightRequest="100" x:Name="EncapsulatingView" HorizontalOptions="CenterAndExpand" VerticalOptions="CenterAndExpand">
+    <AbsoluteLayout MinimumWidthRequest="100" MinimumHeightRequest="100" x:Name="EncapsulatingView" >
         <!-- Frame in the center -->
         <Border Stroke="#C49B33"
             StrokeThickness="4"
-                Padding="0,0"
-                Margin="0,0"
                 VerticalOptions="FillAndExpand"
                 HorizontalOptions="FillAndExpand"
+     AbsoluteLayout.LayoutBounds="0.5, 0.5, 1, 1"
+     AbsoluteLayout.LayoutFlags="All"
                 x:Name="ElementBorder"
                 Content="{Binding View, Source={x:Reference DesignerView}}" InputTransparent="True" 
         >
@@ -18,6 +18,7 @@
 
         <!-- Top Left Rectangle -->
         <Rectangle 
+            ZIndex="1000"
                x:Name="topLeftRect"
      WidthRequest="8"
      HeightRequest="8"
@@ -30,6 +31,7 @@
 
         <!-- Top Right Rectangle -->
         <Rectangle 
+            ZIndex="1000"
                x:Name="topRightRect"
      WidthRequest="8"
      HeightRequest="8"
@@ -42,6 +44,7 @@
 
         <!-- Bottom Left Rectangle -->
         <Rectangle 
+            ZIndex="1000"
                 x:Name="bottomLeftRect"
      WidthRequest="8"
      HeightRequest="8"
@@ -55,6 +58,7 @@
 
         <!-- Bottom Right Rectangle -->
         <Rectangle 
+            ZIndex="1000"
                 x:Name="bottomRightRect"
      WidthRequest="8"
      HeightRequest="8"

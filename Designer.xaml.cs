@@ -130,6 +130,8 @@ public partial class Designer : ContentPage
             newLayout.Add(elementDesignerView);
             ElementOperations.AddDesignerGestureControls(loadedView);
         }
+
+        DragAndDropOperations.OnFocusChanged.Invoke(null);
     }
 
     private void DragGestureRecognizer_DragStarting_1(object sender, DragStartingEventArgs e)

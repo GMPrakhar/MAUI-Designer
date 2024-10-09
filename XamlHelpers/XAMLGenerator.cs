@@ -22,7 +22,7 @@ namespace MAUIDesigner.XamlHelpers
             return finalXamlBuilder.ToString();
         }
 
-        private static string GetInternalXAML(VisualElement element)
+        internal static string GetInternalXAML(VisualElement element)
         {
             StringBuilder xamlBuilder = new StringBuilder();
             if (element.StyleId == Constants.DraggingViewName)
