@@ -34,6 +34,8 @@ namespace MAUIDesigner.XamlHelpers
             {
                 element = designerView.View;
                 (element as View).Margin = designerView.EncapsulatingViewProperty.Margin;
+                (element as View).WidthRequest = designerView.EncapsulatingViewProperty.WidthRequest;
+                (element as View).HeightRequest = designerView.EncapsulatingViewProperty.HeightRequest;
             }
 
             xamlBuilder.AppendLine($"<{element.GetType().Name}");
@@ -66,6 +68,8 @@ namespace MAUIDesigner.XamlHelpers
             }
 
             (element as View).Margin = 0;
+            (element as View).WidthRequest = -1;
+            (element as View).HeightRequest = -1;
 
             // Check if element can contain children
             if (element is Layout layout)

@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="MAUIDesigner.HelperViews.ElementDesignerView"
              x:Name="DesignerView">
-    <AbsoluteLayout MinimumWidthRequest="100" MinimumHeightRequest="100" x:Name="EncapsulatingView" >
+    <AbsoluteLayout MinimumWidthRequest="20" MinimumHeightRequest="20" x:Name="EncapsulatingView" >
         <!-- Frame in the center -->
         <Border Stroke="#C49B33"
             StrokeThickness="4"

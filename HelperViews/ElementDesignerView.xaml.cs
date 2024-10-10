@@ -37,6 +37,8 @@ public partial class ElementDesignerView : ContentView
         Padding = 0;
 
         loadedView.Margin = 0;
+        loadedView.HeightRequest = -1;
+        loadedView.WidthRequest = -1;
 
         loadedView.PropertyChanged += LoadedView_PropertyChanged;
     }
