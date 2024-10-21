@@ -8,7 +8,7 @@ namespace MAUIDesigner
 {
     public static class Constants
     {
-        public const string DraggingViewName = "gradientBorder2";
+        public static string[] FrameworkElementNames = { "EncapsulatingView", "topLeftRect", "topRightRect", "bottomLeftRect", "bottomRightRect", "ElementBorder" };
         public const int ToolBoxItemLabelSize = 12;
         public const int ToolBoxItemLabelAnimateSize = 15;
         public const int ToolBoxItemImageHeight = 15;

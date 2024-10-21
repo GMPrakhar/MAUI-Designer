@@ -1,10 +1,14 @@
-﻿using static MAUIDesigner.DnDHelper.ScalingHelper;
+﻿using MAUIDesigner.HelperViews;
+using MAUIDesigner.LayoutDesigners;
+using static MAUIDesigner.DnDHelper.ScalingHelper;
 
 namespace MAUIDesigner.DnDHelper
 {
     internal static class DragAndDropOperations
     {
         public static Action<object> OnFocusChanged;
+
+        public static AbsoluteLayout BaseLayout;
 
         public static void OnDrop(object sender, DropEventArgs e)
         {
@@ -13,8 +17,12 @@ namespace MAUIDesigner.DnDHelper
             var draggingView = draggingObject as View;
 
             var parentView = (sender as GestureRecognizer).Parent;
+            if (parentView is ElementDesignerView designerView)
+            {
+                parentView = designerView.View;
+            }
 
-            var location = e.GetPosition((sender as GestureRecognizer).Parent).Value;
+            var location = e.GetPosition(parentView).Value;
 
             if (IsScalingObject != null && (bool)IsScalingObject == true)
             {
@@ -24,11 +32,17 @@ namespace MAUIDesigner.DnDHelper
             }
             else
             {
-                if (draggingObject != null)
+                if (draggingObject is not null)
                 {
-                    draggingView.Margin = new Thickness(location.X, location.Y, location.X + draggingView.Width, location.Y + draggingView.Height);
+                    var layoutDesigner = LayoutDesignerFactory.CreateLayoutDesigner(parentView as Layout);
+                    layoutDesigner.OnDrop(draggingView, location);
                 }
             }
+        }
+
+        private static Layout GetLayoutAtPosition(Point location)
+        {
+            return BaseLayout.GetVisualTreeDescendants().Last(x => x is Layout lay && lay.Frame.Contains(location)) as Layout;
         }
     }
 }

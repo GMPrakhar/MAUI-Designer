@@ -27,7 +27,7 @@ namespace MAUIDesigner
             }
         }
 
-        internal static void AddDesignerGestureControls(View newElement)
+        internal static void AddDesignerGestureControls(ElementDesignerView newElement)
         {
             var rightClickRecognizer = new TapGestureRecognizer();
             rightClickRecognizer.Tapped += ToolBox.ShowContextMenu;
@@ -37,6 +37,13 @@ namespace MAUIDesigner
             var pointerGestureRecognizer = new PointerGestureRecognizer();
             pointerGestureRecognizer.PointerEntered += (s, e) => ChangeCursorToHand(s);
             pointerGestureRecognizer.PointerExited += (s, e) => ChangeCursorToDefault(s);
+
+            if(newElement.View is Layout)
+            {
+                var dropGestureRecognizer = new DropGestureRecognizer();
+                dropGestureRecognizer.Drop += DragAndDropOperations.OnDrop;
+                newElement.GestureRecognizers.Add(dropGestureRecognizer);
+            }
 
 
             newElement.GestureRecognizers.Add(rightClickRecognizer);

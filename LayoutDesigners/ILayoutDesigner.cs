@@ -8,6 +8,6 @@ namespace MAUIDesigner.LayoutDesigners
 {
     public interface ILayoutDesigner
     {
-
+        public void OnDrop(View view, Point location);
     }
 }

@@ -46,6 +46,7 @@ public partial class Designer : ContentPage
         designerFrame.GestureRecognizers.Add(rightClickRecognizer);
 
         DragAndDropOperations.OnFocusChanged += UpdatePropertyForFocusedView;
+        DragAndDropOperations.BaseLayout = designerFrame;
     }
 
     private void UpdatePropertyForFocusedView(object obj)
@@ -118,6 +119,7 @@ public partial class Designer : ContentPage
             if (loadedView is Layout internalLayout)
             {
                 var newLoadedLayout = Activator.CreateInstance(internalLayout.GetType()) as Layout;
+                CopyProperties(internalLayout, newLoadedLayout);
                 LoadLayoutRecursively(newLoadedLayout, internalLayout);
 
                 elementDesignerView = new ElementDesignerView(newLoadedLayout);
@@ -128,11 +130,28 @@ public partial class Designer : ContentPage
             }
 
             newLayout.Add(elementDesignerView);
-            ElementOperations.AddDesignerGestureControls(loadedView);
+            ElementOperations.AddDesignerGestureControls(elementDesignerView);
         }
 
         DragAndDropOperations.OnFocusChanged.Invoke(null);
     }
+
+    private void CopyProperties(Layout internalLayout, Layout? newLoadedLayout)
+    {
+        if (newLoadedLayout == null)
+            return;
+
+        var properties = internalLayout.GetType().GetProperties();
+        foreach (var property in properties)
+        {
+            if (property.CanRead && property.CanWrite && property.Name != "Item")
+            {
+                var value = property.GetValue(internalLayout);
+                property.SetValue(newLoadedLayout, value);
+            }
+        }
+    }
+
 
     private void DragGestureRecognizer_DragStarting_1(object sender, DragStartingEventArgs e)
     {

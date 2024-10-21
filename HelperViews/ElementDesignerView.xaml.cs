@@ -31,9 +31,14 @@ public partial class ElementDesignerView : ContentView
     public ElementDesignerView(View? loadedView) : this()
     {
         this.View = loadedView;
+        Grid.SetRow(this, Grid.GetRow(loadedView));
+        Grid.SetColumn(this, Grid.GetColumn(loadedView));
+        Grid.SetRowSpan(this, Grid.GetRowSpan(loadedView));
+        Grid.SetColumnSpan(this, Grid.GetColumnSpan(loadedView));
         EncapsulatingView.Margin = loadedView.Margin;
         EncapsulatingView.HeightRequest = loadedView.HeightRequest;
         EncapsulatingView.WidthRequest = loadedView.WidthRequest;
+        this.View.Layout(this.View.Bounds);
         Padding = 0;
 
         loadedView.Margin = 0;

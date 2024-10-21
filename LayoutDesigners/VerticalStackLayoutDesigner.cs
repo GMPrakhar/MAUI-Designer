@@ -8,5 +8,9 @@ namespace MAUIDesigner.LayoutDesigners
 {
     internal class VerticalStackLayoutDesigner : ILayoutDesigner
     {
+        public void OnDrop(View view, Point location)
+        {
+            throw new NotImplementedException();
+        }
     }
 }
