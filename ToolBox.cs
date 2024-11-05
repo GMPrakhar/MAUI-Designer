@@ -82,7 +82,7 @@ namespace MAUIDesigner
 
         internal static View GetViewForPropertyType(View view, PropertyInfo property, object value)
         {
-            
+
             // Get the view according to the type of the value. If it is primitive type or string, it should be an editor, if it's enum it should be a picker
             if (value is string || value == null || value.GetType().IsPrimitive)
             {
@@ -126,6 +126,72 @@ namespace MAUIDesigner
 
                 return picker;
             }
+            else if (value.GetType() == typeof(ColumnDefinitionCollection))
+            {
+                var columnDefinitionCollection = (ColumnDefinitionCollection)value;
+                var columnDefintionString = string.Join(',',columnDefinitionCollection.Select(columnDefinition => columnDefinition.Width.ToString()));
+                var editor = new Entry
+                {
+                    Text = columnDefintionString,
+                    FontSize = 10,
+                    VerticalOptions = LayoutOptions.Center,
+                    HeightRequest = 10
+                };
+
+                editor.TextChanged += (s, e) =>
+                {
+                    try
+                    {
+                        var text = (s as Entry)!.Text;
+                        var columnDefinitions = text.Split(',').Select(x => {
+                            var gridData = x.Split('.');
+                            return new ColumnDefinition(new GridLength(double.Parse(gridData[0]), Enum.Parse<GridUnitType>(gridData[1])));
+                        });
+                        var columnDefinitionCollection = new ColumnDefinitionCollection(columnDefinitions.ToArray());
+                        property.SetValue(view, columnDefinitionCollection);
+                    }
+                    catch
+                    {
+
+                    }
+                };
+
+                return editor;
+
+            }
+            else if (value.GetType() == typeof(RowDefinitionCollection))
+            {
+                var RowDefinitionCollection = (RowDefinitionCollection)value;
+                var rowDefintionString = string.Join(',', RowDefinitionCollection.Select(RowDefinition => RowDefinition.Height.ToString()));
+                var editor = new Entry
+                {
+                    Text = rowDefintionString,
+                    FontSize = 10,
+                    VerticalOptions = LayoutOptions.Center,
+                    HeightRequest = 10
+                };
+
+                editor.TextChanged += (s, e) =>
+                {
+                    try
+                    {
+                        var text = (s as Entry)!.Text;
+                        var RowDefinitions = text.Split(',').Select(x => {
+                            var gridData = x.Split('.');
+                            return new RowDefinition(new GridLength(double.Parse(gridData[0]), Enum.Parse<GridUnitType>(gridData[1])));
+                        });
+                        var RowDefinitionCollection = new RowDefinitionCollection(RowDefinitions.ToArray());
+                        property.SetValue(view, RowDefinitionCollection);
+                    }
+                    catch
+                    {
+
+                    }
+                };
+
+                return editor;
+
+            }
             else if (value.GetType() == typeof(Color) || value.GetType() == typeof(Thickness))
             {
                 var colorGrid = new Grid
@@ -148,7 +214,7 @@ namespace MAUIDesigner
 
                 if (value.GetType() == typeof(Color))
                 {
-                    ((Color)value).ToRgba(out var r,out var g,out var b,out var a);
+                    ((Color)value).ToRgba(out var r, out var g, out var b, out var a);
                     red.Text = r.ToString();
                     green.Text = g.ToString();
                     blue.Text = b.ToString();

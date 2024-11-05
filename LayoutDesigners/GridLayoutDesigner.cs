@@ -8,18 +8,6 @@ namespace MAUIDesigner.LayoutDesigners
         public GridLayoutDesigner(Grid grid)
         {
             this.Grid = grid;
-            grid.RowDefinitions = new RowDefinitionCollection()
-            {
-                new RowDefinition(new GridLength(100, GridUnitType.Absolute)),
-                new RowDefinition(new GridLength(1, GridUnitType.Star)),
-            };
-
-
-            grid.ColumnDefinitions = new ColumnDefinitionCollection()
-            {
-                new ColumnDefinition(new GridLength(100, GridUnitType.Absolute)),
-                new ColumnDefinition(new GridLength(1, GridUnitType.Star)),
-            };
         }
 
         public Grid Grid { get; }
