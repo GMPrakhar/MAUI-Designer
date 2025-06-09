@@ -84,7 +84,7 @@ namespace MAUIDesigner
         {
 
             // Get the view according to the type of the value. If it is primitive type or string, it should be an editor, if it's enum it should be a picker
-            if (value is string || value == null || value.GetType().IsPrimitive)
+            if (property.PropertyType == typeof(string) ||  property.PropertyType.IsPrimitive)
             {
                 var editor = new Entry
                 {
@@ -111,22 +111,22 @@ namespace MAUIDesigner
 
                 return editor;
             }
-            else if (value.GetType().IsEnum)
+            else if (property.PropertyType.IsEnum)
             {
                 var picker = new Picker
                 {
-                    ItemsSource = Enum.GetValues(value.GetType()).Cast<object>().ToList()
+                    ItemsSource = Enum.GetValues(property.PropertyType).Cast<object>().ToList()
                 };
 
                 picker.SelectedIndexChanged += (s, e) =>
                 {
-                    var finalValue = Enum.Parse(value.GetType(), (s as Picker)!.SelectedItem.ToString());
+                    var finalValue = Enum.Parse(property.PropertyType, (s as Picker)!.SelectedItem!.ToString());
                     property.SetValue(view, finalValue);
                 };
 
                 return picker;
             }
-            else if (value.GetType() == typeof(ColumnDefinitionCollection))
+            else if (property.PropertyType == typeof(ColumnDefinitionCollection))
             {
                 var columnDefinitionCollection = (ColumnDefinitionCollection)value;
                 var columnDefintionString = string.Join(',',columnDefinitionCollection.Select(columnDefinition => columnDefinition.Width.ToString()));
@@ -159,7 +159,7 @@ namespace MAUIDesigner
                 return editor;
 
             }
-            else if (value.GetType() == typeof(RowDefinitionCollection))
+            else if (property.PropertyType == typeof(RowDefinitionCollection))
             {
                 var RowDefinitionCollection = (RowDefinitionCollection)value;
                 var rowDefintionString = string.Join(',', RowDefinitionCollection.Select(RowDefinition => RowDefinition.Height.ToString()));
@@ -192,7 +192,7 @@ namespace MAUIDesigner
                 return editor;
 
             }
-            else if (value.GetType() == typeof(Color) || value.GetType() == typeof(Thickness))
+            else if (property.PropertyType == typeof(Color) || property.PropertyType == typeof(Thickness))
             {
                 var colorGrid = new Grid
                 {
@@ -212,8 +212,9 @@ namespace MAUIDesigner
                 var blue = new Entry() { HeightRequest = 10, FontSize = 10 };
                 var alpha = new Entry() { HeightRequest = 10, FontSize = 10 };
 
-                if (value.GetType() == typeof(Color))
+                if (property.PropertyType == typeof(Color))
                 {
+                    if(value == null) value = new Color();
                     ((Color)value).ToRgba(out var r, out var g, out var b, out var a);
                     red.Text = r.ToString();
                     green.Text = g.ToString();
@@ -222,6 +223,7 @@ namespace MAUIDesigner
                 }
                 else
                 {
+                    if (value == null) value = new Thickness();
                     var thickness = (Thickness)value;
                     red.Text = thickness.Left.ToString();
                     green.Text = thickness.Top.ToString();
@@ -252,7 +254,7 @@ namespace MAUIDesigner
                         var valueB = int.Parse(green.Text);
                         var valueC = int.Parse(blue.Text);
                         var valueD = int.Parse(alpha.Text);
-                        if (value.GetType() == typeof(Color))
+                        if (property.PropertyType == typeof(Color))
                         {
                             var color = Color.FromRgba(valueA, valueB, valueC, valueD);
                             property.SetValue(view, color);
@@ -270,7 +272,7 @@ namespace MAUIDesigner
             }
             var label = new Label
             {
-                Text = value.ToString(),
+                Text = value?.ToString() ?? "",
                 FontSize = 10,
             };
 

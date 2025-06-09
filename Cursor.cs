@@ -31,6 +31,9 @@ namespace MAUIDesigner
         [DllImport("user32.dll")]
         public static extern bool GetCursorPos(out POINT lpPoint);
 
+        [DllImport("user32.dll")]
+        public static extern short GetAsyncKeyState(UInt16 virtualKeyCode);
+
         public static Point GetCursorPosition()
         {
             POINT lpPoint;
@@ -40,6 +43,12 @@ namespace MAUIDesigner
             // if (!success)
 
             return lpPoint;
+        }
+
+        public static bool IsMousePressed()
+        {
+            // Check if the left mouse button is pressed
+            return (GetAsyncKeyState(0x01) & 0x8000) != 0; // 0x01 is the virtual key code for the left mouse button
         }
     }
 }

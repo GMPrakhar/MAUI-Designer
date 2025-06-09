@@ -29,6 +29,7 @@
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
 	</PropertyGroup>
 

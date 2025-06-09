@@ -7,9 +7,21 @@ using System.Threading.Tasks;
 
 namespace MAUIDesigner.HelperViews
 {
+    [AttributeUsage(AttributeTargets.Method, AllowMultiple = false)]
+    public class ContextMenuActionAttribute : Attribute
+    {
+        public string DisplayName { get; }
+        public ContextMenuActionAttribute(string displayName)
+        {
+            DisplayName = displayName;
+        }
+    }
+
     internal static class ContextMenuActions
     {
         public static View? ClipboardElement { get; set; }
+
+        [ContextMenuAction("Detach from Parent")]
         public static void DetachFromParent(View targetElement, ContextMenu contextMenu, EventArgs e, Layout designerFrame)
         {
             if (targetElement?.Parent is Layout parentLayout)
@@ -22,6 +34,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
+        [ContextMenuAction("Lock in Place")]
         public static void LockInPlace(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement != null)
@@ -33,6 +46,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
+        [ContextMenuAction("Bring to Front")]
         public static void BringToFrontButton(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement?.Parent is Layout parentLayout)
@@ -47,6 +61,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
+        [ContextMenuAction("Send to Back")]
         public static void SendToBackButton(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement?.Parent is Layout parentLayout)
@@ -61,6 +76,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
+        [ContextMenuAction("Cut Element")]
         public static void CutElement(View targetElement, ContextMenu contextMenu, EventArgs e, Layout designerFrame)
         {
             if (targetElement != null)
@@ -71,7 +87,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
-
+        [ContextMenuAction("Copy Element")]
         public static void CopyElement(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement != null)
@@ -81,6 +97,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
+        [ContextMenuAction("Paste Element")]
         public static void PasteElement(View targetElement, ContextMenu contextMenu, EventArgs e, Layout designerFrame)
         {
             if (ClipboardElement != null)
@@ -96,7 +113,6 @@ namespace MAUIDesigner.HelperViews
 
         private static View CloneView(View originalView)
         {
-            
             var newView = ElementCreator.Create(originalView.GetType().Name);
 
             newView.BindingContext = originalView.BindingContext;
@@ -105,6 +121,7 @@ namespace MAUIDesigner.HelperViews
             return newView;
         }
 
+        [ContextMenuAction("Delete Element")]
         public static void DeleteElement(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
             if (targetElement != null)
@@ -115,15 +132,16 @@ namespace MAUIDesigner.HelperViews
             contextMenu.Close();
         }
 
+        [ContextMenuAction("Undo")]
         public static void Undo(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
 
         }
 
+        [ContextMenuAction("Redo")]
         public static void Redo(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
 
         }
-
     }
 }

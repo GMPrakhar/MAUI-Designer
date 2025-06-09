@@ -12,5 +12,15 @@ namespace MAUIDesigner.LayoutDesigners
         {
             throw new NotImplementedException();
         }
+
+        public void OnHoverExit()
+        {
+            throw new NotImplementedException();
+        }
+
+        public void OnHoverMove(Point location)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

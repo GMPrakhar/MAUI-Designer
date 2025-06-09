@@ -38,7 +38,7 @@ public partial class ContextMenu : ContentView
     {
         this.IsVisible = true;
         this.Focus();
-        this.ZIndex = int.MaxValue;
+        this.ZIndex = int.MaxValue-5;
     }
 
     public void Reset()
@@ -83,16 +83,24 @@ public partial class ContextMenu : ContentView
         this.ActionList.Clear();
         var hoverRecognizer = CreateHoverRecognizer();
 
-        AddContextMenuItem("Send to Back", targetElement, (s, e) => ContextMenuActions.SendToBackButton(targetElement, this, e), hoverRecognizer);
-        AddContextMenuItem("Bring to Front", targetElement, (s, e) => ContextMenuActions.BringToFrontButton(targetElement, this, e), hoverRecognizer);
-        AddContextMenuItem("Lock in place", targetElement, (s, e) => ContextMenuActions.LockInPlace(targetElement, this, e), hoverRecognizer);
-        AddContextMenuItem("Detach from parent", targetElement, (s, e) => ContextMenuActions.DetachFromParent(targetElement, this, e, designerFrame), hoverRecognizer);
-        AddContextMenuItem("Cut", targetElement,  (s, e) => ContextMenuActions.CutElement(targetElement, this, e, designerFrame), hoverRecognizer);
-        AddContextMenuItem("Copy", targetElement, (s, e) => ContextMenuActions.CopyElement(targetElement, this, e), hoverRecognizer);
-        AddContextMenuItem("Paste", targetElement, (s, e) => ContextMenuActions.PasteElement(targetElement, this, e, designerFrame), hoverRecognizer);
-        AddContextMenuItem("Delete", targetElement, (s, e) => ContextMenuActions.DeleteElement(targetElement, this, e), hoverRecognizer);
-        AddContextMenuItem("Undo", targetElement, (s, e) => ContextMenuActions.Undo(targetElement, this, e), hoverRecognizer);
-        AddContextMenuItem("Redo", targetElement,  (s, e) => ContextMenuActions.Redo(targetElement, this, e), hoverRecognizer);
+        var actionMethods = typeof(ContextMenuActions)
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(m => m.GetCustomAttributes(typeof(ContextMenuActionAttribute), false).Length > 0);
+
+        foreach (var method in actionMethods)
+        {
+            var attr = (ContextMenuActionAttribute)method.GetCustomAttributes(typeof(ContextMenuActionAttribute), false).First();
+            string displayName = attr.DisplayName;
+
+            // Create a delegate for the method
+            EventHandler<EventArgs> handler = (s, e) =>
+            {
+                // Assume all methods have the same signature: (View, ContextMenu, EventArgs)
+                method.Invoke(null, new object[] { targetElement, this, e });
+            };
+
+            AddContextMenuItem(displayName, targetElement, handler, hoverRecognizer);
+        }
 
         foreach (var x in this.ActionList)
         {

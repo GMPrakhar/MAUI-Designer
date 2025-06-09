@@ -1,5 +1,8 @@
 using CommunityToolkit.Maui.Views;
 using MAUIDesigner.DnDHelper;
+using MAUIDesigner.Interfaces;
+using MAUIDesigner.LayoutDesigners;
+using MAUIDesigner.NewFolder;
 using System.Runtime.CompilerServices;
 using static MAUIDesigner.DnDHelper.ScalingHelper;
 using static MAUIDesigner.MainPage;
@@ -12,9 +15,13 @@ public partial class ElementDesignerView : ContentView
 
     public static readonly BindableProperty ViewProperty = BindableProperty.Create(nameof(View), typeof(View), typeof(ElementDesignerView));
 
+    public Type[] allowedHoverables = new[] { typeof(Grid) };
+
     private bool AllowOperations = false;
 
     public View EncapsulatingViewProperty => EncapsulatingView;
+
+    public IHoverable? hoverController { get; }
 
     public View View
     {
@@ -44,6 +51,23 @@ public partial class ElementDesignerView : ContentView
         loadedView.Margin = 0;
         loadedView.HeightRequest = -1;
         loadedView.WidthRequest = -1;
+
+        if(allowedHoverables.Contains(loadedView.GetType()))
+        {
+            hoverController = HoverableFactory.GetHoverController(loadedView);
+
+            // Add pointer move gesture recognizer to the loaded view
+            var dragGestureRecognizer = new DropGestureRecognizer();
+            dragGestureRecognizer.DragOver += (s, e) =>
+            {
+                hoverController.OnHoverMove(e.GetPosition(loadedView).Value);
+            };
+
+            dragGestureRecognizer.DragLeave += (s, e) => hoverController.OnHoverExit();
+            dragGestureRecognizer.Drop += (s, e) => hoverController.OnHoverExit();
+
+            this.GestureRecognizers.Add(dragGestureRecognizer);
+        }
 
         loadedView.PropertyChanged += LoadedView_PropertyChanged;
     }
