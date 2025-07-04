@@ -93,6 +93,11 @@ public partial class ElementDesignerView : ContentView
         {
             var draggingView = (sender as GestureRecognizer).Parent as View;
             e.Data.Properties.Add("DraggingView", draggingView);
+
+            // Add location of the pointer inside the view to the drag data
+            // It should be taken from the current view
+            var location = e.GetPosition(View).Value;
+            e.Data.Properties.Add("DragLocation", location);
         }
     }
 

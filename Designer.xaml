@@ -1,117 +1,69 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:views="clr-namespace:MAUIDesigner.HelperViews"
              x:Class="MAUIDesigner.Designer"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              Title="Designer">
 
     <Grid VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" x:Name="MainGrid" Margin="5">
-        <Grid.GestureRecognizers>
-            <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_Drop"/>
-        </Grid.GestureRecognizers>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200"/>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="350" />
-        </Grid.ColumnDefinitions>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="150"/>
         </Grid.RowDefinitions>
-        <Border Grid.Row="0"
-                StrokeThickness="1"
-                AbsoluteLayout.LayoutBounds="0, 0, 1, 1"
-                AbsoluteLayout.LayoutFlags="All"
-                >
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="3"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="20"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <Label Text="Toolbox" Padding="5,0" FontSize="14" Grid.Row="0" Grid.Column="0" BackgroundColor="#10000000" HorizontalOptions="FillAndExpand" TextColor="LightSlateGrey"/>
-                <ScrollView  Grid.Column="0" Grid.Row="1" Padding="5,0" >
-                    <VerticalStackLayout x:Name="Toolbox" Margin="10">
-                    </VerticalStackLayout>
-                </ScrollView>
-                <Rectangle Grid.Row="0" Grid.Column="1" Grid.RowSpan="2" x:Name="TabDraggerLeft" HorizontalOptions="FillAndExpand" VerticalOptions="FillAndExpand" >
-                    <Rectangle.GestureRecognizers>
-                        <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
-                        <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
-                    </Rectangle.GestureRecognizers>
-                </Rectangle>
-            </Grid>
-        </Border>
-        <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Column="1" Grid.Row="0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="350"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Left TabMenuHolder and Dragger -->
+        <Grid Grid.Row="0" Grid.Column="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2"/>
+            </Grid.ColumnDefinitions>
+            <views:TabMenuHolder x:Name="LeftTabMenuHolder" IsSidebar="True" Grid.Column="0"/>
+            <Rectangle x:Name="TabDraggerLeft" Grid.Column="1" Fill="#555" WidthRequest="6" HorizontalOptions="End" VerticalOptions="FillAndExpand">
+                <Rectangle.GestureRecognizers>
+                    <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
+                </Rectangle.GestureRecognizers>
+            </Rectangle>
+        </Grid>
+
+        <!-- Center Designer Frame -->
+        <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Row="0" Grid.Column="1">
             <AbsoluteLayout.GestureRecognizers>
                 <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" Buttons="Secondary,Primary"/>
-                <DropGestureRecognizer Drop="DropGestureRecognizer_Drop_1"/>
             </AbsoluteLayout.GestureRecognizers>
-
         </AbsoluteLayout>
-        <Border Grid.Column="2" Grid.Row="0"  Margin="0, 5"
-            StrokeThickness="1"
-            AbsoluteLayout.LayoutBounds="0, 0, 1, 1"
-            AbsoluteLayout.LayoutFlags="All"
-            >
-            <Grid  x:Name="PropertiesFrame">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="3"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="25"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <Label Text="Properties" Padding="5,0" FontSize="14" Grid.Row="0" Grid.Column="1" BackgroundColor="#10000000" TextColor="LightSlateGrey" HorizontalOptions="FillAndExpand"/>
-                <Rectangle BackgroundColor="Transparent" Grid.Column="0" Grid.Row="0" Grid.RowSpan="2" x:Name="TabDraggerRight">
-                    <Rectangle.GestureRecognizers>
-                        <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
-                        <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
-                    </Rectangle.GestureRecognizers>
-                </Rectangle>
-                <ScrollView Grid.Column="1" Grid.Row="1" Padding="10,0,10,0">
-                    <VerticalStackLayout x:Name="Properties">
-                    </VerticalStackLayout>
-                </ScrollView>
-            </Grid>
-        </Border>
-        <Border Grid.Row="1"  Grid.ColumnSpan="3"  Margin="0, 5"
-                StrokeThickness="1"
-                AbsoluteLayout.LayoutBounds="0, 0, 1, 1"
-                AbsoluteLayout.LayoutFlags="All"
-                >
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="3"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <VerticalStackLayout Grid.Row="0">
-                    <Rectangle BackgroundColor="Transparent" x:Name="TabDraggerBottom">
-                        <Rectangle.GestureRecognizers>
-                            <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting_1"/>
-                            <PointerGestureRecognizer PointerEntered="TabDraggerEntered" PointerExited="TabDraggerExited"/>
-                        </Rectangle.GestureRecognizers>
-                    </Rectangle>
-                    <Label Text="XAML Editor" Margin="10,0" FontSize="10" TextColor="LightSlateGrey"/>
-                </VerticalStackLayout>
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="150"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <VerticalStackLayout  VerticalOptions="CenterAndExpand" Padding="10,0">
-                        <Button Text="Generate XAML" Clicked="GenerateXamlForTheView" HeightRequest="20" Margin="2" Padding="2"/>
-                        <Button Text="Load from XAML" Clicked="LoadViewFromXaml" Margin="2" Padding="2"/>
-                    </VerticalStackLayout>
-                    <ScrollView Grid.Column="1">
-                        <Editor x:Name="XAMLHolder" MinimumHeightRequest="150" FontAutoScalingEnabled="True"/>
-                    </ScrollView>
-                </Grid>
-            </Grid>
-        </Border>
+
+        <!-- Right TabMenuHolder and Dragger -->
+        <Grid Grid.Row="0" Grid.Column="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Rectangle x:Name="TabDraggerRight" Grid.Column="0" Fill="#555" WidthRequest="2" HorizontalOptions="Start" VerticalOptions="FillAndExpand">
+                <Rectangle.GestureRecognizers>
+                    <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
+                </Rectangle.GestureRecognizers>
+            </Rectangle>
+            <views:TabMenuHolder x:Name="RightTabMenuHolder" Grid.Column="1"/>
+        </Grid>
+
+        <!-- Bottom TabMenuHolder and Dragger -->
+        <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="3"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Rectangle x:Name="TabDraggerBottom" Grid.Row="0" Fill="#555" HeightRequest="3" HorizontalOptions="FillAndExpand" VerticalOptions="End">
+                <Rectangle.GestureRecognizers>
+                    <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
+                </Rectangle.GestureRecognizers>
+            </Rectangle>
+            <views:TabMenuHolder x:Name="BottomTabMenuHolder" Grid.Row="1" />
+        </Grid>
     </Grid>
 </ContentPage>

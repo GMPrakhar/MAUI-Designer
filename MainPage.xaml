@@ -8,8 +8,5 @@
         </cv:ElementDesignerView>
         <cv:ElementDesignerView x:Name="DesignerView2">
         </cv:ElementDesignerView>
-        <AbsoluteLayout.GestureRecognizers>
-            <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_Drop"/>
-        </AbsoluteLayout.GestureRecognizers>
     </AbsoluteLayout>
 </ContentPage>

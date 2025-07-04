@@ -15,11 +15,6 @@ namespace MAUIDesigner
             InitializeComponent();
 
         }
-
-        private void DropGestureRecognizer_Drop(object sender, DropEventArgs e)
-        {
-            DragAndDropOperations.OnDrop(sender, e);
-        }
     }
 
 }

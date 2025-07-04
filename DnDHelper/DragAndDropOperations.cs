@@ -14,7 +14,9 @@ namespace MAUIDesigner.DnDHelper
         {
             e.Data.Properties.TryGetValue("IsScaling", out object IsScalingObject);
             e.Data.Properties.TryGetValue("DraggingView", out object draggingObject);
+            e.Data.Properties.TryGetValue("DragLocation", out object dragLocation);
             var draggingView = draggingObject as View;
+            var dragLocationInsideView = dragLocation is not null ? (Point)dragLocation : Point.Zero;
 
             var parentView = (sender as GestureRecognizer).Parent;
             if (parentView is ElementDesignerView designerView)
@@ -22,7 +24,9 @@ namespace MAUIDesigner.DnDHelper
                 parentView = designerView.View;
             }
 
-            var location = e.GetPosition(parentView).Value;
+            if (parentView == (draggingView?.Parent as ElementDesignerView)?.View) return;
+
+            var location = e.GetPosition(draggingView).Value;
 
             if (IsScalingObject != null && (bool)IsScalingObject == true)
             {
@@ -35,7 +39,7 @@ namespace MAUIDesigner.DnDHelper
                 if (draggingObject is not null)
                 {
                     var layoutDesigner = LayoutDesignerFactory.CreateLayoutDesigner(parentView as Layout);
-                    layoutDesigner.OnDrop(draggingView, location);
+                    layoutDesigner.OnDrop(draggingView, location.Offset(-dragLocationInsideView.X, -dragLocationInsideView.Y));
                 }
             }
         }

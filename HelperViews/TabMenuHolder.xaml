@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentView xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MAUIDesigner.HelperViews.TabMenuHolder">
+	<Border>
+    <Grid x:Name="RightTabGrid">
+        <Grid.RowDefinitions>
+			<RowDefinition Height="Auto" />
+            <RowDefinition Height="*" /> <!-- Main content -->
+            <RowDefinition Height="Auto" /> <!-- Tab bar -->
+        </Grid.RowDefinitions>
+        <!-- Main content area with header -->
+		<ContentView x:Name="TabHeaderContent" Grid.Row="0"/>
+		<Border Grid.Row="1">
+            <ContentView x:Name="TabContentHolder" /> <!-- This will show the content of the selected tab -->
+		</Border>
+        <!-- Tab bar at the bottom -->
+        <HorizontalStackLayout Grid.Row="2"  x:Name="TabHeaderPanelBottom" BackgroundColor="#222" Spacing="0" HorizontalOptions="FillAndExpand" />
+    </Grid>
+	</Border>
+</ContentView>
