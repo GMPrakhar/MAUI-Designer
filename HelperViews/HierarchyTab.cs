@@ -463,13 +463,9 @@ namespace MAUIDesigner.HelperViews
             // First focus the element
             HighlightElement(designerView);
             
-            // Create a mock TappedEventArgs with the position relative to the designer frame
-            // For now, we'll position the context menu at the top of the designer frame
-            // In a real implementation, we'd want to position it relative to the hierarchy item
-            var mockArgs = new TappedEventArgs(new Point(100, 100));
-            
             // Show the context menu using the existing ToolBox.ShowContextMenu method
-            ToolBox.ShowContextMenu(designerFrame, mockArgs);
+            // We'll use the existing system that expects a TappedEventArgs with the designer layout
+            ToolBox.ShowContextMenu(designerFrame, e);
         }
 
         private void HighlightElement(ElementDesignerView designerView)
