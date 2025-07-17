@@ -127,7 +127,7 @@ namespace MAUIDesigner.HelperViews
             }
         }
 
-        private View CreateSimpleHierarchyItem(View view, int indentLevel)
+        private View CreateSimpleHierarchyItem(IView view, int indentLevel)
         {
             var elementName = GetSimpleElementDisplayName(view);
             
@@ -181,7 +181,7 @@ namespace MAUIDesigner.HelperViews
             return itemFrame;
         }
 
-        private string GetSimpleElementDisplayName(View view)
+        private string GetSimpleElementDisplayName(IView view)
         {
             if (view == null) return "Unknown";
 
@@ -227,7 +227,7 @@ namespace MAUIDesigner.HelperViews
             return displayName;
         }
 
-        private string GetSimpleElementIcon(View view)
+        private string GetSimpleElementIcon(IView view)
         {
             if (view == null) return "🔹";
 
@@ -246,7 +246,7 @@ namespace MAUIDesigner.HelperViews
                 AbsoluteLayout => "🎯",
                 ScrollView => "📜",
                 Border => "⬛",
-                Frame => "🖼️",
+                Microsoft.Maui.Controls.Frame => "🖼️",
                 ContentView => "📦",
                 CollectionView => "📝",
                 ListView => "📑",
@@ -450,7 +450,7 @@ namespace MAUIDesigner.HelperViews
                 AbsoluteLayout => "🎯",
                 ScrollView => "📜",
                 Border => "⬛",
-                Frame => "🖼️",
+                Microsoft.Maui.Controls.Frame => "🖼️",
                 ContentView => "📦",
                 CollectionView => "📝",
                 ListView => "📑",

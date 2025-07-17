@@ -38,7 +38,7 @@ public partial class ContextMenu : ContentView
     {
         this.IsVisible = true;
         this.Focus();
-        this.ZIndex = int.MaxValue-5;
+        this.ZIndex = 10000;
     }
 
     public void Reset()
