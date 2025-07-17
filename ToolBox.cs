@@ -24,10 +24,7 @@ namespace MAUIDesigner
 
         internal static Layout MainDesignerView;
 
-        public static ContextMenu contextMenu = new ContextMenu()
-        {
-            IsVisible = false
-        };
+        public static ContextMenu contextMenu;
 
         static ToolBox()
         {

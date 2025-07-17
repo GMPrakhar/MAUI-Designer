@@ -12,6 +12,13 @@ public partial class ContextMenu : ContentView
 {
     public ObservableCollection<PropertyViewer> ActionList { get; set; } = new();
     private readonly IDictionary<string, string> IconMapping;
+    private static ElementDesignerView? _currentSelectedElement;
+
+    public static ElementDesignerView? CurrentSelectedElement
+    {
+        get => _currentSelectedElement;
+        set => _currentSelectedElement = value;
+    }
 
     public ContextMenu()
     {
@@ -36,14 +43,9 @@ public partial class ContextMenu : ContentView
 
     private void Show()
     {
+        this.ZIndex = 10000;
         this.IsVisible = true;
         this.Focus();
-        this.ZIndex = 10000;
-        // Ensure context menu is brought to front
-        if (this.Parent is Layout parentLayout)
-        {
-            parentLayout.RaiseChild(this);
-        }
     }
 
     public void Reset()
@@ -54,19 +56,24 @@ public partial class ContextMenu : ContentView
 
     public void Show(TappedEventArgs e, Layout designerFrame)
     {
-        var location = e.GetPosition(designerFrame).Value;
-        this.Margin = new Thickness(location.X, location.Y, 0, 0);
-        // Check if the click is on any element
-        var targetElement = designerFrame.GetVisualTreeDescendants().FirstOrDefault(desc => desc is ElementDesignerView view && view.Frame.Contains(location)) as ElementDesignerView;
+        var location = e.GetPosition(this.Parent).Value;
+        this.Margin = new Thickness(location.X, location.Y);
+        // Use globally selected element if available
+        var targetElement = CurrentSelectedElement;
         if (targetElement != null)
         {
-            UpdateContextMenuWithElementProperties(targetElement, designerFrame);
+            UpdateContextMenuWithElementProperties(targetElement);
         }
         else
         {
             UpdateContextMenuForNonElement(designerFrame);
         }
         Show();
+    }
+
+    public static void SetCurrentSelectedElement(ElementDesignerView element)
+    {
+        CurrentSelectedElement = element;
     }
 
     private void UpdateContextMenuForNonElement(Layout designerFrame)
@@ -83,7 +90,7 @@ public partial class ContextMenu : ContentView
         }
     }
 
-    private void UpdateContextMenuWithElementProperties(View targetElement, Layout designerFrame)
+    private void UpdateContextMenuWithElementProperties(ElementDesignerView targetElement)
     {
         this.ActionList.Clear();
         var hoverRecognizer = CreateHoverRecognizer();
@@ -101,7 +108,7 @@ public partial class ContextMenu : ContentView
             bool shouldShow = true;
             if (displayName.Contains("Column") || displayName.Contains("Row"))
             {
-                shouldShow = targetElement is Grid;
+                shouldShow = targetElement.View is Grid;
             }
 
             if (shouldShow)

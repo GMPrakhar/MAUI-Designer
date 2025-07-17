@@ -25,8 +25,19 @@ namespace MAUIDesigner.HelperViews
             {
                 Content = hierarchyLayout
             };
+            scrollView.GestureRecognizers.Add(new TapGestureRecognizer
+            {
+                Command = new Command(() => ClearSelection())
+            });
             
             TabContent = scrollView;
+        }
+
+        private void ClearSelection()
+        {
+            currentlyFocusedElement = null;
+            ContextMenu.CurrentSelectedElement = null;
+            UpdateHierarchy();
         }
 
         public void SetDesignerFrame(AbsoluteLayout designerFrame)
@@ -369,7 +380,10 @@ namespace MAUIDesigner.HelperViews
 
             // Add tap gesture to highlight the element
             var tapGesture = new TapGestureRecognizer();
-            tapGesture.Tapped += (s, e) => HighlightElement(designerView);
+            tapGesture.Tapped += (s, e) => {
+                HighlightElement(designerView);
+                ContextMenu.SetCurrentSelectedElement(designerView);
+            };
             itemLayout.GestureRecognizers.Add(tapGesture);
 
             // Add right-click context menu

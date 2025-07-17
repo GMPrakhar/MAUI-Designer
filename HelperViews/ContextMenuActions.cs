@@ -82,7 +82,8 @@ namespace MAUIDesigner.HelperViews
         [ContextMenuAction("Add Column")]
         public static void AddColumn(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
-            if (targetElement is Grid grid)
+            var grid = GetGridFromDesignerView(targetElement);
+            if (grid != null)
             {
                 grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
                 contextMenu.Close();
@@ -92,7 +93,8 @@ namespace MAUIDesigner.HelperViews
         [ContextMenuAction("Remove Column")]
         public static void RemoveColumn(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
-            if (targetElement is Grid grid && grid.ColumnDefinitions.Count > 1)
+            var grid = GetGridFromDesignerView(targetElement);
+            if (grid != null && grid.ColumnDefinitions.Count > 1)
             {
                 grid.ColumnDefinitions.RemoveAt(grid.ColumnDefinitions.Count - 1);
                 contextMenu.Close();
@@ -102,7 +104,8 @@ namespace MAUIDesigner.HelperViews
         [ContextMenuAction("Add Row")]
         public static void AddRow(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
-            if (targetElement is Grid grid)
+            var grid = GetGridFromDesignerView(targetElement);
+            if (grid != null)
             {
                 grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
                 contextMenu.Close();
@@ -112,11 +115,21 @@ namespace MAUIDesigner.HelperViews
         [ContextMenuAction("Remove Row")]
         public static void RemoveRow(View targetElement, ContextMenu contextMenu, EventArgs e)
         {
-            if (targetElement is Grid grid && grid.RowDefinitions.Count > 1)
+            var grid = GetGridFromDesignerView(targetElement);
+            if (grid != null && grid.RowDefinitions.Count > 1)
             {
                 grid.RowDefinitions.RemoveAt(grid.RowDefinitions.Count - 1);
                 contextMenu.Close();
             }
+        }
+
+        private static Grid? GetGridFromDesignerView(View targetElement)
+        {
+            if (targetElement is ElementDesignerView edv && edv.View is Grid grid)
+                return grid;
+            if (targetElement is Grid directGrid)
+                return directGrid;
+            return null;
         }
 
         private static View CloneView(View originalView)
