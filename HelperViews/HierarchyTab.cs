@@ -100,6 +100,10 @@ namespace MAUIDesigner.HelperViews
 
             foreach (var child in layout.Children)
             {
+                // Skip scaling rectangles used by ElementDesignerView
+                if (IsScalingRectangle(child))
+                    continue;
+
                 // Check if the child is an ElementDesignerView
                 if (child is ElementDesignerView childDesignerView)
                 {
@@ -125,6 +129,28 @@ namespace MAUIDesigner.HelperViews
                     }
                 }
             }
+        }
+
+        private bool IsScalingRectangle(IView view)
+        {
+            // Check if this is a scaling rectangle used by ElementDesignerView
+            if (view is Microsoft.Maui.Controls.Shapes.Rectangle rect)
+            {
+                // Check if it's a scaling rectangle by checking common properties
+                var element = view as Element;
+                if (element != null)
+                {
+                    var name = element.GetValue(Element.AutomationIdProperty) as string;
+                    if (name != null && (name.Contains("Rect") || name.Contains("rect")))
+                        return true;
+                    
+                    // Check if it's a small rectangle (8x8 pixels) which is typical for scaling handles
+                    if (rect.WidthRequest == 8 && rect.HeightRequest == 8)
+                        return true;
+                }
+            }
+            
+            return false;
         }
 
         private View CreateSimpleHierarchyItem(IView view, int indentLevel)

@@ -39,6 +39,11 @@ public partial class ContextMenu : ContentView
         this.IsVisible = true;
         this.Focus();
         this.ZIndex = 10000;
+        // Ensure context menu is brought to front
+        if (this.Parent is Layout parentLayout)
+        {
+            parentLayout.RaiseChild(this);
+        }
     }
 
     public void Reset()
@@ -92,14 +97,24 @@ public partial class ContextMenu : ContentView
             var attr = (ContextMenuActionAttribute)method.GetCustomAttributes(typeof(ContextMenuActionAttribute), false).First();
             string displayName = attr.DisplayName;
 
-            // Create a delegate for the method
-            EventHandler<EventArgs> handler = (s, e) =>
+            // Filter actions based on target element type
+            bool shouldShow = true;
+            if (displayName.Contains("Column") || displayName.Contains("Row"))
             {
-                // Assume all methods have the same signature: (View, ContextMenu, EventArgs)
-                method.Invoke(null, new object[] { targetElement, this, e });
-            };
+                shouldShow = targetElement is Grid;
+            }
 
-            AddContextMenuItem(displayName, targetElement, handler, hoverRecognizer);
+            if (shouldShow)
+            {
+                // Create a delegate for the method
+                EventHandler<EventArgs> handler = (s, e) =>
+                {
+                    // Assume all methods have the same signature: (View, ContextMenu, EventArgs)
+                    method.Invoke(null, new object[] { targetElement, this, e });
+                };
+
+                AddContextMenuItem(displayName, targetElement, handler, hoverRecognizer);
+            }
         }
 
         foreach (var x in this.ActionList)

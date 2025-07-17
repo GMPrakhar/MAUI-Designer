@@ -79,6 +79,46 @@ namespace MAUIDesigner.HelperViews
 
         }
 
+        [ContextMenuAction("Add Column")]
+        public static void AddColumn(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+            if (targetElement is Grid grid)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+                contextMenu.Close();
+            }
+        }
+
+        [ContextMenuAction("Remove Column")]
+        public static void RemoveColumn(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+            if (targetElement is Grid grid && grid.ColumnDefinitions.Count > 1)
+            {
+                grid.ColumnDefinitions.RemoveAt(grid.ColumnDefinitions.Count - 1);
+                contextMenu.Close();
+            }
+        }
+
+        [ContextMenuAction("Add Row")]
+        public static void AddRow(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+            if (targetElement is Grid grid)
+            {
+                grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+                contextMenu.Close();
+            }
+        }
+
+        [ContextMenuAction("Remove Row")]
+        public static void RemoveRow(View targetElement, ContextMenu contextMenu, EventArgs e)
+        {
+            if (targetElement is Grid grid && grid.RowDefinitions.Count > 1)
+            {
+                grid.RowDefinitions.RemoveAt(grid.RowDefinitions.Count - 1);
+                contextMenu.Close();
+            }
+        }
+
         private static View CloneView(View originalView)
         {
             var newView = ElementCreator.Create(originalView.GetType().Name);

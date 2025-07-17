@@ -19,45 +19,60 @@ namespace MAUIDesigner.DnDHelper
                 return;
             }
 
-            location.X = (int)location.X;
-            location.Y = (int)location.Y;
-
             // Check if the dragging view is positioned in a Grid layout
             bool isInGrid = draggingView.Parent is Grid;
 
-            Thickness scalingFactor;
-            if (scaleDirection == ScaleDirection.TopLeft)
-            {
-                scalingFactor = new Thickness(draggingView.Margin.Left - location.X, draggingView.Margin.Top - location.Y);
-            }
-            else if (scaleDirection == ScaleDirection.TopRight)
-            {
-                scalingFactor = new Thickness(location.X - draggingView.Margin.Right, draggingView.Margin.Top - location.Y);
+            // Get current dimensions and position
+            double currentWidth = draggingView.WidthRequest > 0 ? draggingView.WidthRequest : draggingView.Width;
+            double currentHeight = draggingView.HeightRequest > 0 ? draggingView.HeightRequest : draggingView.Height;
+            double currentX = draggingView.Margin.Left;
+            double currentY = draggingView.Margin.Top;
 
-                // Set location X to be same as focused view's margin so it doesn't get updated.
-                location.X = draggingView.Margin.Left;
-            }
-            else if (scaleDirection == ScaleDirection.BottomLeft)
+            double newWidth = currentWidth;
+            double newHeight = currentHeight;
+            double newX = currentX;
+            double newY = currentY;
+
+            switch (scaleDirection)
             {
-                scalingFactor = new Thickness(draggingView.Margin.Left - location.X, location.Y - draggingView.Margin.Bottom);
-                location.Y = draggingView.Margin.Top;
-            }
-            else
-            {
-                scalingFactor = new Thickness(location.X - draggingView.Margin.Right, location.Y - draggingView.Margin.Bottom);
-                location.X = draggingView.Margin.Left;
-                location.Y = draggingView.Margin.Top;
+                case ScaleDirection.TopLeft:
+                    // Scaling from top-left: position changes, size changes
+                    newWidth = Math.Max(20, currentWidth + (currentX - location.X));
+                    newHeight = Math.Max(20, currentHeight + (currentY - location.Y));
+                    newX = currentX - (newWidth - currentWidth);
+                    newY = currentY - (newHeight - currentHeight);
+                    break;
+
+                case ScaleDirection.TopRight:
+                    // Scaling from top-right: only width and height change, Y position changes
+                    newWidth = Math.Max(20, location.X - currentX);
+                    newHeight = Math.Max(20, currentHeight + (currentY - location.Y));
+                    newY = currentY - (newHeight - currentHeight);
+                    break;
+
+                case ScaleDirection.BottomLeft:
+                    // Scaling from bottom-left: width and height change, X position changes
+                    newWidth = Math.Max(20, currentWidth + (currentX - location.X));
+                    newHeight = Math.Max(20, location.Y - currentY);
+                    newX = currentX - (newWidth - currentWidth);
+                    break;
+
+                case ScaleDirection.BottomRight:
+                    // Scaling from bottom-right: only width and height change
+                    newWidth = Math.Max(20, location.X - currentX);
+                    newHeight = Math.Max(20, location.Y - currentY);
+                    break;
             }
 
             // Update the size
-            draggingView.WidthRequest = Math.Max(draggingView.WidthRequest + scalingFactor.Left, 20);
-            draggingView.HeightRequest = Math.Max(draggingView.HeightRequest + scalingFactor.Top, 20);
+            draggingView.WidthRequest = newWidth;
+            draggingView.HeightRequest = newHeight;
             
             // Only update margin if the element is NOT in a Grid layout
             // Grid elements use Grid.Row/Grid.Column for positioning, not margin
             if (!isInGrid)
             {
-                draggingView.Margin = new Thickness(location.X, location.Y, location.X + draggingView.WidthRequest, location.Y + draggingView.HeightRequest);
+                draggingView.Margin = new Thickness(newX, newY, 0, 0);
             }
         }
 
