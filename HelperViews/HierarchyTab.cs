@@ -42,36 +42,46 @@ namespace MAUIDesigner.HelperViews
             // Get all ElementDesignerView instances from the designer frame
             var designerViews = designerFrame.Children
                 .OfType<ElementDesignerView>()
+                .Where(dv => dv.View != null)
                 .ToList();
 
-            // Create hierarchy items for each element
-            foreach (var designerView in designerViews)
+            // Group by element type for better organization
+            var groupedElements = designerViews
+                .GroupBy(dv => dv.View.GetType().Name)
+                .OrderBy(g => g.Key);
+
+            foreach (var group in groupedElements)
             {
-                var hierarchyItem = CreateHierarchyItem(designerView, 0);
-                hierarchyLayout.Children.Add(hierarchyItem);
+                // Add group header
+                var groupHeader = new Label
+                {
+                    Text = $"{group.Key} ({group.Count()})",
+                    FontSize = 13,
+                    TextColor = Colors.LightGray,
+                    FontAttributes = FontAttributes.Bold,
+                    Padding = new Thickness(5, 8, 5, 2),
+                    BackgroundColor = Color.FromArgb("#22333333")
+                };
+                hierarchyLayout.Children.Add(groupHeader);
+
+                // Add each element in the group
+                foreach (var designerView in group.OrderBy(dv => GetElementDisplayName(dv)))
+                {
+                    var hierarchyItem = CreateHierarchyItem(designerView, 1);
+                    hierarchyLayout.Children.Add(hierarchyItem);
+                }
             }
         }
 
         private View CreateHierarchyItem(ElementDesignerView designerView, int indentLevel)
         {
             var elementName = GetElementDisplayName(designerView);
-            var indentWidth = indentLevel * 20; // 20 pixels per indent level
 
             var itemLayout = new HorizontalStackLayout
             {
                 Spacing = 5,
-                Padding = new Thickness(indentWidth, 2, 5, 2)
+                Padding = new Thickness(15, 2, 5, 2)
             };
-
-            // Add indent spacing
-            if (indentLevel > 0)
-            {
-                itemLayout.Children.Add(new BoxView 
-                { 
-                    WidthRequest = indentWidth, 
-                    IsVisible = false 
-                });
-            }
 
             // Add element icon/indicator
             var indicator = new Label
@@ -79,7 +89,9 @@ namespace MAUIDesigner.HelperViews
                 Text = GetElementIcon(designerView),
                 FontSize = 12,
                 TextColor = Colors.LightBlue,
-                VerticalTextAlignment = TextAlignment.Center
+                VerticalTextAlignment = TextAlignment.Center,
+                WidthRequest = 20,
+                HorizontalTextAlignment = TextAlignment.Center
             };
 
             var nameLabel = new Label
@@ -87,7 +99,8 @@ namespace MAUIDesigner.HelperViews
                 Text = elementName,
                 FontSize = 12,
                 TextColor = Colors.White,
-                VerticalTextAlignment = TextAlignment.Center
+                VerticalTextAlignment = TextAlignment.Center,
+                HorizontalOptions = LayoutOptions.Start
             };
 
             itemLayout.Children.Add(indicator);
@@ -104,7 +117,8 @@ namespace MAUIDesigner.HelperViews
                 BackgroundColor = Colors.Transparent,
                 Content = itemLayout,
                 Padding = new Thickness(2),
-                Margin = new Thickness(0, 1)
+                Margin = new Thickness(0, 1),
+                StrokeThickness = 0
             };
 
             // Add hover effect
