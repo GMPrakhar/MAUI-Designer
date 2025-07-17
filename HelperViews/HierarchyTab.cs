@@ -9,6 +9,7 @@ namespace MAUIDesigner.HelperViews
         private ScrollView scrollView;
         private VerticalStackLayout hierarchyLayout;
         private AbsoluteLayout? designerFrame;
+        private ElementDesignerView? currentlyFocusedElement;
 
         public HierarchyTab()
         {
@@ -30,7 +31,25 @@ namespace MAUIDesigner.HelperViews
         public void SetDesignerFrame(AbsoluteLayout designerFrame)
         {
             this.designerFrame = designerFrame;
+            
+            // Subscribe to focus changes to highlight the current element
+            MAUIDesigner.DnDHelper.DragAndDropOperations.OnFocusChanged += OnFocusChanged;
+            
             UpdateHierarchy();
+        }
+
+        private void OnFocusChanged(object obj)
+        {
+            if (obj is ElementDesignerView elementDesigner)
+            {
+                currentlyFocusedElement = elementDesigner;
+                UpdateHierarchy(); // Refresh to show current selection
+            }
+            else
+            {
+                currentlyFocusedElement = null;
+                UpdateHierarchy();
+            }
         }
 
         public void UpdateHierarchy()
@@ -44,6 +63,20 @@ namespace MAUIDesigner.HelperViews
                 .OfType<ElementDesignerView>()
                 .Where(dv => dv.View != null)
                 .ToList();
+
+            if (designerViews.Count == 0)
+            {
+                var emptyLabel = new Label
+                {
+                    Text = "No elements in designer",
+                    FontSize = 12,
+                    TextColor = Colors.Gray,
+                    Padding = new Thickness(15, 20),
+                    HorizontalTextAlignment = TextAlignment.Center
+                };
+                hierarchyLayout.Children.Add(emptyLabel);
+                return;
+            }
 
             // Group by element type for better organization
             var groupedElements = designerViews
@@ -76,6 +109,7 @@ namespace MAUIDesigner.HelperViews
         private View CreateHierarchyItem(ElementDesignerView designerView, int indentLevel)
         {
             var elementName = GetElementDisplayName(designerView);
+            var isCurrentlyFocused = currentlyFocusedElement == designerView;
 
             var itemLayout = new HorizontalStackLayout
             {
@@ -88,7 +122,7 @@ namespace MAUIDesigner.HelperViews
             {
                 Text = GetElementIcon(designerView),
                 FontSize = 12,
-                TextColor = Colors.LightBlue,
+                TextColor = isCurrentlyFocused ? Colors.Yellow : Colors.LightBlue,
                 VerticalTextAlignment = TextAlignment.Center,
                 WidthRequest = 20,
                 HorizontalTextAlignment = TextAlignment.Center
@@ -98,9 +132,10 @@ namespace MAUIDesigner.HelperViews
             {
                 Text = elementName,
                 FontSize = 12,
-                TextColor = Colors.White,
+                TextColor = isCurrentlyFocused ? Colors.Yellow : Colors.White,
                 VerticalTextAlignment = TextAlignment.Center,
-                HorizontalOptions = LayoutOptions.Start
+                HorizontalOptions = LayoutOptions.Start,
+                FontAttributes = isCurrentlyFocused ? FontAttributes.Bold : FontAttributes.None
             };
 
             itemLayout.Children.Add(indicator);
@@ -114,7 +149,7 @@ namespace MAUIDesigner.HelperViews
             // Style the item
             var itemFrame = new Border
             {
-                BackgroundColor = Colors.Transparent,
+                BackgroundColor = isCurrentlyFocused ? Color.FromArgb("#44666600") : Colors.Transparent,
                 Content = itemLayout,
                 Padding = new Thickness(2),
                 Margin = new Thickness(0, 1),
@@ -123,8 +158,16 @@ namespace MAUIDesigner.HelperViews
 
             // Add hover effect
             var pointerGesture = new PointerGestureRecognizer();
-            pointerGesture.PointerEntered += (s, e) => itemFrame.BackgroundColor = Color.FromArgb("#33444444");
-            pointerGesture.PointerExited += (s, e) => itemFrame.BackgroundColor = Colors.Transparent;
+            pointerGesture.PointerEntered += (s, e) => 
+            {
+                if (!isCurrentlyFocused)
+                    itemFrame.BackgroundColor = Color.FromArgb("#33444444");
+            };
+            pointerGesture.PointerExited += (s, e) => 
+            {
+                if (!isCurrentlyFocused)
+                    itemFrame.BackgroundColor = Colors.Transparent;
+            };
             itemFrame.GestureRecognizers.Add(pointerGesture);
 
             return itemFrame;
@@ -143,20 +186,43 @@ namespace MAUIDesigner.HelperViews
             switch (designerView.View)
             {
                 case Label label when !string.IsNullOrEmpty(label.Text):
-                    displayName = $"{elementType} (\"{label.Text.Substring(0, Math.Min(label.Text.Length, 15))}{(label.Text.Length > 15 ? "..." : "")}\")";
+                    displayName = $"{elementType} (\"{TruncateText(label.Text)}\")";
                     break;
                 case Button button when !string.IsNullOrEmpty(button.Text):
-                    displayName = $"{elementType} (\"{button.Text.Substring(0, Math.Min(button.Text.Length, 15))}{(button.Text.Length > 15 ? "..." : "")}\")";
+                    displayName = $"{elementType} (\"{TruncateText(button.Text)}\")";
                     break;
                 case Entry entry when !string.IsNullOrEmpty(entry.Text):
-                    displayName = $"{elementType} (\"{entry.Text.Substring(0, Math.Min(entry.Text.Length, 15))}{(entry.Text.Length > 15 ? "..." : "")}\")";
+                    displayName = $"{elementType} (\"{TruncateText(entry.Text)}\")";
+                    break;
+                case Editor editor when !string.IsNullOrEmpty(editor.Text):
+                    displayName = $"{elementType} (\"{TruncateText(editor.Text)}\")";
+                    break;
+                case BoxView boxView:
+                    displayName = $"{elementType} ({boxView.BackgroundColor})";
+                    break;
+                case Image image when !string.IsNullOrEmpty(image.Source?.ToString()):
+                    displayName = $"{elementType} ({TruncateText(image.Source.ToString())})";
                     break;
                 default:
-                    displayName = elementType;
+                    // For layout elements, show child count if available
+                    if (designerView.View is Layout layout)
+                    {
+                        displayName = $"{elementType} ({layout.Children.Count} items)";
+                    }
+                    else
+                    {
+                        displayName = elementType;
+                    }
                     break;
             }
 
             return displayName;
+        }
+
+        private string TruncateText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+            return text.Length > 20 ? text.Substring(0, 20) + "..." : text;
         }
 
         private string GetElementIcon(ElementDesignerView designerView)
@@ -173,7 +239,15 @@ namespace MAUIDesigner.HelperViews
                 BoxView => "⬜",
                 Grid => "📊",
                 StackLayout => "📋",
+                HorizontalStackLayout => "↔️",
+                VerticalStackLayout => "↕️",
                 AbsoluteLayout => "🎯",
+                ScrollView => "📜",
+                Border => "⬛",
+                Frame => "🖼️",
+                ContentView => "📦",
+                CollectionView => "📝",
+                ListView => "📑",
                 _ => "🔹"
             };
         }
