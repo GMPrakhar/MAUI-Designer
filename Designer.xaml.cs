@@ -20,6 +20,7 @@ public partial class Designer : ContentPage
     private ToolboxTab _toolboxTab;
     private PropertiesTab _propertiesTab;
     private XamlEditorTab _xamlEditorTab;
+    private HierarchyTab _hierarchyTab;
 
     private const string defaultXaml = "<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<ContentPage xmlns=\"http://schemas.microsoft.com/dotnet/2021/maui\"\r\n             xmlns:x=\"http://schemas.microsoft.com/winfx/2009/xaml\"\r\n>\r\n<AbsoluteLayout\r\n    Margin=\"20,20,20,20\"\r\n    IsPlatformEnabled=\"True\"\r\n    StyleId=\"designerFrame\"\r\n>\r\n\r\n<Button\r\n    Text=\"Login\"\r\n    Margin=\"114,150,205,195\"\r\n    HeightRequest=\"45\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"91\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<BoxView\r\n    Margin=\"5,-16,329,249\"\r\n    BackgroundColor=\"#17FFFFFF\"\r\n    HeightRequest=\"265\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"324\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Label\r\n    Text=\"Username \"\r\n    Margin=\"26,21,25,20\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Label\r\n    Text=\"Password \"\r\n    Margin=\"26,70,25,69\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Line\r\n    Margin=\"14,378,13,377\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Editor\r\n    Text=\"Type here\"\r\n    TextColor=\"#FF404040\"\r\n    Margin=\"110,16,305,48\"\r\n    HeightRequest=\"32\"\r\n    IsEnabled=\"True\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"195\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n<Editor\r\n    Text=\"Type here\"\r\n    TextColor=\"#FF404040\"\r\n    Margin=\"111,67,311,97\"\r\n    HeightRequest=\"30\"\r\n    IsEnabled=\"True\"\r\n    MinimumHeightRequest=\"20\"\r\n    MinimumWidthRequest=\"20\"\r\n    WidthRequest=\"200\"\r\n    IsPlatformEnabled=\"True\"\r\n/>\r\n\r\n</AbsoluteLayout>\r\n\r\n</ContentPage>\r\n";
 
@@ -36,6 +37,7 @@ public partial class Designer : ContentPage
         // Instantiate tabs
         _toolboxTab = new ToolboxTab();
         _propertiesTab = new PropertiesTab();
+        _hierarchyTab = new HierarchyTab();
         _xamlEditorTab = new XamlEditorTab(
             () => GenerateXamlForTheView(this, null),
             () => LoadViewFromXaml(this, null)
@@ -45,6 +47,7 @@ public partial class Designer : ContentPage
         BottomTabMenuHolder.AddTab(_xamlEditorTab);
         LeftTabMenuHolder.AddTab(_toolboxTab);
         RightTabMenuHolder.AddTab(_propertiesTab);
+        RightTabMenuHolder.AddTab(_hierarchyTab);
 
         // Setup toolbox
         ToolBox.contextMenu.UpdateCollectionView();
@@ -68,6 +71,11 @@ public partial class Designer : ContentPage
 
         DragAndDropOperations.OnFocusChanged += UpdatePropertyForFocusedView;
         DragAndDropOperations.BaseLayout = designerFrame;
+
+        // Setup hierarchy tab
+        _hierarchyTab.SetDesignerFrame(designerFrame);
+        designerFrame.ChildAdded += (s, e) => _hierarchyTab.UpdateHierarchy();
+        designerFrame.ChildRemoved += (s, e) => _hierarchyTab.UpdateHierarchy();
 
         // Attach PanGestureRecognizer for TabDragger rectangles
         AttachPanGestureRecognizer(TabDraggerLeft);
@@ -190,6 +198,7 @@ public partial class Designer : ContentPage
             LoadLayoutRecursively(newAbsoluteLayout, loadedLayout);
             AddDirectChildrenOfAbsoluteLayout(newAbsoluteLayout);
             designerFrame.Add(ToolBox.contextMenu);
+            _hierarchyTab.UpdateHierarchy();
         }
         catch
         {
