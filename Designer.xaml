@@ -5,65 +5,70 @@
              x:Class="MAUIDesigner.Designer"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              Title="Designer">
-
-    <Grid VerticalOptions="FillAndExpand" HorizontalOptions="FillAndExpand" x:Name="MainGrid" Margin="5">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="150"/>
-        </Grid.RowDefinitions>
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="350"/>
-        </Grid.ColumnDefinitions>
-
-        <!-- Left TabMenuHolder and Dragger -->
-        <Grid Grid.Row="0" Grid.Column="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="2"/>
-            </Grid.ColumnDefinitions>
-            <views:TabMenuHolder x:Name="LeftTabMenuHolder" IsSidebar="True" Grid.Column="0"/>
-            <Rectangle x:Name="TabDraggerLeft" Grid.Column="1" Fill="#555" WidthRequest="6" HorizontalOptions="End" VerticalOptions="FillAndExpand">
-                <Rectangle.GestureRecognizers>
-                    <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
-                </Rectangle.GestureRecognizers>
-            </Rectangle>
-        </Grid>
-
-        <!-- Center Designer Frame -->
-        <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Row="0" Grid.Column="1">
-            <AbsoluteLayout.GestureRecognizers>
-                <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" Buttons="Secondary,Primary"/>
-            </AbsoluteLayout.GestureRecognizers>
-        </AbsoluteLayout>
-
-        <!-- Right TabMenuHolder and Dragger -->
-        <Grid Grid.Row="0" Grid.Column="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Rectangle x:Name="TabDraggerRight" Grid.Column="0" Fill="#555" WidthRequest="2" HorizontalOptions="Start" VerticalOptions="FillAndExpand">
-                <Rectangle.GestureRecognizers>
-                    <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
-                </Rectangle.GestureRecognizers>
-            </Rectangle>
-            <views:TabMenuHolder x:Name="RightTabMenuHolder" Grid.Column="1"/>
-        </Grid>
-
-        <!-- Bottom TabMenuHolder and Dragger -->
-        <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3">
+    <AbsoluteLayout >
+        <Grid x:Name="MainGrid" Margin="5" WidthRequest="-1" HeightRequest="-1"
+              AbsoluteLayout.LayoutBounds="0,0,1,1" 
+        AbsoluteLayout.LayoutFlags="All">
             <Grid.RowDefinitions>
-                <RowDefinition Height="3"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="150"/>
             </Grid.RowDefinitions>
-            <Rectangle x:Name="TabDraggerBottom" Grid.Row="0" Fill="#555" HeightRequest="3" HorizontalOptions="FillAndExpand" VerticalOptions="End">
-                <Rectangle.GestureRecognizers>
-                    <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
-                </Rectangle.GestureRecognizers>
-            </Rectangle>
-            <views:TabMenuHolder x:Name="BottomTabMenuHolder" Grid.Row="1" />
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="350"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Left TabMenuHolder and Dragger -->
+            <Grid Grid.Row="0" Grid.Column="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="2"/>
+                </Grid.ColumnDefinitions>
+                <views:TabMenuHolder x:Name="LeftTabMenuHolder" IsSidebar="True" Grid.Column="0"/>
+                <Rectangle x:Name="TabDraggerLeft" Grid.Column="1" Fill="#555" WidthRequest="6" HorizontalOptions="End" VerticalOptions="FillAndExpand">
+                    <Rectangle.GestureRecognizers>
+                        <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
+                    </Rectangle.GestureRecognizers>
+                </Rectangle>
+            </Grid>
+
+            <!-- Center Designer Frame -->
+            <AbsoluteLayout Margin="20" VerticalOptions="FillAndExpand" x:Name="designerFrame" Grid.Row="0" Grid.Column="1">
+                <AbsoluteLayout.GestureRecognizers>
+                    <TapGestureRecognizer Tapped="TapGestureRecognizer_Tapped" Buttons="Secondary,Primary"/>
+                </AbsoluteLayout.GestureRecognizers>
+            </AbsoluteLayout>
+
+            <!-- Right TabMenuHolder and Dragger -->
+            <Grid Grid.Row="0" Grid.Column="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Rectangle x:Name="TabDraggerRight" Grid.Column="0" Fill="#555" WidthRequest="2" HorizontalOptions="Start" VerticalOptions="FillAndExpand">
+                    <Rectangle.GestureRecognizers>
+                        <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
+                    </Rectangle.GestureRecognizers>
+                </Rectangle>
+                <views:TabMenuHolder x:Name="RightTabMenuHolder" Grid.Column="1"/>
+            </Grid>
+
+            <!-- Bottom TabMenuHolder and Dragger -->
+            <Grid Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="3"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Rectangle x:Name="TabDraggerBottom" Grid.Row="0" Fill="#555" HeightRequest="3" HorizontalOptions="FillAndExpand" VerticalOptions="End">
+                    <Rectangle.GestureRecognizers>
+                        <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
+                    </Rectangle.GestureRecognizers>
+                </Rectangle>
+                <views:TabMenuHolder x:Name="BottomTabMenuHolder" Grid.Row="1" />
+            </Grid>
         </Grid>
-    </Grid>
+
+        <views:ContextMenu IsVisible="False" x:Name="contextMenu" ZIndex="10000"/>
+    </AbsoluteLayout>
 </ContentPage>

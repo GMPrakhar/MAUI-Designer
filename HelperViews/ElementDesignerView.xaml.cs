@@ -33,6 +33,9 @@ public partial class ElementDesignerView : ContentView
     {
         InitializeComponent();
         DragAndDropOperations.OnFocusChanged += OnFocusChanged;
+        var tapGesture = new TapGestureRecognizer();
+        tapGesture.Tapped += TapGestureRecognizer_Tapped;
+        this.GestureRecognizers.Add(tapGesture);
     }
 
     public ElementDesignerView(View? loadedView) : this()
@@ -170,5 +173,6 @@ public partial class ElementDesignerView : ContentView
     private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)
     {
         DragAndDropOperations.OnFocusChanged(this);
+        ContextMenu.SetCurrentSelectedElement(this);
     }
 }

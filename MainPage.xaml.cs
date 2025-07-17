@@ -13,7 +13,7 @@ namespace MAUIDesigner
         public MainPage()
         {
             InitializeComponent();
-
+// ToolBox.contextMenu = contextMenu;
         }
     }
 

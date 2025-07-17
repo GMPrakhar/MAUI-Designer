@@ -50,6 +50,7 @@ public partial class Designer : ContentPage
         RightTabMenuHolder.AddTab(_hierarchyTab);
 
         // Setup toolbox
+        ToolBox.contextMenu = contextMenu;
         ToolBox.contextMenu.UpdateCollectionView();
         ToolBox.MainDesignerView = designerFrame;
         ToolBox.AddElementsForToolbox(_toolboxTab.ToolboxLayout);
@@ -197,7 +198,6 @@ public partial class Designer : ContentPage
             var newAbsoluteLayout = new AbsoluteLayout();
             LoadLayoutRecursively(newAbsoluteLayout, loadedLayout);
             AddDirectChildrenOfAbsoluteLayout(newAbsoluteLayout);
-            designerFrame.Add(ToolBox.contextMenu);
             _hierarchyTab.UpdateHierarchy();
         }
         catch

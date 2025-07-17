@@ -26,7 +26,7 @@ namespace MAUIDesigner.DnDHelper
 
             if (parentView == (draggingView?.Parent as ElementDesignerView)?.View) return;
 
-            var location = e.GetPosition(draggingView).Value;
+            var location = e.GetPosition(parentView).Value;
 
             if (IsScalingObject != null && (bool)IsScalingObject == true)
             {
