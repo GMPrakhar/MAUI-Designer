@@ -22,6 +22,9 @@ namespace MAUIDesigner.DnDHelper
             location.X = (int)location.X;
             location.Y = (int)location.Y;
 
+            // Check if the dragging view is positioned in a Grid layout
+            bool isInGrid = draggingView.Parent is Grid;
+
             Thickness scalingFactor;
             if (scaleDirection == ScaleDirection.TopLeft)
             {
@@ -46,9 +49,16 @@ namespace MAUIDesigner.DnDHelper
                 location.Y = draggingView.Margin.Top;
             }
 
+            // Update the size
             draggingView.WidthRequest = Math.Max(draggingView.WidthRequest + scalingFactor.Left, 20);
             draggingView.HeightRequest = Math.Max(draggingView.HeightRequest + scalingFactor.Top, 20);
-            draggingView.Margin = new Thickness(location.X, location.Y, location.X + draggingView.WidthRequest, location.Y + draggingView.HeightRequest);
+            
+            // Only update margin if the element is NOT in a Grid layout
+            // Grid elements use Grid.Row/Grid.Column for positioning, not margin
+            if (!isInGrid)
+            {
+                draggingView.Margin = new Thickness(location.X, location.Y, location.X + draggingView.WidthRequest, location.Y + draggingView.HeightRequest);
+            }
         }
 
         public enum ScaleDirection
