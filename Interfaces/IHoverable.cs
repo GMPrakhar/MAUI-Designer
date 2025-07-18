@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MAUIDesigner.NewFolder
+namespace MAUIDesigner.Interfaces
 {
     public interface IHoverable
     {
