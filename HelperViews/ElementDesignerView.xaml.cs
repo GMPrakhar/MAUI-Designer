@@ -2,7 +2,6 @@ using CommunityToolkit.Maui.Views;
 using MAUIDesigner.DnDHelper;
 using MAUIDesigner.Interfaces;
 using MAUIDesigner.LayoutDesigners;
-using MAUIDesigner.NewFolder;
 using System.Runtime.CompilerServices;
 using static MAUIDesigner.DnDHelper.ScalingHelper;
 using static MAUIDesigner.MainPage;
