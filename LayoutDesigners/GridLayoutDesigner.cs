@@ -1,7 +1,6 @@
 ﻿using CommunityToolkit.Maui.Views;
 using MAUIDesigner.HelperViews;
 using MAUIDesigner.Interfaces;
-using Microsoft.Maui.Controls.Shapes;
 using Windows.Devices.Input;
 using MAUIDesigner.DnDHelper;
 
@@ -18,8 +17,8 @@ namespace MAUIDesigner.LayoutDesigners
             BackgroundColor = Colors.AliceBlue,
         };
 
-        private List<Line> columnLines = new();
-        private List<Line> rowLines = new();
+        private List<Border> columnLines = new();
+        private List<Border> rowLines = new();
         private List<Rectangle> columnDividers = new();
         private List<Rectangle> rowDividers = new();
 
@@ -118,22 +117,18 @@ namespace MAUIDesigner.LayoutDesigners
             columnDividers.Clear();
             rowDividers.Clear();
 
-            // Add column lines
+            // Add column lines using Border elements for better visibility
             for (int i = 1; i < Grid.ColumnDefinitions.Count; i++)
             {
-                var line = new Line
+                var line = new Border
                 {
-                    X1 = 0,
-                    Y1 = 0,
-                    X2 = 0,
-                    Y2 = 1,
-                    Stroke = Colors.Gray,
-                    StrokeThickness = 1,
-                    StrokeDashArray = new DoubleCollection { 2, 2 },
+                    WidthRequest = 1,
+                    BackgroundColor = Colors.Gray,
                     VerticalOptions = LayoutOptions.Fill,
-                    HorizontalOptions = LayoutOptions.Center,
+                    HorizontalOptions = LayoutOptions.Start,
                     IsHitTestVisible = false,
-                    ZIndex = 500
+                    ZIndex = 500,
+                    Opacity = 0.7
                 };
                 
                 Grid.SetColumn(line, i);
@@ -147,8 +142,9 @@ namespace MAUIDesigner.LayoutDesigners
                     WidthRequest = 4,
                     Fill = Colors.Transparent,
                     VerticalOptions = LayoutOptions.Fill,
-                    HorizontalOptions = LayoutOptions.Center,
-                    ZIndex = 600
+                    HorizontalOptions = LayoutOptions.Start,
+                    ZIndex = 600,
+                    Margin = new Thickness(-2, 0, 0, 0)
                 };
 
                 var dragGesture = new DragGestureRecognizer();
@@ -162,22 +158,18 @@ namespace MAUIDesigner.LayoutDesigners
                 columnDividers.Add(divider);
             }
 
-            // Add row lines
+            // Add row lines using Border elements for better visibility
             for (int i = 1; i < Grid.RowDefinitions.Count; i++)
             {
-                var line = new Line
+                var line = new Border
                 {
-                    X1 = 0,
-                    Y1 = 0,
-                    X2 = 1,
-                    Y2 = 0,
-                    Stroke = Colors.Gray,
-                    StrokeThickness = 1,
-                    StrokeDashArray = new DoubleCollection { 2, 2 },
-                    VerticalOptions = LayoutOptions.Center,
+                    HeightRequest = 1,
+                    BackgroundColor = Colors.Gray,
+                    VerticalOptions = LayoutOptions.Start,
                     HorizontalOptions = LayoutOptions.Fill,
                     IsHitTestVisible = false,
-                    ZIndex = 500
+                    ZIndex = 500,
+                    Opacity = 0.7
                 };
 
                 Grid.SetRow(line, i);
@@ -190,9 +182,10 @@ namespace MAUIDesigner.LayoutDesigners
                 {
                     HeightRequest = 4,
                     Fill = Colors.Transparent,
-                    VerticalOptions = LayoutOptions.Center,
+                    VerticalOptions = LayoutOptions.Start,
                     HorizontalOptions = LayoutOptions.Fill,
-                    ZIndex = 600
+                    ZIndex = 600,
+                    Margin = new Thickness(0, -2, 0, 0)
                 };
 
                 var dragGesture = new DragGestureRecognizer();
