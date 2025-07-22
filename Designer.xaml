@@ -5,6 +5,14 @@
              x:Class="MAUIDesigner.Designer"
              xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
              Title="Designer">
+    
+    <ContentPage.ToolbarItems>
+        <ToolbarItem x:Name="RunInteractiveButton" 
+                     Text="Run Interactive Mode" 
+                     Order="Primary" 
+                     Priority="0" 
+                     Clicked="RunInteractiveButton_Clicked"/>
+    </ContentPage.ToolbarItems>
     <AbsoluteLayout >
         <Grid x:Name="MainGrid" Margin="5" WidthRequest="-1" HeightRequest="-1"
               AbsoluteLayout.LayoutBounds="0,0,1,1" 

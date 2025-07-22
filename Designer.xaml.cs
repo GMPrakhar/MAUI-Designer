@@ -140,7 +140,27 @@ public partial class Designer : ContentPage
         _xamlService.LoadViewFromXaml(xaml, designerFrame, _tabSetupService.HierarchyTab);
     }
 
-
+    private async void RunInteractiveButton_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            // Generate XAML from current designer content
+            var xaml = XAMLGenerator.GetXamlForElement(designerFrame);
+            
+            // Navigate to the interactive preview page with the generated XAML
+            var navigationParameter = new Dictionary<string, object>
+            {
+                { "xamlContent", xaml }
+            };
+            
+            await Shell.Current.GoToAsync("interactive-preview", navigationParameter);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error navigating to interactive preview: {ex.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", "Could not open interactive preview: " + ex.Message, "OK");
+        }
+    }
 
     protected override void OnHandlerChanged()
     {
