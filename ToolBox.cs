@@ -23,6 +23,7 @@ namespace MAUIDesigner
         private static readonly IDictionary<string, string> IconMapping;
 
         internal static Layout MainDesignerView;
+        internal static Core.Elements.IElementOperations ElementOperations;
 
         public static ContextMenu contextMenu;
 
@@ -392,7 +393,7 @@ namespace MAUIDesigner
                     Grid.SetColumn(horizontalStack, 0);
 
                     var gestureRecognizer = new TapGestureRecognizer();
-                    gestureRecognizer.Tapped += (s,e) => ElementOperations.CreateElementInDesignerFrame(MainDesignerView, s);
+                    gestureRecognizer.Tapped += (s,e) => ElementOperations?.CreateElementInDesignerFrame(MainDesignerView, GetElementName(s));
                     var pointerGestureRecognizer = new PointerGestureRecognizer();
                     pointerGestureRecognizer.PointerEntered += RaiseLabel;
                     pointerGestureRecognizer.PointerExited += MakeLabelDefault;
@@ -441,5 +442,17 @@ namespace MAUIDesigner
         Shape,
         Layout,
         Other,
+    }
+    
+    // Helper method to extract element name from sender
+    private static string GetElementName(object sender)
+    {
+        if (sender is HorizontalStackLayout horizontalStack && 
+            horizontalStack.Children.Count > 1 && 
+            horizontalStack.Children[1] is Label label)
+        {
+            return label.Text.Trim();
+        }
+        return string.Empty;
     }
 }
