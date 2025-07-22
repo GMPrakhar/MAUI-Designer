@@ -120,16 +120,6 @@ namespace MAUIDesigner
 
                 return editor;
             }
-                        property.SetValue(view, finalValue);
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error setting property {property.Name}: {ex.Message}");
-                    }
-                };
-
-                return editor;
-            }
             else if (property.PropertyType.IsEnum)
             {
                 var picker = new Picker
