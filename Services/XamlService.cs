@@ -1,3 +1,4 @@
+using MAUIDesigner.DnDHelper;
 using MAUIDesigner.HelperViews;
 using System.Diagnostics;
 using Extensions = Microsoft.Maui.Controls.Xaml.Extensions;

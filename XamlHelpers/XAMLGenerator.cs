@@ -115,7 +115,7 @@ namespace MAUIDesigner.XamlHelpers
             var stringBuilder = new StringBuilder();
             var sizeName = valueType == typeof(ColumnDefinitionCollection) ? "Width" : "Height";
             stringBuilder.AppendLine($"<Grid.{propertyName}>");
-            var gridDefinitions = value as IEnumerable;
+            var gridDefinitions = value as IEnumerable<object>;
             foreach (var definition in gridDefinitions)
             {
                 var sizeValue = definition is ColumnDefinition column ? (column.Width.IsAbsolute ? column.Width.Value.ToString() : "*"): ((definition as RowDefinition).Height.IsAbsolute ? (definition as RowDefinition).Height.Value.ToString() : "*");
