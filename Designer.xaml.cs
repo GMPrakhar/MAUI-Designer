@@ -13,10 +13,8 @@ public partial class Designer : ContentPage
 {
     private readonly ICursorService _cursorService;
     private readonly IXamlService _xamlService;
-    private ToolboxTab _toolboxTab;
-    private PropertiesTab _propertiesTab;
-    private XamlEditorTab _xamlEditorTab;
-    private HierarchyTab _hierarchyTab;
+    private readonly ITabSetupService _tabSetupService;
+    private readonly IGestureSetupService _gestureSetupService;
 
 
 
@@ -31,76 +29,42 @@ public partial class Designer : ContentPage
         InitializeComponent();
         _cursorService = new CursorService();
         _xamlService = new XamlService();
+        _tabSetupService = new TabSetupService();
+        _gestureSetupService = new GestureSetupService();
 
-        // Instantiate tabs
-        _toolboxTab = new ToolboxTab();
-        _propertiesTab = new PropertiesTab();
-        _hierarchyTab = new HierarchyTab();
-        _xamlEditorTab = new XamlEditorTab(
+        InitializeDesigner();
+    }
+
+    private void InitializeDesigner()
+    {
+        // Setup tabs
+        _tabSetupService.SetupTabs(
+            LeftTabMenuHolder,
+            RightTabMenuHolder,
+            BottomTabMenuHolder,
+            designerFrame,
             () => GenerateXamlForTheView(this, null),
             () => LoadViewFromXaml(this, null)
         );
-
-        // Add tabs to holders
-        BottomTabMenuHolder.AddTab(_xamlEditorTab);
-        LeftTabMenuHolder.AddTab(_toolboxTab);
-        RightTabMenuHolder.AddTab(_propertiesTab);
-        RightTabMenuHolder.AddTab(_hierarchyTab);
 
         // Setup toolbox
         ToolBox.contextMenu = contextMenu;
         ToolBox.contextMenu.UpdateCollectionView();
         ToolBox.MainDesignerView = designerFrame;
-        ToolBox.AddElementsForToolbox(_toolboxTab.ToolboxLayout);
+        ToolBox.AddElementsForToolbox(_tabSetupService.ToolboxTab.ToolboxLayout);
 
         // Setup XAML editor
-        _xamlEditorTab.XamlEditor.Text = DefaultXaml.Content;
-        LoadViewFromXaml(_xamlEditorTab.XamlEditor, null);
+        _tabSetupService.XamlEditorTab.XamlEditor.Text = DefaultXaml.Content;
+        LoadViewFromXaml(_tabSetupService.XamlEditorTab.XamlEditor, null);
 
-        // Setup context menu
-        var rightClickRecognizer = new TapGestureRecognizer();
-        rightClickRecognizer.Tapped += ToolBox.ShowContextMenu;
-        rightClickRecognizer.Buttons = ButtonsMask.Secondary;
-        designerFrame.GestureRecognizers.Add(rightClickRecognizer);
-
-        // Setup drag and drop
-        var dropGestureRecognizer = new DropGestureRecognizer();
-        dropGestureRecognizer.Drop += DragAndDropOperations.OnDrop;
-        designerFrame.GestureRecognizers.Add(dropGestureRecognizer);
+        // Setup gestures
+        _gestureSetupService.SetupDesignerGestures(designerFrame, contextMenu, TapGestureRecognizer_Tapped);
+        _gestureSetupService.SetupTabDraggers(TabDraggerLeft, TabDraggerRight, TabDraggerBottom, TabDragger_PanUpdated, _cursorService);
 
         DragAndDropOperations.OnFocusChanged += UpdatePropertyForFocusedView;
-        DragAndDropOperations.BaseLayout = designerFrame;
-
-        // Setup hierarchy tab
-        _hierarchyTab.SetDesignerFrame(designerFrame);
-        designerFrame.ChildAdded += (s, e) => _hierarchyTab.UpdateHierarchy();
-        designerFrame.ChildRemoved += (s, e) => _hierarchyTab.UpdateHierarchy();
-
-        // Attach PanGestureRecognizer for TabDragger rectangles
-        AttachPanGestureRecognizer(TabDraggerLeft);
-        AttachPanGestureRecognizer(TabDraggerRight);
-        AttachPanGestureRecognizer(TabDraggerBottom);
-
-        // Attach pointer recognizers for draggers
-        AttachPointerGestureRecognizer(TabDraggerLeft, CursorType.SizeWE);
-        AttachPointerGestureRecognizer(TabDraggerRight, CursorType.SizeWE);
-        AttachPointerGestureRecognizer(TabDraggerBottom, CursorType.SizeNS);
     }
 
-    private void AttachPanGestureRecognizer(Rectangle tabDragger)
-    {
-        var panGestureRecognizer = new PanGestureRecognizer();
-        panGestureRecognizer.PanUpdated += TabDragger_PanUpdated;
-        tabDragger.GestureRecognizers.Add(panGestureRecognizer);
-    }
 
-    private void AttachPointerGestureRecognizer(Rectangle tabDragger, CursorType cursorType)
-    {
-        var pointerGesture = new PointerGestureRecognizer();
-        pointerGesture.PointerEntered += (s, e) => _cursorService.SetCursor(tabDragger, cursorType);
-        pointerGesture.PointerExited += (s, e) => _cursorService.SetCursor(tabDragger, CursorType.Arrow);
-        tabDragger.GestureRecognizers.Add(pointerGesture);
-    }
 
 
 
@@ -147,10 +111,10 @@ public partial class Designer : ContentPage
 
     private void UpdatePropertyForFocusedView(object obj)
     {
-        _propertiesTab.PropertiesLayout.Clear();
+        _tabSetupService.PropertiesTab.PropertiesLayout.Clear();
         if (obj is ElementDesignerView designerView)
         {
-            PropertyHelper.PopulatePropertyView(_propertiesTab.PropertiesLayout, designerView.View);
+            PropertyHelper.PopulatePropertyView(_tabSetupService.PropertiesTab.PropertiesLayout, designerView.View);
         }
     }
 
@@ -167,13 +131,13 @@ public partial class Designer : ContentPage
     private void GenerateXamlForTheView(object sender, EventArgs e)
     {
         var xaml = XAMLGenerator.GetXamlForElement(designerFrame);
-        _xamlEditorTab.XamlEditor.Text = xaml;
+        _tabSetupService.XamlEditorTab.XamlEditor.Text = xaml;
     }
 
     private void LoadViewFromXaml(object sender, EventArgs e)
     {
-        var xaml = _xamlEditorTab.XamlEditor.Text;
-        _xamlService.LoadViewFromXaml(xaml, designerFrame, _hierarchyTab);
+        var xaml = _tabSetupService.XamlEditorTab.XamlEditor.Text;
+        _xamlService.LoadViewFromXaml(xaml, designerFrame, _tabSetupService.HierarchyTab);
     }
 
 

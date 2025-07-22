@@ -17,5 +17,10 @@
         // Animation constants
         public const uint AnimationDuration = 100;
         public const uint AnimationRate = 16;
+        
+        // XAML constants
+        public const string XmlHeader = "<?xml version=\"1.0\" encoding=\"utf-8\" ?>";
+        public const string ContentPageOpenTag = "<ContentPage xmlns=\"http://schemas.microsoft.com/dotnet/2021/maui\"\r\n             xmlns:x=\"http://schemas.microsoft.com/winfx/2009/xaml\"\r\n>";
+        public const string ContentPageCloseTag = "</ContentPage>";
     }
 }

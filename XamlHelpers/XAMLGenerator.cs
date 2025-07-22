@@ -1,14 +1,9 @@
-﻿using MAUIDesigner.HelperViews;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
+using MAUIDesigner.HelperViews;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace MAUIDesigner.XamlHelpers
 {
-    class XAMLGenerator
+    internal class XAMLGenerator
     {
         private static Type[] allowedTypesForXamlProperties = { typeof(string), typeof(Color), typeof(Thickness), typeof(Enum), typeof(ColumnDefinitionCollection), typeof(RowDefinitionCollection) };
 
@@ -16,9 +11,9 @@ namespace MAUIDesigner.XamlHelpers
         {
             var xaml = GetInternalXAML(element);
             var finalXamlBuilder = new StringBuilder();
-            finalXamlBuilder.AppendLine("<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<ContentPage xmlns=\"http://schemas.microsoft.com/dotnet/2021/maui\"\r\n             xmlns:x=\"http://schemas.microsoft.com/winfx/2009/xaml\"\r\n>");
+            finalXamlBuilder.AppendLine($"{Constants.XmlHeader}\r\n{Constants.ContentPageOpenTag}");
             finalXamlBuilder.AppendLine(xaml);
-            finalXamlBuilder.AppendLine("</ContentPage>");
+            finalXamlBuilder.AppendLine(Constants.ContentPageCloseTag);
 
             return finalXamlBuilder.ToString();
         }
