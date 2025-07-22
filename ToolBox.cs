@@ -61,25 +61,35 @@ namespace MAUIDesigner
             return IconMapping.TryGetValue(elementName, out var icon) ? icon : IconMapping["Default"];
         }
 
-        // Get all properties for a given View
+        // Get all properties for a given View - optimized without parallel processing
         internal static IDictionary<string, View> GetAllPropertiesForView(View view)
         {
             var viewProperties = view.GetType().GetProperties().Where(x => x.CanWrite);
-            var properties = new ConcurrentDictionary<string, View>();
-            Parallel.ForEach(viewProperties, property =>
+            var properties = new Dictionary<string, View>();
+            
+            // Sequential processing is more efficient for this use case than parallel processing
+            foreach (var property in viewProperties)
             {
                 if (property.GetIndexParameters().Length == 0)
                 {
-                    properties[property.Name] = GetViewForPropertyType(view, property, property.GetValue(view));
+                    try
+                    {
+                        var value = property.GetValue(view);
+                        properties[property.Name] = GetViewForPropertyType(view, property, value);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error getting property {property.Name}: {ex.Message}");
+                        // Continue with other properties even if one fails
+                    }
                 }
-            });
+            }
 
             return properties;
         }
 
         internal static View GetViewForPropertyType(View view, PropertyInfo property, object value)
         {
-
             // Get the view according to the type of the value. If it is primitive type or string, it should be an editor, if it's enum it should be a picker
             if (property.PropertyType == typeof(string) ||  property.PropertyType.IsPrimitive)
             {
@@ -88,9 +98,11 @@ namespace MAUIDesigner
                     Text = value?.ToString() ?? "0",
                     FontSize = 10,
                     VerticalOptions = LayoutOptions.Center,
+                    BackgroundColor = Application.Current?.RequestedTheme == AppTheme.Dark ? Color.FromRgba(50, 50, 50, 255) : Colors.White,
+                    TextColor = Application.Current?.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
+                    Placeholder = $"Enter {property.PropertyType.Name.ToLower()}",
+                    MinimumHeightRequest = 30
                 };
-
-                editor.HeightRequest = 10;
 
                 editor.TextChanged += (s, e) =>
                 {
@@ -108,17 +120,47 @@ namespace MAUIDesigner
 
                 return editor;
             }
+                        property.SetValue(view, finalValue);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error setting property {property.Name}: {ex.Message}");
+                    }
+                };
+
+                return editor;
+            }
             else if (property.PropertyType.IsEnum)
             {
                 var picker = new Picker
                 {
-                    ItemsSource = Enum.GetValues(property.PropertyType).Cast<object>().ToList()
+                    ItemsSource = Enum.GetValues(property.PropertyType).Cast<object>().ToList(),
+                    FontSize = 10,
+                    BackgroundColor = Application.Current?.RequestedTheme == AppTheme.Dark ? Color.FromRgba(50, 50, 50, 255) : Colors.White,
+                    TextColor = Application.Current?.RequestedTheme == AppTheme.Dark ? Colors.White : Colors.Black,
+                    MinimumHeightRequest = 30
                 };
+
+                // Set current value if available
+                if (value != null)
+                {
+                    picker.SelectedItem = value;
+                }
 
                 picker.SelectedIndexChanged += (s, e) =>
                 {
-                    var finalValue = Enum.Parse(property.PropertyType, (s as Picker)!.SelectedItem!.ToString());
-                    property.SetValue(view, finalValue);
+                    try
+                    {
+                        if ((s as Picker)?.SelectedItem != null)
+                        {
+                            var finalValue = Enum.Parse(property.PropertyType, (s as Picker)!.SelectedItem!.ToString()!);
+                            property.SetValue(view, finalValue);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error setting enum property {property.Name}: {ex.Message}");
+                    }
                 };
 
                 return picker;

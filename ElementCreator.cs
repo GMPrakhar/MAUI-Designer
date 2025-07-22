@@ -188,26 +188,157 @@ namespace MAUIDesigner
 
         internal static View Create(string elementTypeName)
         {
-            if (factories.TryGetValue(elementTypeName, out var factory))
+            if (string.IsNullOrWhiteSpace(elementTypeName))
             {
-                return factory.CreateElement();
+                System.Diagnostics.Debug.WriteLine("ElementCreator: Null or empty element type name provided");
+                return CreateFallbackElement("Invalid element name");
             }
 
+            // Try factory-based creation first (optimized path)
+            if (factories.TryGetValue(elementTypeName, out var factory))
+            {
+                try
+                {
+                    var element = factory.CreateElement();
+                    System.Diagnostics.Debug.WriteLine($"ElementCreator: Successfully created {elementTypeName} using factory");
+                    return element;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"ElementCreator: Factory creation failed for {elementTypeName}: {ex.Message}");
+                    // Continue to reflection-based creation
+                }
+            }
+
+            // Try reflection-based creation with improved error handling
             try
             {
-                var elementType = typeof(View).Assembly.GetTypes().FirstOrDefault(t => t.Name == elementTypeName);
+                var elementType = FindElementType(elementTypeName);
                 if (elementType != null)
                 {
-                    return Activator.CreateInstance(elementType) as View ?? new Label { Text = "Error creating element" };
+                    var instance = CreateInstanceWithValidation(elementType);
+                    if (instance is View view)
+                    {
+                        SetDefaultProperties(view);
+                        System.Diagnostics.Debug.WriteLine($"ElementCreator: Successfully created {elementTypeName} using reflection");
+                        return view;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error creating element {elementTypeName}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"ElementCreator: Reflection creation failed for {elementTypeName}: {ex.Message}");
             }
 
-            // Fallback to a basic label if element creation fails
-            return new Label { Text = $"Unknown element: {elementTypeName}" };
+            // Fallback to error element
+            System.Diagnostics.Debug.WriteLine($"ElementCreator: All creation methods failed for {elementTypeName}, creating fallback");
+            return CreateFallbackElement($"Failed to create: {elementTypeName}");
+        }
+
+        private static Type? FindElementType(string elementTypeName)
+        {
+            // Search in Microsoft.Maui.Controls assembly
+            var mauiTypes = typeof(View).Assembly.GetTypes()
+                .Where(t => t.Name == elementTypeName && 
+                           (t.IsSubclassOf(typeof(View)) || t.IsSubclassOf(typeof(Layout))))
+                .ToArray();
+
+            if (mauiTypes.Length == 1)
+                return mauiTypes[0];
+
+            // If multiple types found, prefer non-abstract ones
+            var concreteTypes = mauiTypes.Where(t => !t.IsAbstract).ToArray();
+            if (concreteTypes.Length > 0)
+                return concreteTypes[0];
+
+            // Search in Microsoft.Maui.Controls.Shapes assembly for shapes
+            var shapeTypes = typeof(Microsoft.Maui.Controls.Shapes.Shape).Assembly.GetTypes()
+                .Where(t => t.Name == elementTypeName && t.IsSubclassOf(typeof(View)))
+                .ToArray();
+
+            return shapeTypes.FirstOrDefault(t => !t.IsAbstract);
+        }
+
+        private static object? CreateInstanceWithValidation(Type elementType)
+        {
+            // Check if type has a parameterless constructor
+            var constructor = elementType.GetConstructor(Type.EmptyTypes);
+            if (constructor == null)
+            {
+                System.Diagnostics.Debug.WriteLine($"ElementCreator: No parameterless constructor found for {elementType.Name}");
+                return null;
+            }
+
+            // Create instance
+            return Activator.CreateInstance(elementType);
+        }
+
+        private static void SetDefaultProperties(View view)
+        {
+            // Set common default properties for better usability
+            try
+            {
+                if (view.GetType().GetProperty("Margin") != null)
+                {
+                    view.Margin = new Thickness(10);
+                }
+
+                if (view.GetType().GetProperty("MinimumHeightRequest") != null)
+                {
+                    view.MinimumHeightRequest = 20;
+                }
+
+                if (view.GetType().GetProperty("MinimumWidthRequest") != null)
+                {
+                    view.MinimumWidthRequest = 20;
+                }
+
+                // Set specific defaults for text-based controls
+                if (view is Label label && string.IsNullOrEmpty(label.Text))
+                {
+                    label.Text = "New Label";
+                }
+                else if (view is Button button && string.IsNullOrEmpty(button.Text))
+                {
+                    button.Text = "New Button";
+                }
+                else if (view is Entry entry && string.IsNullOrEmpty(entry.Placeholder))
+                {
+                    entry.Placeholder = "Enter text";
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ElementCreator: Error setting default properties: {ex.Message}");
+                // Continue even if default property setting fails
+            }
+        }
+
+        private static View CreateFallbackElement(string errorMessage)
+        {
+            return new Label 
+            { 
+                Text = errorMessage,
+                TextColor = Colors.Red,
+                FontSize = 10,
+                Margin = new Thickness(10),
+                MinimumHeightRequest = 20,
+                MinimumWidthRequest = 100,
+                BackgroundColor = Color.FromRgba(255, 200, 200, 100)
+            };
+        }
+
+        /// <summary>
+        /// Gets all available element types that can be created
+        /// </summary>
+        internal static IEnumerable<string> GetAvailableElementTypes()
+        {
+            var factoryTypes = factories.Keys;
+            var reflectionTypes = typeof(View).Assembly.GetTypes()
+                .Where(t => t.IsSubclassOf(typeof(View)) && !t.IsAbstract && t.GetConstructor(Type.EmptyTypes) != null)
+                .Select(t => t.Name);
+
+            return factoryTypes.Concat(reflectionTypes).Distinct().OrderBy(name => name);
         }
     }
 }
