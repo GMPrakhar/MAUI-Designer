@@ -6,14 +6,14 @@ namespace MAUIDesigner.Services
 {
     public interface IGestureSetupService
     {
-        void SetupDesignerGestures(AbsoluteLayout designerFrame, ContextMenu contextMenu, Action<object, TappedEventArgs> tapHandler);
+        void SetupDesignerGestures(AbsoluteLayout designerFrame, ContextMenu contextMenu, EventHandler<TappedEventArgs> tapHandler);
         void SetupTabDraggers(Rectangle tabDraggerLeft, Rectangle tabDraggerRight, Rectangle tabDraggerBottom, 
-                            PanUpdatedEventHandler panHandler, ICursorService cursorService);
+                            EventHandler<PanUpdatedEventArgs> panHandler, ICursorService cursorService);
     }
 
     public class GestureSetupService : IGestureSetupService
     {
-        public void SetupDesignerGestures(AbsoluteLayout designerFrame, ContextMenu contextMenu, Action<object, TappedEventArgs> tapHandler)
+        public void SetupDesignerGestures(AbsoluteLayout designerFrame, ContextMenu contextMenu, EventHandler<TappedEventArgs> tapHandler)
         {
             // Setup context menu
             var rightClickRecognizer = new TapGestureRecognizer();
@@ -35,7 +35,7 @@ namespace MAUIDesigner.Services
         }
 
         public void SetupTabDraggers(Rectangle tabDraggerLeft, Rectangle tabDraggerRight, Rectangle tabDraggerBottom, 
-                                   PanUpdatedEventHandler panHandler, ICursorService cursorService)
+                                   EventHandler<PanUpdatedEventArgs> panHandler, ICursorService cursorService)
         {
             // Attach PanGestureRecognizer for TabDragger rectangles
             AttachPanGestureRecognizer(tabDraggerLeft, panHandler);
@@ -48,7 +48,7 @@ namespace MAUIDesigner.Services
             AttachPointerGestureRecognizer(tabDraggerBottom, CursorType.SizeNS, cursorService);
         }
 
-        private void AttachPanGestureRecognizer(Rectangle tabDragger, PanUpdatedEventHandler panHandler)
+        private void AttachPanGestureRecognizer(Rectangle tabDragger, EventHandler<PanUpdatedEventArgs> panHandler)
         {
             var panGestureRecognizer = new PanGestureRecognizer();
             panGestureRecognizer.PanUpdated += panHandler;
