@@ -100,9 +100,9 @@ namespace MAUIDesigner
                         var finalValue = Convert.ChangeType((s as Entry)!.Text, propertyType);
                         property.SetValue(view, finalValue);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-
+                        System.Diagnostics.Debug.WriteLine($"Error setting property {property.Name}: {ex.Message}");
                     }
                 };
 
@@ -147,9 +147,9 @@ namespace MAUIDesigner
                         var columnDefinitionCollection = new ColumnDefinitionCollection(columnDefinitions.ToArray());
                         property.SetValue(view, columnDefinitionCollection);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-
+                        System.Diagnostics.Debug.WriteLine($"Error setting column definitions: {ex.Message}");
                     }
                 };
 
@@ -180,9 +180,9 @@ namespace MAUIDesigner
                         var RowDefinitionCollection = new RowDefinitionCollection(RowDefinitions.ToArray());
                         property.SetValue(view, RowDefinitionCollection);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-
+                        System.Diagnostics.Debug.WriteLine($"Error setting row definitions: {ex.Message}");
                     }
                 };
 
@@ -262,7 +262,10 @@ namespace MAUIDesigner
                             property.SetValue(view, thickness);
                         }
                     }
-                    catch { }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error setting color/thickness property: {ex.Message}");
+                    }
                 }
 
                 return colorGrid;
@@ -378,7 +381,7 @@ namespace MAUIDesigner
                 if (label != null)
                 {
                     var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelSize, Constants.ToolBoxItemLabelAnimateSize);
-                    label.Animate("FontSize", animation, 16, 100);
+                    label.Animate("FontSize", animation, Constants.AnimationRate, Constants.AnimationDuration);
                 }
             }
         }
@@ -392,7 +395,7 @@ namespace MAUIDesigner
                 if (label != null)
                 {
                     var animation = new Animation(s => label.FontSize = s, Constants.ToolBoxItemLabelAnimateSize, Constants.ToolBoxItemLabelSize);
-                    label.Animate("FontSize", animation, 16, 100);
+                    label.Animate("FontSize", animation, Constants.AnimationRate, Constants.AnimationDuration);
                 }
             }
         }

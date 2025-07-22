@@ -193,9 +193,21 @@ namespace MAUIDesigner
                 return factory.CreateElement();
             }
 
-            var elementType = typeof(View).Assembly.GetTypes().FirstOrDefault(t => t.Name == elementTypeName);
-            var newElement = Activator.CreateInstance(elementType) as View;
-            return newElement;
+            try
+            {
+                var elementType = typeof(View).Assembly.GetTypes().FirstOrDefault(t => t.Name == elementTypeName);
+                if (elementType != null)
+                {
+                    return Activator.CreateInstance(elementType) as View ?? new Label { Text = "Error creating element" };
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error creating element {elementTypeName}: {ex.Message}");
+            }
+
+            // Fallback to a basic label if element creation fails
+            return new Label { Text = $"Unknown element: {elementTypeName}" };
         }
     }
 }
