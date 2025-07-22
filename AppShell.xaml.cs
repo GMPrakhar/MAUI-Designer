@@ -5,6 +5,9 @@
         public AppShell()
         {
             InitializeComponent();
+            
+            // Register routes for navigation
+            Routing.RegisterRoute("interactive-preview", typeof(InteractivePreviewPage));
         }
     }
 }

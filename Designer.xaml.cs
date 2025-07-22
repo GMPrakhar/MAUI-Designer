@@ -15,6 +15,8 @@ public partial class Designer : ContentPage
     private readonly IXamlService _xamlService;
     private readonly ITabSetupService _tabSetupService;
     private readonly IGestureSetupService _gestureSetupService;
+    private readonly Core.Elements.IElementOperations _elementOperations;
+    private readonly Core.Properties.IPropertyService _propertyService;
 
 
 
@@ -31,6 +33,11 @@ public partial class Designer : ContentPage
         _xamlService = new XamlService();
         _tabSetupService = new TabSetupService();
         _gestureSetupService = new GestureSetupService();
+        _elementOperations = new Core.Elements.ElementService(_cursorService);
+        _propertyService = new Core.Properties.PropertyService();
+
+        // Set dependencies
+        _xamlService.SetElementOperations(_elementOperations);
 
         InitializeDesigner();
     }
@@ -51,6 +58,8 @@ public partial class Designer : ContentPage
         ToolBox.contextMenu = contextMenu;
         ToolBox.contextMenu.UpdateCollectionView();
         ToolBox.MainDesignerView = designerFrame;
+        ToolBox.ElementOperations = _elementOperations;
+        HelperViews.ContextMenuActions.ElementOperations = _elementOperations;
         ToolBox.AddElementsForToolbox(_tabSetupService.ToolboxTab.ToolboxLayout);
 
         // Setup XAML editor
@@ -114,7 +123,7 @@ public partial class Designer : ContentPage
         _tabSetupService.PropertiesTab.PropertiesLayout.Clear();
         if (obj is ElementDesignerView designerView)
         {
-            PropertyHelper.PopulatePropertyView(_tabSetupService.PropertiesTab.PropertiesLayout, designerView.View);
+            _propertyService.PopulatePropertyView(_tabSetupService.PropertiesTab.PropertiesLayout, designerView.View);
         }
     }
 
@@ -140,7 +149,27 @@ public partial class Designer : ContentPage
         _xamlService.LoadViewFromXaml(xaml, designerFrame, _tabSetupService.HierarchyTab);
     }
 
-
+    private async void RunInteractiveButton_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            // Generate XAML from current designer content
+            var xaml = XAMLGenerator.GetXamlForElement(designerFrame);
+            
+            // Navigate to the interactive preview page with the generated XAML
+            var navigationParameter = new Dictionary<string, object>
+            {
+                { "xamlContent", xaml }
+            };
+            
+            await Shell.Current.GoToAsync("interactive-preview", navigationParameter);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error navigating to interactive preview: {ex.Message}");
+            await Application.Current.MainPage.DisplayAlert("Error", "Could not open interactive preview: " + ex.Message, "OK");
+        }
+    }
 
     protected override void OnHandlerChanged()
     {

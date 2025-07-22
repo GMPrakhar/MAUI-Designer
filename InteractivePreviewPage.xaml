@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="MAUIDesigner.InteractivePreviewPage"
+             Title="Interactive Preview">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        
+        <!-- Header with controls -->
+        <StackLayout Grid.Row="0" Orientation="Horizontal" Padding="10" BackgroundColor="LightGray">
+            <Button x:Name="BackButton" Text="← Back" Clicked="BackButton_Clicked"/>
+            <Label Text="Interactive Preview" FontSize="18" FontAttributes="Bold" VerticalOptions="Center" Margin="20,0,0,0"/>
+        </StackLayout>
+        
+        <!-- Content area where generated XAML will be displayed -->
+        <ScrollView Grid.Row="1">
+            <ContentView x:Name="PreviewContentView" Padding="20"/>
+        </ScrollView>
+    </Grid>
+</ContentPage>

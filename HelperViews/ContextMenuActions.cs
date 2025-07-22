@@ -20,6 +20,7 @@ namespace MAUIDesigner.HelperViews
     internal static class ContextMenuActions
     {
         public static View? ClipboardElement { get; set; }
+        public static Core.Elements.IElementOperations ElementOperations { get; set; }
 
         [ContextMenuAction("Cut Element")]
         public static void CutElement(View targetElement, ContextMenu contextMenu, EventArgs e, Layout designerFrame)
@@ -134,7 +135,24 @@ namespace MAUIDesigner.HelperViews
 
         private static View CloneView(View originalView)
         {
-            var newView = ElementCreator.Create(originalView.GetType().Name);
+            // Try to use ElementOperations if available, otherwise fall back to ElementCreator
+            View newView;
+            if (ElementOperations is Core.Elements.ElementService elementService)
+            {
+                try
+                {
+                    newView = elementService.CreateElement(originalView.GetType().Name);
+                }
+                catch
+                {
+                    // Fall back to ElementCreator if the element type is not supported
+                    newView = ElementCreator.Create(originalView.GetType().Name);
+                }
+            }
+            else
+            {
+                newView = ElementCreator.Create(originalView.GetType().Name);
+            }
 
             newView.BindingContext = originalView.BindingContext;
             newView.Style = originalView.Style;

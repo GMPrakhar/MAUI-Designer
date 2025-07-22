@@ -11,10 +11,17 @@ namespace MAUIDesigner.Services
         void AddDirectChildrenOfAbsoluteLayout(AbsoluteLayout sourceLayout, AbsoluteLayout targetLayout);
         void LoadLayoutRecursively(Layout newLayout, Layout? loadedLayout);
         void CopyProperties(Layout sourceLayout, Layout? targetLayout);
+        void SetElementOperations(Core.Elements.IElementOperations elementOperations);
     }
 
     public class XamlService : IXamlService
     {
+        private Core.Elements.IElementOperations _elementOperations;
+
+        public void SetElementOperations(Core.Elements.IElementOperations elementOperations)
+        {
+            _elementOperations = elementOperations;
+        }
         public void LoadViewFromXaml(string xaml, AbsoluteLayout designerFrame, HierarchyTab hierarchyTab)
         {
             designerFrame.Children.Clear();
@@ -63,7 +70,7 @@ namespace MAUIDesigner.Services
                     elementDesignerView = new ElementDesignerView(loadedView);
                 }
                 newLayout.Add(elementDesignerView);
-                ElementOperations.AddDesignerGestureControls(elementDesignerView);
+                _elementOperations?.AddDesignerGestureControls(elementDesignerView);
             }
             DragAndDropOperations.OnFocusChanged?.Invoke(null);
         }
