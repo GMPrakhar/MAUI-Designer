@@ -18,8 +18,8 @@ namespace MAUIDesigner.LayoutDesigners
             BackgroundColor = Colors.AliceBlue,
         };
 
-        private List<Border> columnLines = new();
-        private List<Border> rowLines = new();
+        private List<Line> columnLines = new();
+        private List<Line> rowLines = new();
         private List<Rectangle> columnDividers = new();
         private List<Rectangle> rowDividers = new();
 
@@ -164,18 +164,22 @@ namespace MAUIDesigner.LayoutDesigners
             if (OwningGrid.ColumnDefinitions.Count <= 1 && OwningGrid.RowDefinitions.Count <= 1)
                 return;
 
-            // Add column lines using small Border elements with dotted appearance
+            // Add column lines using thin Line elements
             for (int i = 1; i < OwningGrid.ColumnDefinitions.Count; i++)
             {
-                var line = new Border
+                var line = new Line
                 {
-                    WidthRequest = 1,
-                    BackgroundColor = Colors.Gray,
+                    Stroke = Colors.Gray,
+                    StrokeThickness = 0.5,
+                    X1 = 0,
+                    Y1 = 0,
+                    X2 = 0,
+                    Y2 = 1,
                     VerticalOptions = LayoutOptions.Fill,
                     HorizontalOptions = LayoutOptions.Start,
                     ZIndex = 500,
-                    Opacity = 0.5,
-                    Margin = new Thickness(-0.5, 0, 0, 0) // Center the line on the boundary
+                    Opacity = 0.6,
+                    Margin = new Thickness(0, 0, 0, 0)
                 };
                 
                 OwningGrid.SetColumn(line, i);
@@ -205,18 +209,22 @@ namespace MAUIDesigner.LayoutDesigners
                 columnDividers.Add(divider);
             }
 
-            // Add row lines using small Border elements with dotted appearance
+            // Add row lines using thin Line elements
             for (int i = 1; i < OwningGrid.RowDefinitions.Count; i++)
             {
-                var line = new Border
+                var line = new Line
                 {
-                    HeightRequest = 1,
-                    BackgroundColor = Colors.Gray,
+                    Stroke = Colors.Gray,
+                    StrokeThickness = 0.5,
+                    X1 = 0,
+                    Y1 = 0,
+                    X2 = 1,
+                    Y2 = 0,
                     VerticalOptions = LayoutOptions.Start,
                     HorizontalOptions = LayoutOptions.Fill,
                     ZIndex = 500,
-                    Opacity = 0.5,
-                    Margin = new Thickness(0, -0.5, 0, 0) // Center the line on the boundary
+                    Opacity = 0.6,
+                    Margin = new Thickness(0, 0, 0, 0)
                 };
 
                 OwningGrid.SetRow(line, i);
