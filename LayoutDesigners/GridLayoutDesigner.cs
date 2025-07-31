@@ -3,12 +3,13 @@ using MAUIDesigner.HelperViews;
 using MAUIDesigner.Interfaces;
 using Windows.Devices.Input;
 using MAUIDesigner.DnDHelper;
+using Microsoft.Maui.Controls.Shapes;
 
 namespace MAUIDesigner.LayoutDesigners
 {
     class GridLayoutDesigner: ILayoutDesigner
     {
-        public Grid Grid { get; }
+        public Grid OwningGrid { get; }
 
         public Rectangle highlighter = new()
         {
@@ -24,23 +25,23 @@ namespace MAUIDesigner.LayoutDesigners
 
         public GridLayoutDesigner(Grid grid)
         {
-            this.Grid = grid ?? throw new ArgumentNullException(nameof(grid));
+            this.OwningGrid = grid ?? throw new ArgumentNullException(nameof(grid));
 
             // Set lighter background for grid
-            if (Grid.BackgroundColor == null || Grid.BackgroundColor == Colors.Transparent)
+            if (OwningGrid.BackgroundColor == null || OwningGrid.BackgroundColor == Colors.Transparent)
             {
-                Grid.BackgroundColor = Colors.LightGray.WithAlpha(0.1f);
+                OwningGrid.BackgroundColor = Colors.LightGray.WithAlpha(0.1f);
             }
 
             // Initialize the highlighter
             highlighter.IsVisible = false;
-            Grid.Add(highlighter as IView);
+            OwningGrid.Add(highlighter as IView);
 
             // Initialize grid lines
             InitializeGridLines();
         }
 
-        // Assume ElementDesigner View is getting dropped on the Grid, now we need to compute the column and row it belongs to and update the relevant property
+        // Assume ElementDesigner View is getting dropped on the OwningGrid, now we need to compute the column and row it belongs to and update the relevant property
         public void OnDrop(View view, Point location)
         {
             if (view == null)
@@ -56,7 +57,7 @@ namespace MAUIDesigner.LayoutDesigners
             }
 
             (view.Parent.Parent as Layout).Remove(view.Parent as View);
-            Grid.Add(view.Parent as View);
+            OwningGrid.Add(view.Parent as View);
 
             // Compute the column and row
             UpdateColumnAndRowForView(view.Parent as ElementDesignerView, location);
@@ -65,15 +66,15 @@ namespace MAUIDesigner.LayoutDesigners
         private bool IsOutsideGrid(Point location)
         {
             return location.X < 0 || location.Y < 0 || 
-                   location.X > Grid.Width || location.Y > Grid.Height;
+                   location.X > OwningGrid.Width || location.Y > OwningGrid.Height;
         }
 
         private void HandleDropOutsideGrid(View view)
         {
             // Remove from grid and add to base layout
-            if (view.Parent?.Parent == Grid)
+            if (view.Parent?.Parent == OwningGrid)
             {
-                Grid.Remove(view.Parent as View);
+                OwningGrid.Remove(view.Parent as View);
                 
                 // Add to base layout if available
                 if (DragAndDropOperations.BaseLayout != null)
@@ -83,10 +84,10 @@ namespace MAUIDesigner.LayoutDesigners
                     // Reset grid properties
                     if (view.Parent is ElementDesignerView elementDesigner)
                     {
-                        Grid.SetColumn(elementDesigner, 0);
-                        Grid.SetRow(elementDesigner, 0);
-                        Grid.SetColumnSpan(elementDesigner, 1);
-                        Grid.SetRowSpan(elementDesigner, 1);
+                        OwningGrid.SetColumn(elementDesigner, 0);
+                        OwningGrid.SetRow(elementDesigner, 0);
+                        OwningGrid.SetColumnSpan(elementDesigner, 1);
+                        OwningGrid.SetRowSpan(elementDesigner, 1);
                     }
                 }
             }
@@ -97,19 +98,19 @@ namespace MAUIDesigner.LayoutDesigners
             // Clear existing lines
             foreach (var line in columnLines)
             {
-                Grid.Remove(line);
+                OwningGrid.Remove(line);
             }
             foreach (var line in rowLines)
             {
-                Grid.Remove(line);
+                OwningGrid.Remove(line);
             }
             foreach (var divider in columnDividers)
             {
-                Grid.Remove(divider);
+                OwningGrid.Remove(divider);
             }
             foreach (var divider in rowDividers)
             {
-                Grid.Remove(divider);
+                OwningGrid.Remove(divider);
             }
 
             columnLines.Clear();
@@ -118,7 +119,7 @@ namespace MAUIDesigner.LayoutDesigners
             rowDividers.Clear();
 
             // Add column lines using Border elements for better visibility
-            for (int i = 1; i < Grid.ColumnDefinitions.Count; i++)
+            for (int i = 1; i < OwningGrid.ColumnDefinitions.Count; i++)
             {
                 var line = new Border
                 {
@@ -126,14 +127,13 @@ namespace MAUIDesigner.LayoutDesigners
                     BackgroundColor = Colors.Gray,
                     VerticalOptions = LayoutOptions.Fill,
                     HorizontalOptions = LayoutOptions.Start,
-                    IsHitTestVisible = false,
                     ZIndex = 500,
                     Opacity = 0.7
                 };
                 
-                Grid.SetColumn(line, i);
-                Grid.SetRowSpan(line, Grid.RowDefinitions.Count);
-                Grid.Add(line);
+                OwningGrid.SetColumn(line, i);
+                OwningGrid.SetRowSpan(line, OwningGrid.RowDefinitions.Count);
+                OwningGrid.Add(line);
                 columnLines.Add(line);
 
                 // Add draggable divider for column resizing
@@ -152,14 +152,14 @@ namespace MAUIDesigner.LayoutDesigners
                 dragGesture.DragStarting += (s, e) => OnColumnDragStarting(s, e, columnIndex);
                 divider.GestureRecognizers.Add(dragGesture);
 
-                Grid.SetColumn(divider, i);
-                Grid.SetRowSpan(divider, Grid.RowDefinitions.Count);
-                Grid.Add(divider);
+                OwningGrid.SetColumn(divider, i);
+                OwningGrid.SetRowSpan(divider, OwningGrid.RowDefinitions.Count);
+                OwningGrid.Add(divider);
                 columnDividers.Add(divider);
             }
 
             // Add row lines using Border elements for better visibility
-            for (int i = 1; i < Grid.RowDefinitions.Count; i++)
+            for (int i = 1; i < OwningGrid.RowDefinitions.Count; i++)
             {
                 var line = new Border
                 {
@@ -167,14 +167,13 @@ namespace MAUIDesigner.LayoutDesigners
                     BackgroundColor = Colors.Gray,
                     VerticalOptions = LayoutOptions.Start,
                     HorizontalOptions = LayoutOptions.Fill,
-                    IsHitTestVisible = false,
                     ZIndex = 500,
                     Opacity = 0.7
                 };
 
-                Grid.SetRow(line, i);
-                Grid.SetColumnSpan(line, Grid.ColumnDefinitions.Count);
-                Grid.Add(line);
+                OwningGrid.SetRow(line, i);
+                OwningGrid.SetColumnSpan(line, OwningGrid.ColumnDefinitions.Count);
+                OwningGrid.Add(line);
                 rowLines.Add(line);
 
                 // Add draggable divider for row resizing
@@ -193,9 +192,9 @@ namespace MAUIDesigner.LayoutDesigners
                 dragGesture.DragStarting += (s, e) => OnRowDragStarting(s, e, rowIndex);
                 divider.GestureRecognizers.Add(dragGesture);
 
-                Grid.SetRow(divider, i);
-                Grid.SetColumnSpan(divider, Grid.ColumnDefinitions.Count);
-                Grid.Add(divider);
+                OwningGrid.SetRow(divider, i);
+                OwningGrid.SetColumnSpan(divider, OwningGrid.ColumnDefinitions.Count);
+                OwningGrid.Add(divider);
                 rowDividers.Add(divider);
             }
         }
@@ -216,9 +215,9 @@ namespace MAUIDesigner.LayoutDesigners
 
         public void ResizeColumn(int columnIndex, double newWidth)
         {
-            if (columnIndex > 0 && columnIndex < Grid.ColumnDefinitions.Count)
+            if (columnIndex > 0 && columnIndex < OwningGrid.ColumnDefinitions.Count)
             {
-                var columnDef = Grid.ColumnDefinitions[columnIndex - 1];
+                var columnDef = OwningGrid.ColumnDefinitions[columnIndex - 1];
                 columnDef.Width = new GridLength(Math.Max(20, newWidth));
                 
                 // Refresh grid lines
@@ -228,9 +227,9 @@ namespace MAUIDesigner.LayoutDesigners
 
         public void ResizeRow(int rowIndex, double newHeight)
         {
-            if (rowIndex > 0 && rowIndex < Grid.RowDefinitions.Count)
+            if (rowIndex > 0 && rowIndex < OwningGrid.RowDefinitions.Count)
             {
-                var rowDef = Grid.RowDefinitions[rowIndex - 1];
+                var rowDef = OwningGrid.RowDefinitions[rowIndex - 1];
                 rowDef.Height = new GridLength(Math.Max(20, newHeight));
                 
                 // Refresh grid lines
@@ -249,8 +248,8 @@ namespace MAUIDesigner.LayoutDesigners
             var (column, row) = ComputerColumnAndRowForPoint(location);
 
             // Update the column and row
-            Grid.SetColumn(elementDesigner as IView, column);
-            Grid.SetRow(elementDesigner as IView, row);
+            OwningGrid.SetColumn(elementDesigner as IView, column);
+            OwningGrid.SetRow(elementDesigner as IView, row);
 
             // Update the margin
             elementDesigner.EncapsulatingViewProperty.Margin = 0;
@@ -262,8 +261,8 @@ namespace MAUIDesigner.LayoutDesigners
 
             // Compute the column
             var x = location.X;
-            var columnWidth = Grid.Width / Grid.ColumnDefinitions.Count;
-            for (int i = 0; i < Grid.ColumnDefinitions.Count; i++)
+            var columnWidth = OwningGrid.Width / OwningGrid.ColumnDefinitions.Count;
+            for (int i = 0; i < OwningGrid.ColumnDefinitions.Count; i++)
             {
                 if (x < columnWidth * (i + 1))
                 {
@@ -274,8 +273,8 @@ namespace MAUIDesigner.LayoutDesigners
 
             // Compute the row
             var y = location.Y;
-            var rowHeight = Grid.Height / Grid.RowDefinitions.Count;
-            for (int i = 0; i < Grid.RowDefinitions.Count; i++)
+            var rowHeight = OwningGrid.Height / OwningGrid.RowDefinitions.Count;
+            for (int i = 0; i < OwningGrid.RowDefinitions.Count; i++)
             {
                 if (y < rowHeight * (i + 1))
                 {
@@ -304,8 +303,8 @@ namespace MAUIDesigner.LayoutDesigners
             var (column, row) = ComputerColumnAndRowForPoint(location);
 
             // Set the highlighter position and size
-            Grid.SetColumn(highlighter as IView, column);
-            Grid.SetRow(highlighter as IView, row);
+            OwningGrid.SetColumn(highlighter as IView, column);
+            OwningGrid.SetRow(highlighter as IView, row);
             highlighter.IsVisible = true;
         }
 

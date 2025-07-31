@@ -19,7 +19,7 @@ namespace MAUIDesigner.DnDHelper
                 return;
             }
 
-            // Check if the dragging view is positioned in a Grid layout
+            // Check if the dragging view is positioned in a OwningGrid layout
             bool isInGrid = draggingView.Parent is Grid;
 
             // Get current dimensions and position
@@ -68,8 +68,8 @@ namespace MAUIDesigner.DnDHelper
             draggingView.WidthRequest = newWidth;
             draggingView.HeightRequest = newHeight;
             
-            // Only update margin if the element is NOT in a Grid layout
-            // Grid elements use Grid.Row/Grid.Column for positioning, not margin
+            // Only update margin if the element is NOT in a OwningGrid layout
+            // OwningGrid elements use OwningGrid.Row/OwningGrid.Column for positioning, not margin
             if (!isInGrid)
             {
                 draggingView.Margin = new Thickness(newX, newY, 0, 0);

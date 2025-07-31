@@ -81,10 +81,10 @@ namespace MAUIDesigner.XamlHelpers
                 var column = parentGrid.GetColumn(designerView);
                 var rowSpan = parentGrid.GetRowSpan(designerView);
                 var columnSpan = parentGrid.GetColumnSpan(designerView);
-                xamlBuilder.AppendLine($"    Grid.Row=\"{row}\"");
-                xamlBuilder.AppendLine($"    Grid.Column=\"{column}\"");
-                xamlBuilder.AppendLine($"    Grid.RowSpan=\"{rowSpan}\"");
-                xamlBuilder.AppendLine($"    Grid.ColumnSpan=\"{columnSpan}\"");
+                xamlBuilder.AppendLine($"    OwningGrid.Row=\"{row}\"");
+                xamlBuilder.AppendLine($"    OwningGrid.Column=\"{column}\"");
+                xamlBuilder.AppendLine($"    OwningGrid.RowSpan=\"{rowSpan}\"");
+                xamlBuilder.AppendLine($"    OwningGrid.ColumnSpan=\"{columnSpan}\"");
             }
 
             (element as View).Margin = 0;
@@ -119,7 +119,7 @@ namespace MAUIDesigner.XamlHelpers
         {
             var stringBuilder = new StringBuilder();
             var sizeName = valueType == typeof(ColumnDefinitionCollection) ? "Width" : "Height";
-            stringBuilder.AppendLine($"<Grid.{propertyName}>");
+            stringBuilder.AppendLine($"<OwningGrid.{propertyName}>");
             var gridDefinitions = value as IEnumerable;
             foreach (var definition in gridDefinitions)
             {
@@ -127,7 +127,7 @@ namespace MAUIDesigner.XamlHelpers
                 stringBuilder.AppendLine($"<{valueType.Name.Replace("Collection", "")} {sizeName}=\"{sizeValue}\"/>");
             }
 
-            stringBuilder.AppendLine($"</Grid.{propertyName}>");
+            stringBuilder.AppendLine($"</OwningGrid.{propertyName}>");
             return stringBuilder.ToString();
         }
 
