@@ -1,0 +1,62 @@
+<div class="maui-designer">
+  <div class="header">
+    <h1>{{ title() }}</h1>
+  </div>
+  
+  <div class="designer-container">
+    <!-- Left Panel -->
+    <div class="left-panel" [style.width.px]="leftPanelWidth">
+      <div class="panel-tabs">
+        <button 
+          class="tab-button" 
+          [class.active]="selectedTab === 'toolbox'"
+          (click)="selectTab('toolbox')">
+          Toolbox
+        </button>
+        <button 
+          class="tab-button" 
+          [class.active]="selectedTab === 'hierarchy'"
+          (click)="selectTab('hierarchy')">
+          Hierarchy
+        </button>
+      </div>
+      
+      <div class="panel-content">
+        <app-toolbox *ngIf="selectedTab === 'toolbox'"></app-toolbox>
+        <app-hierarchy-panel *ngIf="selectedTab === 'hierarchy'"></app-hierarchy-panel>
+      </div>
+    </div>
+    
+    <!-- Center Canvas -->
+    <div class="center-panel">
+      <app-designer-canvas></app-designer-canvas>
+    </div>
+    
+    <!-- Right Panel -->
+    <div class="right-panel" [style.width.px]="rightPanelWidth">
+      <div class="panel-tabs">
+        <button class="tab-button active">Properties</button>
+      </div>
+      
+      <div class="panel-content">
+        <app-properties-panel></app-properties-panel>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Bottom Panel -->
+  <div class="bottom-panel" [style.height.px]="bottomPanelHeight">
+    <div class="panel-tabs">
+      <button 
+        class="tab-button" 
+        [class.active]="selectedBottomTab === 'xaml'"
+        (click)="selectBottomTab('xaml')">
+        XAML
+      </button>
+    </div>
+    
+    <div class="panel-content">
+      <app-xaml-editor *ngIf="selectedBottomTab === 'xaml'"></app-xaml-editor>
+    </div>
+  </div>
+</div>
