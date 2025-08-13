@@ -12,9 +12,48 @@
   background-color: #f8f9fa;
   border-bottom: 1px solid #e2e8f0;
   
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  
   .toolbar-title {
     font-weight: 600;
     color: #2d3748;
+  }
+  
+  .editor-mode {
+    display: flex;
+    gap: 4px;
+    
+    .mode-button {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      background-color: #e2e8f0;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      color: #4a5568;
+      
+      &:hover {
+        background-color: #d1d5db;
+      }
+      
+      &.active {
+        background-color: #3182ce;
+        border-color: #2c5aa0;
+        color: white;
+      }
+      
+      .material-icons {
+        font-size: 16px;
+      }
+    }
   }
   
   .toolbar-actions {
@@ -34,9 +73,24 @@
     cursor: pointer;
     transition: all 0.2s ease;
     
-    &:hover {
+    &:hover:not(:disabled) {
       background-color: #f3f4f6;
       border-color: #9ca3af;
+    }
+    
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    &.apply-button {
+      background-color: #10b981;
+      border-color: #059669;
+      color: white;
+      
+      &:hover:not(:disabled) {
+        background-color: #059669;
+      }
     }
     
     .material-icons {
@@ -50,22 +104,84 @@
   overflow: auto;
   background-color: #f8f9fa;
   
-  .xaml-code {
-    margin: 0;
-    padding: 15px;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 0.8rem;
-    line-height: 1.4;
-    color: #2d3748;
-    background-color: #fff;
-    border: none;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+  .generated-view {
+    height: 100%;
     
-    code {
-      background: none;
-      padding: 0;
-      font-family: inherit;
+    .xaml-code {
+      margin: 0;
+      padding: 15px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      color: #2d3748;
+      background-color: #fff;
+      border: none;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      height: 100%;
+      box-sizing: border-box;
+      
+      code {
+        background: none;
+        padding: 0;
+        font-family: inherit;
+      }
+    }
+  }
+  
+  .input-view {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    
+    .xaml-input {
+      flex: 1;
+      width: 100%;
+      padding: 15px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 0.8rem;
+      line-height: 1.4;
+      color: #2d3748;
+      background-color: #fff;
+      border: none;
+      outline: none;
+      resize: none;
+      box-sizing: border-box;
+      
+      &::placeholder {
+        color: #9ca3af;
+        font-style: italic;
+      }
+    }
+    
+    .validation-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 15px;
+      background-color: #f8f9fa;
+      border-top: 1px solid #e2e8f0;
+      font-size: 0.875rem;
+      
+      .material-icons {
+        font-size: 18px;
+        
+        &.success {
+          color: #10b981;
+        }
+        
+        &.error {
+          color: #ef4444;
+        }
+      }
+      
+      .success {
+        color: #059669;
+      }
+      
+      .error {
+        color: #dc2626;
+      }
     }
   }
 }

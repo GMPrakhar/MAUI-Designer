@@ -207,6 +207,13 @@ export class ElementService {
   getSelectedElement(): MauiElement | null {
     return this.selectedElement;
   }
+  
+  replaceRootElement(newRootElement: MauiElement): void {
+    this.rootElement = newRootElement;
+    this.selectedElement = null;
+    this.selectedElementSubject.next(null);
+    this.elementsSubject.next(this.rootElement);
+  }
 
   // Grid specific methods
   addGridRow(gridElement: MauiElement): void {

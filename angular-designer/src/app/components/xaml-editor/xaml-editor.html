@@ -1,8 +1,38 @@
-<p><div class="xaml-editor">
+<div class="xaml-editor">
   <div class="editor-toolbar">
-    <div class="toolbar-title">Generated XAML</div>
+    <div class="toolbar-left">
+      <div class="toolbar-title">XAML Editor</div>
+      <div class="editor-mode">
+        <button 
+          class="mode-button" 
+          [class.active]="editMode === 'generated'"
+          (click)="setEditMode('generated')"
+          title="View generated XAML">
+          <span class="material-icons">visibility</span>
+          Generated
+        </button>
+        <button 
+          class="mode-button" 
+          [class.active]="editMode === 'input'"
+          (click)="setEditMode('input')"
+          title="Edit XAML directly">
+          <span class="material-icons">edit</span>
+          Edit
+        </button>
+      </div>
+    </div>
     
     <div class="toolbar-actions">
+      <button 
+        class="action-button"
+        *ngIf="editMode === 'input'"
+        (click)="applyXaml()"
+        [disabled]="!isValidXaml || isApplying"
+        title="Apply XAML changes to design">
+        <span class="material-icons">{{ isApplying ? 'hourglass_empty' : 'check' }}</span>
+        {{ isApplying ? 'Applying...' : 'Apply' }}
+      </button>
+      
       <button 
         class="action-button"
         (click)="copyToClipboard()"
@@ -22,6 +52,29 @@
   </div>
   
   <div class="editor-content">
-    <pre class="xaml-code"><code>{{ xamlContent$ | async }}</code></pre>
+    <!-- Generated XAML View -->
+    <div *ngIf="editMode === 'generated'" class="generated-view">
+      <pre class="xaml-code"><code>{{ xamlContent$ | async }}</code></pre>
+    </div>
+    
+    <!-- Editable XAML Input -->
+    <div *ngIf="editMode === 'input'" class="input-view">
+      <textarea 
+        class="xaml-input"
+        [(ngModel)]="inputXaml"
+        (input)="onXamlInput()"
+        placeholder="Paste or type XAML here to apply changes to the design..."
+        spellcheck="false">
+      </textarea>
+      
+      <div class="validation-status" *ngIf="validationMessage">
+        <span class="material-icons" [class.error]="!isValidXaml" [class.success]="isValidXaml">
+          {{ isValidXaml ? 'check_circle' : 'error' }}
+        </span>
+        <span [class.error]="!isValidXaml" [class.success]="isValidXaml">
+          {{ validationMessage }}
+        </span>
+      </div>
+    </div>
   </div>
 </div>
