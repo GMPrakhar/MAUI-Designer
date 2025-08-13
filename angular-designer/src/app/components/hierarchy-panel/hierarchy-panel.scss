@@ -1,0 +1,118 @@
+.hierarchy-panel {
+  padding: 10px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.hierarchy-tree {
+  font-size: 0.875rem;
+}
+
+.hierarchy-node {
+  .node-content {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    
+    &:hover {
+      background-color: #f7fafc;
+    }
+    
+    &.selected {
+      background-color: #ebf8ff;
+      color: #2b6cb0;
+      
+      .node-icon .material-icons {
+        color: #2b6cb0;
+      }
+    }
+  }
+  
+  .node-icon {
+    margin-right: 8px;
+    display: flex;
+    align-items: center;
+    
+    .material-icons {
+      font-size: 18px;
+      color: #4a5568;
+    }
+  }
+  
+  .node-label {
+    font-weight: 500;
+    color: #2d3748;
+    margin-right: 8px;
+  }
+  
+  .node-type {
+    font-size: 0.75rem;
+    color: #718096;
+    font-style: italic;
+    flex: 1;
+  }
+  
+  .node-actions {
+    display: flex;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    
+    .action-button {
+      background: none;
+      border: none;
+      padding: 4px;
+      border-radius: 3px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      &:hover {
+        background-color: #fed7d7;
+      }
+      
+      .material-icons {
+        font-size: 16px;
+        color: #e53e3e;
+      }
+    }
+  }
+  
+  .node-content:hover .node-actions {
+    opacity: 1;
+  }
+}
+
+.node-children {
+  border-left: 1px solid #e2e8f0;
+  margin-left: 12px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  text-align: center;
+  color: #718096;
+  
+  .material-icons {
+    font-size: 48px;
+    color: #cbd5e0;
+    margin-bottom: 16px;
+  }
+  
+  p {
+    margin: 4px 0;
+    
+    &.hint {
+      font-size: 0.75rem;
+      color: #a0aec0;
+    }
+  }
+}

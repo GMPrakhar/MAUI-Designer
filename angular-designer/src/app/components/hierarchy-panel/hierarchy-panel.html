@@ -1,0 +1,50 @@
+<p><div class="hierarchy-panel">
+  <div class="hierarchy-tree" *ngIf="rootElement$ | async as rootElement">
+    <ng-container *ngTemplateOutlet="hierarchyNode; context: { $implicit: rootElement, level: 0 }"></ng-container>
+  </div>
+  
+  <div class="empty-state" *ngIf="!(rootElement$ | async)?.children?.length">
+    <span class="material-icons">account_tree</span>
+    <p>No elements yet</p>
+    <p class="hint">Drag controls from the toolbox to start designing</p>
+  </div>
+</div>
+
+<!-- Template for recursive hierarchy node rendering -->
+<ng-template #hierarchyNode let-element let-level="level">
+  <div class="hierarchy-node" [style.padding-left.px]="level * 20">
+    <div 
+      class="node-content"
+      [class.selected]="isSelected(element)"
+      (click)="onElementSelect(element)">
+      
+      <div class="node-icon">
+        <span class="material-icons">{{ getElementIcon(element) }}</span>
+      </div>
+      
+      <div class="node-label">
+        {{ element.name }}
+      </div>
+      
+      <div class="node-type">
+        ({{ element.type }})
+      </div>
+      
+      <div class="node-actions" *ngIf="element.id !== 'root'">
+        <button 
+          class="action-button delete-button"
+          (click)="onElementDelete(element, $event)"
+          title="Delete element">
+          <span class="material-icons">delete</span>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Render children recursively -->
+    <div class="node-children" *ngIf="element.children?.length">
+      <ng-container *ngFor="let child of element.children">
+        <ng-container *ngTemplateOutlet="hierarchyNode; context: { $implicit: child, level: level + 1 }"></ng-container>
+      </ng-container>
+    </div>
+  </div>
+</ng-template>

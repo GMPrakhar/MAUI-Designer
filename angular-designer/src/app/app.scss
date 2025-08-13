@@ -1,0 +1,105 @@
+.maui-designer {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f5f5;
+}
+
+.header {
+  background-color: #2d3748;
+  color: white;
+  padding: 10px 20px;
+  border-bottom: 1px solid #4a5568;
+  
+  h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 500;
+  }
+}
+
+.designer-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.left-panel, .right-panel {
+  background-color: #fff;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  
+  &.right-panel {
+    border-right: none;
+    border-left: 1px solid #e2e8f0;
+  }
+}
+
+.center-panel {
+  flex: 1;
+  background-color: #f7fafc;
+  border: 1px solid #e2e8f0;
+  margin: 5px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bottom-panel {
+  background-color: #fff;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-tabs {
+  display: flex;
+  background-color: #edf2f7;
+  border-bottom: 1px solid #e2e8f0;
+  
+  .tab-button {
+    background: none;
+    border: none;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: 0.875rem;
+    color: #4a5568;
+    
+    &:hover {
+      background-color: #f7fafc;
+    }
+    
+    &.active {
+      color: #2b6cb0;
+      border-bottom-color: #2b6cb0;
+      background-color: #fff;
+    }
+  }
+}
+
+.panel-content {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+}
+
+// Scrollbar styling
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

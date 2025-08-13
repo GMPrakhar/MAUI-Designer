@@ -1,0 +1,203 @@
+<p><div class="properties-panel">
+  <div class="properties-content" *ngIf="selectedElement$ | async as element; else noSelection">
+    <div class="property-section">
+      <h3 class="section-title">Element: {{ element.name }}</h3>
+      <div class="section-subtitle">{{ element.type }}</div>
+    </div>
+
+    <!-- General Properties -->
+    <div class="property-section">
+      <h4 class="section-header">General</h4>
+      
+      <div class="property-group">
+        <label class="property-label">Width</label>
+        <input 
+          type="number" 
+          class="property-input"
+          [value]="element.properties.width || 0"
+          (input)="updateProperty(element, 'width', +$any($event.target).value)">
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">Height</label>
+        <input 
+          type="number" 
+          class="property-input"
+          [value]="element.properties.height || 0"
+          (input)="updateProperty(element, 'height', +$any($event.target).value)">
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">X Position</label>
+        <input 
+          type="number" 
+          class="property-input"
+          [value]="element.properties.x || 0"
+          (input)="updateProperty(element, 'x', +$any($event.target).value)">
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">Y Position</label>
+        <input 
+          type="number" 
+          class="property-input"
+          [value]="element.properties.y || 0"
+          (input)="updateProperty(element, 'y', +$any($event.target).value)">
+      </div>
+    </div>
+
+    <!-- Appearance Properties -->
+    <div class="property-section">
+      <h4 class="section-header">Appearance</h4>
+      
+      <div class="property-group">
+        <label class="property-label">Background Color</label>
+        <input 
+          type="color" 
+          class="property-input color-input"
+          [value]="element.properties.backgroundColor || '#ffffff'"
+          (input)="updateProperty(element, 'backgroundColor', $any($event.target).value)">
+      </div>
+      
+      <div class="property-group" *ngIf="element.properties.text !== undefined">
+        <label class="property-label">Text Color</label>
+        <input 
+          type="color" 
+          class="property-input color-input"
+          [value]="element.properties.textColor || '#000000'"
+          (input)="updateProperty(element, 'textColor', $any($event.target).value)">
+      </div>
+    </div>
+
+    <!-- Text Properties -->
+    <div class="property-section" *ngIf="element.properties.text !== undefined">
+      <h4 class="section-header">Text</h4>
+      
+      <div class="property-group">
+        <label class="property-label">Text</label>
+        <input 
+          type="text" 
+          class="property-input"
+          [value]="element.properties.text || ''"
+          (input)="updateProperty(element, 'text', $any($event.target).value)">
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">Font Size</label>
+        <input 
+          type="number" 
+          class="property-input"
+          [value]="element.properties.fontSize || 14"
+          (input)="updateProperty(element, 'fontSize', +$any($event.target).value)">
+      </div>
+      
+      <div class="property-group">
+        <label class="property-label">Font Family</label>
+        <select 
+          class="property-input"
+          [value]="element.properties.fontFamily || 'Arial'"
+          (change)="updateProperty(element, 'fontFamily', $any($event.target).value)">
+          <option value="Arial">Arial</option>
+          <option value="Times New Roman">Times New Roman</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Helvetica">Helvetica</option>
+          <option value="Georgia">Georgia</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Margin Properties -->
+    <div class="property-section">
+      <h4 class="section-header">Margin</h4>
+      
+      <div class="spacing-grid">
+        <div class="spacing-item">
+          <label class="property-label">Top</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.margin?.top || 0"
+            (input)="updateMargin(element, 'top', +$any($event.target).value)">
+        </div>
+        
+        <div class="spacing-item">
+          <label class="property-label">Right</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.margin?.right || 0"
+            (input)="updateMargin(element, 'right', +$any($event.target).value)">
+        </div>
+        
+        <div class="spacing-item">
+          <label class="property-label">Bottom</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.margin?.bottom || 0"
+            (input)="updateMargin(element, 'bottom', +$any($event.target).value)">
+        </div>
+        
+        <div class="spacing-item">
+          <label class="property-label">Left</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.margin?.left || 0"
+            (input)="updateMargin(element, 'left', +$any($event.target).value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- Padding Properties -->
+    <div class="property-section">
+      <h4 class="section-header">Padding</h4>
+      
+      <div class="spacing-grid">
+        <div class="spacing-item">
+          <label class="property-label">Top</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.padding?.top || 0"
+            (input)="updatePadding(element, 'top', +$any($event.target).value)">
+        </div>
+        
+        <div class="spacing-item">
+          <label class="property-label">Right</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.padding?.right || 0"
+            (input)="updatePadding(element, 'right', +$any($event.target).value)">
+        </div>
+        
+        <div class="spacing-item">
+          <label class="property-label">Bottom</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.padding?.bottom || 0"
+            (input)="updatePadding(element, 'bottom', +$any($event.target).value)">
+        </div>
+        
+        <div class="spacing-item">
+          <label class="property-label">Left</label>
+          <input 
+            type="number" 
+            class="property-input small"
+            [value]="element.properties.padding?.left || 0"
+            (input)="updatePadding(element, 'left', +$any($event.target).value)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ng-template #noSelection>
+    <div class="no-selection">
+      <span class="material-icons">tune</span>
+      <p>No element selected</p>
+      <p class="hint">Select an element to edit its properties</p>
+    </div>
+  </ng-template>
+</div>
