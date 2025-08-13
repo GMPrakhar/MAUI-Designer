@@ -23,6 +23,7 @@
   display: flex;
   flex: 1;
   overflow: hidden;
+  position: relative;
 }
 
 .left-panel, .right-panel {
@@ -30,6 +31,8 @@
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  min-width: 200px;
+  max-width: 600px;
   
   &.right-panel {
     border-right: none;
@@ -51,6 +54,51 @@
   border-top: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  min-height: 150px;
+  max-height: 400px;
+}
+
+.resize-handle {
+  background-color: #e2e8f0;
+  position: relative;
+  
+  &:hover {
+    background-color: #cbd5e0;
+  }
+  
+  &.resize-handle-vertical {
+    width: 4px;
+    cursor: ew-resize;
+    
+    &:hover::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 20px;
+      background-color: #4a5568;
+      border-radius: 2px;
+    }
+  }
+  
+  &.resize-handle-horizontal {
+    height: 4px;
+    cursor: ns-resize;
+    
+    &:hover::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 20px;
+      height: 8px;
+      background-color: #4a5568;
+      border-radius: 2px;
+    }
+  }
 }
 
 .panel-tabs {
