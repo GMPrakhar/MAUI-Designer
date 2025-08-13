@@ -30,7 +30,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 6px;
   background-color: #fff;
-  cursor: grab;
+  cursor: pointer;
   transition: all 0.2s ease;
   min-height: 70px;
   
@@ -41,11 +41,11 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   }
   
-  &:active,
-  &.cdk-drag-dragging {
-    cursor: grabbing;
+  &:active {
+    cursor: pointer;
     background-color: #edf2f7;
     border-color: #a0aec0;
+    transform: translateY(0);
   }
   
   .item-icon {
@@ -64,26 +64,4 @@
     line-height: 1.2;
     font-weight: 500;
   }
-}
-
-.cdk-drag-preview {
-  background-color: #fff;
-  border: 2px solid #4299e1;
-  border-radius: 6px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  opacity: 0.8;
-  
-  .item-icon .material-icons {
-    color: #4299e1;
-  }
-  
-  .item-label {
-    color: #4299e1;
-    font-weight: 600;
-  }
-}
-
-.cdk-drag-placeholder {
-  opacity: 0.3;
-  border-style: dashed;
 }
