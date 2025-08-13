@@ -19,6 +19,9 @@ export class DesignerCanvasComponent implements OnInit {
   
   rootElement$: Observable<MauiElement>;
   selectedElement$: Observable<MauiElement | null>;
+  
+  // Store drag start position to calculate accurate drop position
+  private dragStartPosition: { x: number, y: number } | null = null;
 
   constructor(
     private elementService: ElementService,
@@ -63,20 +66,15 @@ export class DesignerCanvasComponent implements OnInit {
     this.dragDropService.handleElementMove(element, x, y, rootElement);
   }
 
-  onElementClick(element: MauiElement, event: MouseEvent) {
-    event.preventDefault();
-    event.stopPropagation();
-    console.log('Element clicked:', element.name, element.type);
-    this.elementService.selectElement(element);
-  }
-
-  onCanvasClick() {
-    console.log('Canvas clicked - deselecting');
-    this.elementService.selectElement(null);
-  }
-
   onDragStarted(element: MauiElement, event: CdkDragStart) {
     console.log('Drag started for:', element.name);
+    
+    // Store the element's current position when drag starts
+    this.dragStartPosition = {
+      x: element.properties.x || 0,
+      y: element.properties.y || 0
+    };
+    
     // Start drag operation for the selected element
     this.dragDropService.startDrag({
       element: element,
@@ -86,19 +84,31 @@ export class DesignerCanvasComponent implements OnInit {
 
   onDragEnded(element: MauiElement, event: CdkDragEnd) {
     console.log('Drag ended for:', element.name, 'at position:', event.dropPoint);
+    console.log('Distance moved:', event.distance);
+    
     // End drag operation
     this.dragDropService.endDrag();
     
-    // Update element position based on drop point
-    const rect = this.canvas.nativeElement.getBoundingClientRect();
-    const x = Math.max(0, event.dropPoint.x - rect.left);
-    const y = Math.max(0, event.dropPoint.y - rect.top);
+    if (!this.dragStartPosition) {
+      console.warn('Drag start position not recorded');
+      return;
+    }
     
-    console.log('New position:', x, y);
+    // Calculate new position by adding the drag distance to the start position
+    // This ensures the element moves by exactly the amount the user dragged it
+    const newX = Math.max(0, this.dragStartPosition.x + event.distance.x);
+    const newY = Math.max(0, this.dragStartPosition.y + event.distance.y);
+    
+    console.log('Start position:', this.dragStartPosition);
+    console.log('Distance:', event.distance);
+    console.log('New position:', newX, newY);
     
     // Update the element's position
-    element.properties.x = x;
-    element.properties.y = y;
+    element.properties.x = newX;
+    element.properties.y = newY;
+    
+    // Reset drag start position
+    this.dragStartPosition = null;
     
     // Notify the element service of the change
     this.elementService.updateElementProperties(element, {

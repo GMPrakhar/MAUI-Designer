@@ -4,8 +4,7 @@
     #canvas
     cdkDropList
     [cdkDropListData]="[]"
-    (cdkDropListDropped)="onDrop($event)"
-    (click)="onCanvasClick()">
+    (cdkDropListDropped)="onDrop($event)">
     
     <!-- Root element content -->
     <div 
@@ -36,7 +35,6 @@
     [class.selected]="isSelected(element)"
     [class.layout-element]="isLayoutElement(element)"
     [style]="getElementStyles(element)"
-    (click)="onElementClick(element, $event)"
     [cdkDragDisabled]="!isSelected(element)"
     cdkDrag
     [cdkDragData]="element"
