@@ -1,5 +1,4 @@
 import { Component, signal } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 
@@ -12,7 +11,6 @@ import { XamlEditorComponent } from './components/xaml-editor/xaml-editor';
 @Component({
   selector: 'app-root',
   imports: [
-    RouterOutlet, 
     CommonModule,
     DragDropModule,
     ToolboxComponent,

@@ -1,1 +1,129 @@
-<p>designer-canvas works!</p>
+<p><div class="designer-canvas-container">
+  <div 
+    class="designer-canvas"
+    #canvas
+    cdkDropList
+    [cdkDropListData]="[]"
+    (cdkDropListDropped)="onDrop($event)"
+    (click)="onCanvasClick()">
+    
+    <!-- Root element content -->
+    <div 
+      class="canvas-element root-element"
+      *ngIf="rootElement$ | async as rootElement"
+      [style]="getElementStyles(rootElement)">
+      
+      <!-- Recursive element rendering -->
+      <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: rootElement }"></ng-container>
+    </div>
+    
+    <!-- Grid overlay for visual feedback -->
+    <div class="grid-overlay" [style.display]="'none'">
+      <!-- Grid lines would be drawn here when needed -->
+    </div>
+    
+    <!-- Drop zone indicator -->
+    <div class="drop-zone-indicator" [style.display]="'none'">
+      Drop here
+    </div>
+  </div>
+</div>
+
+<!-- Template for recursive element rendering -->
+<ng-template #elementTemplate let-element>
+  <div 
+    class="canvas-element"
+    [class.selected]="isSelected(element)"
+    [class.layout-element]="isLayoutElement(element)"
+    [style]="getElementStyles(element)"
+    (click)="onElementClick(element, $event)"
+    cdkDrag
+    [cdkDragData]="element">
+    
+    <!-- Element content based on type -->
+    <div class="element-content" [ngSwitch]="element.type">
+      
+      <!-- Label -->
+      <span *ngSwitchCase="'Label'" class="element-text">
+        {{ element.properties.text || 'Label' }}
+      </span>
+      
+      <!-- Button -->
+      <button *ngSwitchCase="'Button'" class="element-button" type="button">
+        {{ element.properties.text || 'Button' }}
+      </button>
+      
+      <!-- Entry -->
+      <input *ngSwitchCase="'Entry'" 
+             class="element-input" 
+             type="text" 
+             [value]="element.properties.text || ''"
+             placeholder="Enter text">
+      
+      <!-- Editor -->
+      <textarea *ngSwitchCase="'Editor'" 
+                class="element-textarea"
+                [value]="element.properties.text || ''"
+                placeholder="Enter text">
+      </textarea>
+      
+      <!-- Image -->
+      <div *ngSwitchCase="'Image'" class="element-image">
+        <span class="material-icons">image</span>
+        <span class="placeholder-text">Image</span>
+      </div>
+      
+      <!-- Frame -->
+      <div *ngSwitchCase="'Frame'" class="element-frame">
+        <div class="frame-content">
+          <!-- Render children for container elements -->
+          <ng-container *ngFor="let child of element.children">
+            <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
+          </ng-container>
+        </div>
+      </div>
+      
+      <!-- Layout containers -->
+      <div *ngSwitchCase="'StackLayout'" class="element-stack-layout">
+        <ng-container *ngFor="let child of element.children">
+          <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
+        </ng-container>
+      </div>
+      
+      <div *ngSwitchCase="'Grid'" class="element-grid">
+        <ng-container *ngFor="let child of element.children">
+          <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
+        </ng-container>
+      </div>
+      
+      <div *ngSwitchCase="'AbsoluteLayout'" class="element-absolute-layout">
+        <ng-container *ngFor="let child of element.children">
+          <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
+        </ng-container>
+      </div>
+      
+      <div *ngSwitchCase="'ScrollView'" class="element-scroll-view">
+        <ng-container *ngFor="let child of element.children">
+          <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
+        </ng-container>
+      </div>
+      
+      <!-- Default case -->
+      <div *ngSwitchDefault class="element-default">
+        {{ element.type }}
+      </div>
+    </div>
+    
+    <!-- Selection handles -->
+    <div class="selection-handles" *ngIf="isSelected(element)">
+      <div class="handle handle-nw"></div>
+      <div class="handle handle-ne"></div>
+      <div class="handle handle-sw"></div>
+      <div class="handle handle-se"></div>
+      <div class="handle handle-n"></div>
+      <div class="handle handle-s"></div>
+      <div class="handle handle-w"></div>
+      <div class="handle handle-e"></div>
+    </div>
+  </div>
+</ng-template>

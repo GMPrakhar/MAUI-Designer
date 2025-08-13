@@ -1,1 +1,25 @@
-<p>toolbox works!</p>
+<p><div class="toolbox">
+  <div class="category-group" *ngFor="let category of categories">
+    <h3 class="category-title">{{ category }}</h3>
+    
+    <div class="toolbox-items">
+      <div 
+        class="toolbox-item"
+        *ngFor="let item of getItemsByCategory(category)"
+        cdkDrag
+        [cdkDragData]="item"
+        (cdkDragStarted)="onDragStart($event, item)"
+        (cdkDragEnded)="onDragEnd()"
+        [title]="item.description">
+        
+        <div class="item-icon">
+          <span class="material-icons">{{ item.icon }}</span>
+        </div>
+        
+        <div class="item-label">
+          {{ item.displayName }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -71,7 +71,7 @@ ${xamlContent}
       case ElementType.Image:
         return 'Image';
       default:
-        return type.toString();
+        return type;
     }
   }
 

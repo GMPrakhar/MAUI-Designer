@@ -1,0 +1,91 @@
+.xaml-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e2e8f0;
+  
+  .toolbar-title {
+    font-weight: 600;
+    color: #2d3748;
+  }
+  
+  .toolbar-actions {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .action-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    background-color: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background-color: #f3f4f6;
+      border-color: #9ca3af;
+    }
+    
+    .material-icons {
+      font-size: 16px;
+    }
+  }
+}
+
+.editor-content {
+  flex: 1;
+  overflow: auto;
+  background-color: #f8f9fa;
+  
+  .xaml-code {
+    margin: 0;
+    padding: 15px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #2d3748;
+    background-color: #fff;
+    border: none;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    
+    code {
+      background: none;
+      padding: 0;
+      font-family: inherit;
+    }
+  }
+}
+
+/* Syntax highlighting could be added here */
+.xaml-code {
+  .xml-tag {
+    color: #d73a49;
+  }
+  
+  .xml-attribute {
+    color: #6f42c1;
+  }
+  
+  .xml-value {
+    color: #032f62;
+  }
+  
+  .xml-comment {
+    color: #6a737d;
+    font-style: italic;
+  }
+}

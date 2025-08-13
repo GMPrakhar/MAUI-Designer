@@ -1,1 +1,27 @@
-<p>xaml-editor works!</p>
+<p><div class="xaml-editor">
+  <div class="editor-toolbar">
+    <div class="toolbar-title">Generated XAML</div>
+    
+    <div class="toolbar-actions">
+      <button 
+        class="action-button"
+        (click)="copyToClipboard()"
+        title="Copy to clipboard">
+        <span class="material-icons">content_copy</span>
+        Copy
+      </button>
+      
+      <button 
+        class="action-button"
+        (click)="downloadXaml()"
+        title="Download XAML file">
+        <span class="material-icons">download</span>
+        Download
+      </button>
+    </div>
+  </div>
+  
+  <div class="editor-content">
+    <pre class="xaml-code"><code>{{ xamlContent$ | async }}</code></pre>
+  </div>
+</div>
