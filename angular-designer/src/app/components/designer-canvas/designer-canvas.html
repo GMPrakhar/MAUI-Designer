@@ -37,8 +37,11 @@
     [class.layout-element]="isLayoutElement(element)"
     [style]="getElementStyles(element)"
     (click)="onElementClick(element, $event)"
+    [cdkDragDisabled]="!isSelected(element)"
     cdkDrag
-    [cdkDragData]="element">
+    [cdkDragData]="element"
+    (cdkDragStarted)="onDragStarted(element, $event)"
+    (cdkDragEnded)="onDragEnded(element, $event)">
     
     <!-- Element content based on type -->
     <div class="element-content" [ngSwitch]="element.type">

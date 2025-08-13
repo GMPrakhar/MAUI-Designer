@@ -52,6 +52,22 @@
     height: 100% !important;
     border: none;
   }
+  
+  &.cdk-drag-disabled {
+    cursor: default;
+  }
+  
+  &:not(.cdk-drag-disabled) {
+    &.selected {
+      cursor: move;
+    }
+  }
+  
+  &.cdk-drag-dragging {
+    opacity: 0.8;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+  }
 }
 
 .element-content {

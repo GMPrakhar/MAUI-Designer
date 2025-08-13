@@ -1,6 +1,6 @@
 import { Component, OnInit, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DragDropModule, CdkDropList, CdkDragDrop } from '@angular/cdk/drag-drop';
+import { DragDropModule, CdkDropList, CdkDragDrop, CdkDragStart, CdkDragEnd } from '@angular/cdk/drag-drop';
 import { ElementService } from '../../services/element';
 import { DragDropService } from '../../services/drag-drop';
 import { LayoutDesignerService } from '../../services/layout-designer';
@@ -64,12 +64,47 @@ export class DesignerCanvasComponent implements OnInit {
   }
 
   onElementClick(element: MauiElement, event: MouseEvent) {
+    event.preventDefault();
     event.stopPropagation();
+    console.log('Element clicked:', element.name, element.type);
     this.elementService.selectElement(element);
   }
 
   onCanvasClick() {
+    console.log('Canvas clicked - deselecting');
     this.elementService.selectElement(null);
+  }
+
+  onDragStarted(element: MauiElement, event: CdkDragStart) {
+    console.log('Drag started for:', element.name);
+    // Start drag operation for the selected element
+    this.dragDropService.startDrag({
+      element: element,
+      isFromToolbox: false
+    });
+  }
+
+  onDragEnded(element: MauiElement, event: CdkDragEnd) {
+    console.log('Drag ended for:', element.name, 'at position:', event.dropPoint);
+    // End drag operation
+    this.dragDropService.endDrag();
+    
+    // Update element position based on drop point
+    const rect = this.canvas.nativeElement.getBoundingClientRect();
+    const x = Math.max(0, event.dropPoint.x - rect.left);
+    const y = Math.max(0, event.dropPoint.y - rect.top);
+    
+    console.log('New position:', x, y);
+    
+    // Update the element's position
+    element.properties.x = x;
+    element.properties.y = y;
+    
+    // Notify the element service of the change
+    this.elementService.updateElementProperties(element, {
+      x: element.properties.x,
+      y: element.properties.y
+    });
   }
 
   getElementStyles(element: MauiElement): any {
