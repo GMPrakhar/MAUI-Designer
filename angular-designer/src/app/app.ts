@@ -10,6 +10,7 @@ import { XamlEditorComponent } from './components/xaml-editor/xaml-editor';
 
 @Component({
   selector: 'app-root',
+  standalone: true,
   imports: [
     CommonModule,
     DragDropModule,

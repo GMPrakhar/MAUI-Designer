@@ -7,6 +7,7 @@ import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-properties-panel',
+  standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './properties-panel.html',
   styleUrl: './properties-panel.scss'

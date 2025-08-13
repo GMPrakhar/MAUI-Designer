@@ -8,6 +8,7 @@ import { Observable, map } from 'rxjs';
 
 @Component({
   selector: 'app-xaml-editor',
+  standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './xaml-editor.html',
   styleUrl: './xaml-editor.scss'

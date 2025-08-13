@@ -9,6 +9,7 @@ import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-designer-canvas',
+  standalone: true,
   imports: [CommonModule, DragDropModule],
   templateUrl: './designer-canvas.html',
   styleUrl: './designer-canvas.scss'

@@ -7,6 +7,7 @@ import { DragDropService } from '../../services/drag-drop';
 
 @Component({
   selector: 'app-toolbox',
+  standalone: true,
   imports: [CommonModule, DragDropModule],
   templateUrl: './toolbox.html',
   styleUrl: './toolbox.scss'

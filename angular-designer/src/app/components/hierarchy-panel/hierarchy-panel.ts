@@ -6,6 +6,7 @@ import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-hierarchy-panel',
+  standalone: true,
   imports: [CommonModule],
   templateUrl: './hierarchy-panel.html',
   styleUrl: './hierarchy-panel.scss'
