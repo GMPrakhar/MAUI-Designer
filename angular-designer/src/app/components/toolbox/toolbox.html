@@ -6,10 +6,7 @@
       <div 
         class="toolbox-item"
         *ngFor="let item of getItemsByCategory(category)"
-        cdkDrag
-        [cdkDragData]="item"
-        (cdkDragStarted)="onDragStart($event, item)"
-        (cdkDragEnded)="onDragEnd()"
+        (click)="onItemClick(item)"
         [title]="item.description">
         
         <div class="item-icon">

@@ -36,10 +36,15 @@
     [class.selected]="isSelected(element)"
     [class.layout-element]="isLayoutElement(element)"
     [style]="getElementStyles(element)"
-    (click)="onElementClick(element, $event)"
     cdkDrag
+    [cdkDragDisabled]="!isSelected(element)"
+    (cdkDragStarted)="onDragStarted(element)"
+    (click)="onElementClick(element, $event)"
     [cdkDragData]="element">
-    
+
+    <!-- Drag handle: appears only when selected; covers element so dragging can only start when selected -->
+    <div *ngIf="isSelected(element)" class="drag-handle" cdkDragHandle (pointerdown)="$event.stopPropagation()"></div>
+
     <!-- Element content based on type -->
     <div class="element-content" [ngSwitch]="element.type">
       

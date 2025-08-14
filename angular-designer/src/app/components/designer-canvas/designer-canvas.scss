@@ -19,10 +19,20 @@
   background-position: -1px -1px;
 }
 
+.selected
+{
+  pointer-events: all;
+}
+
 .canvas-element {
   position: absolute;
   border: 1px transparent solid;
   transition: border-color 0.2s ease;
+  pointer-events:painted;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   
   &:hover {
     border-color: #cbd5e0;
@@ -251,4 +261,19 @@
   opacity: 0.3;
   border: 2px dashed #a0aec0;
   background: transparent;
+}
+
+.canvas-element.selected .element-content {
+  pointer-events: auto;
+}
+
+.drag-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: move;
+  background: rgba(0,0,0,0); /* invisible overlay */
+  z-index: 50;
 }

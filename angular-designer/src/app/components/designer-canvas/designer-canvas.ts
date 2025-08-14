@@ -65,6 +65,7 @@ export class DesignerCanvasComponent implements OnInit {
 
   onElementClick(element: MauiElement, event: MouseEvent) {
     event.stopPropagation();
+    console.log("Selected element", element);
     this.elementService.selectElement(element);
   }
 
@@ -80,7 +81,8 @@ export class DesignerCanvasComponent implements OnInit {
       left: props.x + 'px',
       top: props.y + 'px',
       width: props.width + 'px',
-      height: props.height + 'px'
+      height: props.height + 'px',
+      zIndex: this.isSelected(element) ? 9999 : 'auto'
     };
 
     if (props.backgroundColor) {
@@ -121,5 +123,22 @@ export class DesignerCanvasComponent implements OnInit {
   isSelected(element: MauiElement): boolean {
     const selected = this.elementService.getSelectedElement();
     return selected === element;
+  }
+
+  // Select element on pointerdown so cdkDrag will be enabled when drag starts.
+  onElementPointerDown(element: MauiElement, event: PointerEvent) {
+    // Prevent the pointer event from bubbling to parent elements which may start a drag
+    event.stopPropagation();
+    // Do not call preventDefault so interactive children (inputs/buttons) still work
+    this.elementService.selectElement(element);
+  }
+  
+  onDragStarted(element: MauiElement) {
+    console.log("Drag started for element:", element);
+  }
+
+  onDragEnded(element: MauiElement) {
+    console.log("Drag released for element:", element);
+    this.elementService.selectElement(element);
   }
 }
