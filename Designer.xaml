@@ -26,7 +26,7 @@
                     <ColumnDefinition Width="2"/>
                 </Grid.ColumnDefinitions>
                 <views:TabMenuHolder x:Name="LeftTabMenuHolder" IsSidebar="True" Grid.Column="0"/>
-                <Rectangle x:Name="TabDraggerLeft" Grid.Column="1" Fill="#555" WidthRequest="6" HorizontalOptions="End" VerticalOptions="FillAndExpand">
+                <Rectangle x:Name="TabDraggerLeft" StyleId="TabDraggerLeft" Grid.Column="1" Fill="#555" WidthRequest="6" HorizontalOptions="End" VerticalOptions="FillAndExpand">
                     <Rectangle.GestureRecognizers>
                         <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
                     </Rectangle.GestureRecognizers>
@@ -46,7 +46,7 @@
                     <ColumnDefinition Width="2"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Rectangle x:Name="TabDraggerRight" Grid.Column="0" Fill="#555" WidthRequest="2" HorizontalOptions="Start" VerticalOptions="FillAndExpand">
+                <Rectangle x:Name="TabDraggerRight" StyleId="TabDraggerRight" Grid.Column="0" Fill="#555" WidthRequest="2" HorizontalOptions="Start" VerticalOptions="FillAndExpand">
                     <Rectangle.GestureRecognizers>
                         <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
                     </Rectangle.GestureRecognizers>
@@ -60,7 +60,7 @@
                     <RowDefinition Height="3"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
-                <Rectangle x:Name="TabDraggerBottom" Grid.Row="0" Fill="#555" HeightRequest="3" HorizontalOptions="FillAndExpand" VerticalOptions="End">
+                <Rectangle x:Name="TabDraggerBottom" StyleId="TabDraggerBottom" Grid.Row="0" Fill="#555" HeightRequest="3" HorizontalOptions="FillAndExpand" VerticalOptions="End">
                     <Rectangle.GestureRecognizers>
                         <PanGestureRecognizer PanUpdated="TabDragger_PanUpdated"/>
                     </Rectangle.GestureRecognizers>

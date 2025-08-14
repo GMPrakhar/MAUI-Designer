@@ -6,6 +6,8 @@ namespace MAUIDesigner.Services
     public interface ICursorService
     {
         void SetCursor(View view, CursorType cursorType);
+        void SetResizeCursor(View view);
+        void SetDefaultCursor(View view);
     }
 
     public enum CursorType
@@ -33,6 +35,26 @@ namespace MAUIDesigner.Services
                 element.ChangeCursor(Inputs.InputSystemCursor.Create(shape));
             }
 #endif
+        }
+
+        public void SetResizeCursor(View view)
+        {
+            // Determine cursor type based on view name or type
+            if (view is Rectangle rect)
+            {
+                var cursorType = rect.StyleId switch
+                {
+                    "TabDraggerLeft" or "TabDraggerRight" => CursorType.SizeWE,
+                    "TabDraggerBottom" => CursorType.SizeNS,
+                    _ => CursorType.Arrow
+                };
+                SetCursor(view, cursorType);
+            }
+        }
+
+        public void SetDefaultCursor(View view)
+        {
+            SetCursor(view, CursorType.Arrow);
         }
     }
 }

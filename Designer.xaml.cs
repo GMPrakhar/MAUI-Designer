@@ -83,28 +83,42 @@ public partial class Designer : ContentPage
                     _initialWidth = MainGrid.ColumnDefinitions[2].Width.Value;
                 else if (rect == TabDraggerBottom)
                     _initialHeight = MainGrid.RowDefinitions[1].Height.Value;
+                
+                // Change cursor to resize cursor during dragging
+                _cursorService.SetResizeCursor(rect);
             }
             else if (e.StatusType == GestureStatus.Running && MenuDraggerView != null)
             {
                 if (MenuDraggerView == TabDraggerLeft)
                 {
-                    var newWidth = Math.Max(Constants.MinimumPanelWidth, _initialWidth + (e.TotalX - _panStartX));
+                    // Left panel - ensure minimum width and don't exceed maximum ratio of total width
+                    var maxWidth = this.Width * Constants.MaximumPanelWidthRatio;
+                    var newWidth = Math.Max(Constants.MinimumPanelWidth, 
+                                          Math.Min(maxWidth, _initialWidth + (e.TotalX - _panStartX)));
                     MainGrid.ColumnDefinitions[0].Width = new GridLength(newWidth);
                 }
                 else if (MenuDraggerView == TabDraggerRight)
                 {
-                    var newWidth = Math.Max(Constants.MinimumPanelWidth, _initialWidth - (e.TotalX - _panStartX));
+                    // Right panel - ensure minimum width and don't exceed maximum ratio of total width
+                    var maxWidth = this.Width * Constants.MaximumPanelWidthRatio;
+                    var newWidth = Math.Max(Constants.MinimumPanelWidth, 
+                                          Math.Min(maxWidth, _initialWidth - (e.TotalX - _panStartX)));
                     MainGrid.ColumnDefinitions[2].Width = new GridLength(newWidth);
                 }
                 else if (MenuDraggerView == TabDraggerBottom)
                 {
-                    var newHeight = Math.Max(Constants.MinimumPanelHeight, _initialHeight - (e.TotalY - _panStartY));
+                    // Bottom panel - ensure minimum height and don't exceed maximum ratio of total height
+                    var maxHeight = this.Height * Constants.MaximumPanelHeightRatio;
+                    var newHeight = Math.Max(Constants.MinimumPanelHeight, 
+                                           Math.Min(maxHeight, _initialHeight - (e.TotalY - _panStartY)));
                     MainGrid.RowDefinitions[1].Height = new GridLength(newHeight);
                 }
             }
             else if (e.StatusType == GestureStatus.Completed || e.StatusType == GestureStatus.Canceled)
             {
                 MenuDraggerView = null;
+                // Reset cursor to default
+                _cursorService.SetDefaultCursor(rect);
             }
         }
     }
