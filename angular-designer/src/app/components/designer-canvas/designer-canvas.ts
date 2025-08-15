@@ -55,36 +55,6 @@ export class DesignerCanvasComponent implements OnInit {
     // Initialize the canvas
   }
 
-  onDrop(event: CdkDragDrop<any>) {
-    const dragData = this.dragDropService.getDragData();
-    if (!dragData) return;
-
-    const rect = this.canvas.nativeElement.getBoundingClientRect();
-    const x = event.dropPoint.x - rect.left;
-    const y = event.dropPoint.y - rect.top;
-
-    if (dragData.isFromToolbox && dragData.elementType) {
-      this.handleToolboxDrop(dragData.elementType, x, y);
-    } else if (dragData.element) {
-      this.handleElementMove(dragData.element, x, y);
-    }
-  }
-
-  private handleToolboxDrop(elementType: ElementType, x: number, y: number) {
-    const rootElement = this.elementService.getRootElement();
-    this.dragDropService.handleToolboxDrop(
-      {} as CdkDragDrop<any>, 
-      x, 
-      y, 
-      rootElement
-    );
-  }
-
-  private handleElementMove(element: MauiElement, x: number, y: number) {
-    const rootElement = this.elementService.getRootElement();
-    this.dragDropService.handleElementMove(element, x, y, rootElement);
-  }
-
   onElementClick(element: MauiElement, event: MouseEvent) {
     event.stopPropagation();
     console.log("Selected element", element);
@@ -161,7 +131,6 @@ export class DesignerCanvasComponent implements OnInit {
 
   onDragEnded(element: MauiElement) {
     console.log("Drag released for element:", element);
-    this.elementService.selectElement(element);
   }
 
   // Resize handle interactions
