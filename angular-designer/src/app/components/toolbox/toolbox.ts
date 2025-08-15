@@ -1,13 +1,15 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { DragDropModule } from '@angular/cdk/drag-drop';
 import { MAUI_CONTROLS, ToolboxItem, ToolboxCategory } from '../../models/toolbox';
 import { ElementType } from '../../models/maui-element';
 import { ElementService } from '../../services/element';
+import { DragDropService } from '../../services/drag-drop';
 
 @Component({
   selector: 'app-toolbox',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DragDropModule],
   templateUrl: './toolbox.html',
   styleUrl: './toolbox.scss'
 })
@@ -15,7 +17,10 @@ export class ToolboxComponent {
   toolboxItems = MAUI_CONTROLS;
   categories = Object.values(ToolboxCategory);
 
-  constructor(private elementService: ElementService) {}
+  constructor(
+    private elementService: ElementService,
+    private dragDropService: DragDropService
+  ) {}
 
   getItemsByCategory(category: ToolboxCategory): ToolboxItem[] {
     return this.toolboxItems.filter(item => item.category === category);
@@ -32,5 +37,16 @@ export class ToolboxComponent {
       this.elementService.addElement(newElement, rootElement);
       this.elementService.selectElement(newElement);
     }
+  }
+
+  onDragStart(item: ToolboxItem) {
+    this.dragDropService.startDrag({
+      elementType: item.type as ElementType,
+      isFromToolbox: true
+    });
+  }
+
+  onDragEnd() {
+    this.dragDropService.endDrag();
   }
 }

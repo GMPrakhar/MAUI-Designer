@@ -60,18 +60,18 @@ export class LayoutDesignerService {
     }
   }
 
-  calculateDropPosition(element: MauiElement, event: MouseEvent, containerElement: HTMLElement): { x: number, y: number } {
+  calculateDropPosition(targetParent: MauiElement, event: MouseEvent, containerElement: HTMLElement): { x: number, y: number } {
     const rect = containerElement.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     
-    const layoutInfo = this.getLayoutInfo(element.type);
+    const layoutInfo = this.getLayoutInfo(targetParent.type);
     
     if (layoutInfo.supportsAbsolutePositioning) {
       return { x, y };
     } else if (layoutInfo.supportsGridPositioning) {
       // For grid layouts, calculate grid cell
-      return this.calculateGridPosition(element, x, y, containerElement);
+      return this.calculateGridPosition(targetParent, x, y, containerElement);
     } else {
       // For stack layouts, position is managed by the layout
       return { x: 0, y: 0 };

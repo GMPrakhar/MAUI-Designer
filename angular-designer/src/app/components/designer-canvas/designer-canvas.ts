@@ -63,26 +63,27 @@ export class DesignerCanvasComponent implements OnInit {
     const x = event.dropPoint.x - rect.left;
     const y = event.dropPoint.y - rect.top;
 
+    // Find the target layout element at the drop position
+    const targetParent = this.findTargetLayoutElement(x, y);
+
     if (dragData.isFromToolbox && dragData.elementType) {
-      this.handleToolboxDrop(dragData.elementType, x, y);
+      this.handleToolboxDrop(dragData.elementType, x, y, targetParent);
     } else if (dragData.element) {
-      this.handleElementMove(dragData.element, x, y);
+      this.handleElementMove(dragData.element, x, y, targetParent);
     }
   }
 
-  private handleToolboxDrop(elementType: ElementType, x: number, y: number) {
-    const rootElement = this.elementService.getRootElement();
+  private handleToolboxDrop(elementType: ElementType, x: number, y: number, targetParent: MauiElement) {
     this.dragDropService.handleToolboxDrop(
       {} as CdkDragDrop<any>, 
       x, 
       y, 
-      rootElement
+      targetParent
     );
   }
 
-  private handleElementMove(element: MauiElement, x: number, y: number) {
-    const rootElement = this.elementService.getRootElement();
-    this.dragDropService.handleElementMove(element, x, y, rootElement);
+  private handleElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement) {
+    this.dragDropService.handleElementMove(element, x, y, targetParent);
   }
 
   onElementClick(element: MauiElement, event: MouseEvent) {
@@ -157,10 +158,15 @@ export class DesignerCanvasComponent implements OnInit {
   
   onDragStarted(element: MauiElement) {
     console.log("Drag started for element:", element);
+    this.dragDropService.startDrag({
+      element: element,
+      isFromToolbox: false
+    });
   }
 
   onDragEnded(element: MauiElement) {
     console.log("Drag released for element:", element);
+    this.dragDropService.endDrag();
     this.elementService.selectElement(element);
   }
 
@@ -307,5 +313,50 @@ export class DesignerCanvasComponent implements OnInit {
       default:
         return 'default';
     }
+  }
+
+  /**
+   * Find the deepest layout element at the given coordinates that can accept children
+   */
+  private findTargetLayoutElement(x: number, y: number): MauiElement {
+    const rootElement = this.elementService.getRootElement();
+    return this.findDeepestLayoutAt(rootElement, x, y) || rootElement;
+  }
+
+  /**
+   * Recursively find the deepest layout element at the given coordinates
+   */
+  private findDeepestLayoutAt(element: MauiElement, x: number, y: number): MauiElement | null {
+    // Check if point is within this element's bounds
+    if (!this.isPointInElement(element, x, y)) {
+      return null;
+    }
+
+    // If this element can have children, it's a potential target
+    const canHaveChildren = this.layoutDesigner.getLayoutInfo(element.type).canHaveChildren;
+    let deepestLayout = canHaveChildren ? element : null;
+
+    // Check children for deeper layout elements
+    for (const child of element.children) {
+      const childResult = this.findDeepestLayoutAt(child, x, y);
+      if (childResult) {
+        deepestLayout = childResult;
+      }
+    }
+
+    return deepestLayout;
+  }
+
+  /**
+   * Check if a point is within the bounds of an element
+   */
+  private isPointInElement(element: MauiElement, x: number, y: number): boolean {
+    const props = element.properties;
+    const left = props.x || 0;
+    const top = props.y || 0;
+    const right = left + (props.width || 0);
+    const bottom = top + (props.height || 0);
+
+    return x >= left && x <= right && y >= top && y <= bottom;
   }
 }

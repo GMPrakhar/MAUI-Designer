@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { CdkDragDrop, CdkDragEnd, CdkDragStart, transferArrayItem } from '@angular/cdk/drag-drop';
 import { ElementService } from './element';
+import { LayoutDesignerService } from './layout-designer';
 import { MauiElement, ElementType } from '../models/maui-element';
 import { BehaviorSubject } from 'rxjs';
 
@@ -19,7 +20,10 @@ export class DragDropService {
   
   dragPreview$ = this.dragPreview.asObservable();
 
-  constructor(private elementService: ElementService) { }
+  constructor(
+    private elementService: ElementService,
+    private layoutDesigner: LayoutDesignerService
+  ) { }
 
   startDrag(data: DragData): void {
     this.currentDragData = data;
@@ -36,17 +40,47 @@ export class DragDropService {
 
   handleToolboxDrop(event: CdkDragDrop<any>, x: number, y: number, targetParent: MauiElement): void {
     if (this.currentDragData?.isFromToolbox && this.currentDragData.elementType) {
+      // Calculate position relative to the target parent
+      const position = this.calculateRelativePosition(x, y, targetParent);
+      
+      // Get layout-specific properties
+      const layoutProperties = this.layoutDesigner.getChildLayoutProperties(
+        targetParent, 
+        { type: this.currentDragData.elementType } as MauiElement, 
+        position
+      );
+
       const newElement = this.elementService.createElement(
         this.currentDragData.elementType,
-        { x: x, y: y }
+        layoutProperties
       );
+      
       this.elementService.addElement(newElement, targetParent);
       this.elementService.selectElement(newElement);
     }
   }
 
   handleElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement): void {
-    this.elementService.moveElement(element, targetParent, x, y);
+    // Calculate position relative to the target parent
+    const position = this.calculateRelativePosition(x, y, targetParent);
+    
+    // Get layout-specific properties
+    const layoutProperties = this.layoutDesigner.getChildLayoutProperties(
+      targetParent, 
+      element, 
+      position
+    );
+
+    // Only update x,y coordinates if the parent supports absolute positioning
+    const layoutInfo = this.layoutDesigner.getLayoutInfo(targetParent.type);
+    
+    if (layoutInfo.supportsAbsolutePositioning) {
+      this.elementService.moveElement(element, targetParent, position.x, position.y);
+    } else {
+      // For non-absolute layouts, don't update x,y coordinates
+      // Instead, just move the element to the new parent
+      this.moveElementToParent(element, targetParent, layoutProperties);
+    }
   }
 
   showDragPreview(x: number, y: number): void {
@@ -93,5 +127,42 @@ export class DragDropService {
       default:
         return false;
     }
+  }
+
+  /**
+   * Calculate position relative to the target parent element
+   */
+  private calculateRelativePosition(x: number, y: number, targetParent: MauiElement): { x: number, y: number } {
+    const parentProps = targetParent.properties;
+    const parentX = parentProps.x || 0;
+    const parentY = parentProps.y || 0;
+    
+    return {
+      x: x - parentX,
+      y: y - parentY
+    };
+  }
+
+  /**
+   * Move element to a new parent with layout-specific properties
+   */
+  private moveElementToParent(element: MauiElement, newParent: MauiElement, layoutProperties: any): void {
+    // Remove from current parent
+    if (element.parent) {
+      const index = element.parent.children.indexOf(element);
+      if (index > -1) {
+        element.parent.children.splice(index, 1);
+      }
+    }
+
+    // Update element properties with layout-specific properties
+    element.properties = { ...element.properties, ...layoutProperties };
+    
+    // Add to new parent
+    element.parent = newParent;
+    newParent.children.push(element);
+    
+    // Notify element service
+    this.elementService.setRootElement(this.elementService.getRootElement());
   }
 }
