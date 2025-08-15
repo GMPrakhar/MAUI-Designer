@@ -63,12 +63,17 @@ export class DesignerCanvasComponent implements OnInit {
     const x = event.dropPoint.x - rect.left;
     const y = event.dropPoint.y - rect.top;
 
+    console.log('Drop detected at:', { x, y });
+
     // Find the target layout element at the drop position
     const targetParent = this.findTargetLayoutElement(x, y);
+    
+    console.log('Target parent found:', targetParent.name, targetParent.type);
 
     if (dragData.isFromToolbox && dragData.elementType) {
       this.handleToolboxDrop(dragData.elementType, x, y, targetParent);
     } else if (dragData.element) {
+      console.log('Moving element:', dragData.element.name, 'to parent:', targetParent.name);
       this.handleElementMove(dragData.element, x, y, targetParent);
     }
   }
@@ -320,7 +325,10 @@ export class DesignerCanvasComponent implements OnInit {
    */
   private findTargetLayoutElement(x: number, y: number): MauiElement {
     const rootElement = this.elementService.getRootElement();
-    return this.findDeepestLayoutAt(rootElement, x, y) || rootElement;
+    console.log('Finding target at coordinates:', { x, y });
+    const result = this.findDeepestLayoutAt(rootElement, x, y) || rootElement;
+    console.log('Target found:', result.name, result.type);
+    return result;
   }
 
   /**
@@ -332,9 +340,18 @@ export class DesignerCanvasComponent implements OnInit {
       return null;
     }
 
+    console.log('Checking element:', element.name, element.type, 'bounds:', { 
+      x: element.properties.x, 
+      y: element.properties.y, 
+      width: element.properties.width, 
+      height: element.properties.height 
+    });
+
     // If this element can have children, it's a potential target
     const canHaveChildren = this.layoutDesigner.getLayoutInfo(element.type).canHaveChildren;
     let deepestLayout = canHaveChildren ? element : null;
+
+    console.log('Can have children:', canHaveChildren);
 
     // Check children for deeper layout elements
     for (const child of element.children) {

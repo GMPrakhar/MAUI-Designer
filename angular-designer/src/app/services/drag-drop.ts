@@ -133,14 +133,22 @@ export class DragDropService {
    * Calculate position relative to the target parent element
    */
   private calculateRelativePosition(x: number, y: number, targetParent: MauiElement): { x: number, y: number } {
-    const parentProps = targetParent.properties;
-    const parentX = parentProps.x || 0;
-    const parentY = parentProps.y || 0;
+    // For absolute layouts, coordinates are relative to the parent
+    const layoutInfo = this.layoutDesigner.getLayoutInfo(targetParent.type);
     
-    return {
-      x: x - parentX,
-      y: y - parentY
-    };
+    if (layoutInfo.supportsAbsolutePositioning) {
+      const parentProps = targetParent.properties;
+      const parentX = parentProps.x || 0;
+      const parentY = parentProps.y || 0;
+      
+      return {
+        x: x - parentX,
+        y: y - parentY
+      };
+    } else {
+      // For other layouts, use the raw coordinates since they don't use absolute positioning
+      return { x, y };
+    }
   }
 
   /**
