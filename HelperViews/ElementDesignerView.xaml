@@ -16,12 +16,14 @@
         >
         </Border>
 
+        <!-- Corner resize handles -->
         <!-- Top Left Rectangle -->
         <Rectangle 
             ZIndex="1000"
                x:Name="topLeftRect"
      WidthRequest="8"
      HeightRequest="8"
+     Fill="Blue"
      AbsoluteLayout.LayoutBounds="0, 0, 0.05, 0.05"
      AbsoluteLayout.LayoutFlags="PositionProportional">
             <Rectangle.GestureRecognizers>
@@ -35,6 +37,7 @@
                x:Name="topRightRect"
      WidthRequest="8"
      HeightRequest="8"
+     Fill="Blue"
      AbsoluteLayout.LayoutBounds="1, 0, 0.05, 0.05"
      AbsoluteLayout.LayoutFlags="PositionProportional">
             <Rectangle.GestureRecognizers>
@@ -48,6 +51,7 @@
                 x:Name="bottomLeftRect"
      WidthRequest="8"
      HeightRequest="8"
+     Fill="Blue"
      AbsoluteLayout.LayoutBounds="0, 1, 0.05, 0.05"
      AbsoluteLayout.LayoutFlags="PositionProportional">
 
@@ -62,6 +66,7 @@
                 x:Name="bottomRightRect"
      WidthRequest="8"
      HeightRequest="8"
+     Fill="Blue"
      AbsoluteLayout.LayoutBounds="1, 1, 0.05, 0.05"
      AbsoluteLayout.LayoutFlags="PositionProportional">
 
@@ -69,6 +74,77 @@
                 <DragGestureRecognizer CanDrag="True" DragStarting="BottomRightScaled"/>
             </Rectangle.GestureRecognizers>
         </Rectangle>
+
+        <!-- Side resize handles -->
+        <!-- Top Edge -->
+        <Rectangle 
+            ZIndex="1000"
+            x:Name="topEdgeRect"
+            WidthRequest="60"
+            HeightRequest="4"
+            Fill="Green"
+            AbsoluteLayout.LayoutBounds="0.5, 0, 0.4, 0.02"
+            AbsoluteLayout.LayoutFlags="PositionProportional">
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="TopEdgeScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <!-- Bottom Edge -->
+        <Rectangle 
+            ZIndex="1000"
+            x:Name="bottomEdgeRect"
+            WidthRequest="60"
+            HeightRequest="4"
+            Fill="Green"
+            AbsoluteLayout.LayoutBounds="0.5, 1, 0.4, 0.02"
+            AbsoluteLayout.LayoutFlags="PositionProportional">
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="BottomEdgeScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <!-- Left Edge -->
+        <Rectangle 
+            ZIndex="1000"
+            x:Name="leftEdgeRect"
+            WidthRequest="4"
+            HeightRequest="60"
+            Fill="Green"
+            AbsoluteLayout.LayoutBounds="0, 0.5, 0.02, 0.4"
+            AbsoluteLayout.LayoutFlags="PositionProportional">
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="LeftEdgeScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <!-- Right Edge -->
+        <Rectangle 
+            ZIndex="1000"
+            x:Name="rightEdgeRect"
+            WidthRequest="4"
+            HeightRequest="60"
+            Fill="Green"
+            AbsoluteLayout.LayoutBounds="1, 0.5, 0.02, 0.4"
+            AbsoluteLayout.LayoutFlags="PositionProportional">
+            <Rectangle.GestureRecognizers>
+                <DragGestureRecognizer CanDrag="True" DragStarting="RightEdgeScaled"/>
+            </Rectangle.GestureRecognizers>
+        </Rectangle>
+
+        <!-- Size display label -->
+        <Label 
+            ZIndex="1000"
+            x:Name="sizeLabel"
+            FontSize="10"
+            TextColor="White"
+            BackgroundColor="Black"
+            Padding="4,2"
+            AbsoluteLayout.LayoutBounds="0.5, 0.5, 0.3, 0.1"
+            AbsoluteLayout.LayoutFlags="PositionProportional"
+            HorizontalTextAlignment="Center"
+            VerticalTextAlignment="Center"
+            IsVisible="False" />
 
         <AbsoluteLayout.GestureRecognizers>
             <DragGestureRecognizer CanDrag="True" DragStarting="DragGestureRecognizer_DragStarting"/>

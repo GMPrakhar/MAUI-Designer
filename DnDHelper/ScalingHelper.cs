@@ -62,6 +62,28 @@ namespace MAUIDesigner.DnDHelper
                     newWidth = Math.Max(20, location.X - currentX);
                     newHeight = Math.Max(20, location.Y - currentY);
                     break;
+
+                case ScaleDirection.Top:
+                    // Scaling from top edge: only height changes, Y position changes
+                    newHeight = Math.Max(20, currentHeight + (currentY - location.Y));
+                    newY = currentY - (newHeight - currentHeight);
+                    break;
+
+                case ScaleDirection.Bottom:
+                    // Scaling from bottom edge: only height changes
+                    newHeight = Math.Max(20, location.Y - currentY);
+                    break;
+
+                case ScaleDirection.Left:
+                    // Scaling from left edge: only width changes, X position changes
+                    newWidth = Math.Max(20, currentWidth + (currentX - location.X));
+                    newX = currentX - (newWidth - currentWidth);
+                    break;
+
+                case ScaleDirection.Right:
+                    // Scaling from right edge: only width changes
+                    newWidth = Math.Max(20, location.X - currentX);
+                    break;
             }
 
             // Update the size
@@ -74,6 +96,15 @@ namespace MAUIDesigner.DnDHelper
             {
                 draggingView.Margin = new Thickness(newX, newY, 0, 0);
             }
+
+            // Trigger size label update if the view is an ElementDesignerView
+            if (draggingView.Parent is ElementDesignerView designerView)
+            {
+                // Use reflection to call UpdateSizeLabel if it exists
+                var updateMethod = designerView.GetType().GetMethod("UpdateSizeLabel", 
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                updateMethod?.Invoke(designerView, null);
+            }
         }
 
         public enum ScaleDirection
@@ -81,7 +112,11 @@ namespace MAUIDesigner.DnDHelper
             TopLeft,
             TopRight,
             BottomLeft,
-            BottomRight
+            BottomRight,
+            Top,
+            Bottom,
+            Left,
+            Right
         }
     }
 }

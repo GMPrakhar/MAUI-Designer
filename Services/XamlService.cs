@@ -17,22 +17,43 @@ namespace MAUIDesigner.Services
     {
         public void LoadViewFromXaml(string xaml, AbsoluteLayout designerFrame, HierarchyTab hierarchyTab)
         {
+            if (string.IsNullOrWhiteSpace(xaml))
+            {
+                throw new ArgumentException("XAML content cannot be empty.");
+            }
+
             designerFrame.Children.Clear();
             var newLayout = new AbsoluteLayout();
             
             try
             {
                 var xamlLoaded = Extensions.LoadFromXaml(newLayout, xaml);
+                
+                if (newLayout.Children.Count == 0)
+                {
+                    throw new InvalidOperationException("No valid XAML elements found in the provided content.");
+                }
+                
                 var loadedLayout = newLayout.Children[0] as AbsoluteLayout;
+                if (loadedLayout == null)
+                {
+                    throw new InvalidOperationException("Root element must be an AbsoluteLayout.");
+                }
+                
                 var newAbsoluteLayout = new AbsoluteLayout();
                 LoadLayoutRecursively(newAbsoluteLayout, loadedLayout);
                 AddDirectChildrenOfAbsoluteLayout(newAbsoluteLayout, designerFrame);
                 hierarchyTab.UpdateHierarchy();
             }
+            catch (Microsoft.Maui.Controls.Xaml.XamlParseException xamlEx)
+            {
+                Debug.WriteLine($"XAML Parse Error: {xamlEx.Message}");
+                throw new InvalidOperationException($"XAML parse error at line {xamlEx.XmlInfo?.LineNumber ?? 0}: {xamlEx.Message}");
+            }
             catch (Exception ex)
             {
                 Debug.WriteLine($"Error loading XAML: {ex.Message}");
-                Application.Current.MainPage.DisplayAlert("Error", "Invalid XAML", "OK");
+                throw new InvalidOperationException($"Error loading XAML: {ex.Message}");
             }
         }
 

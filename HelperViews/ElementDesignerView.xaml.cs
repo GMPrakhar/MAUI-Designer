@@ -123,9 +123,15 @@ public partial class ElementDesignerView : ContentView
         topRightRect.IsVisible = true;
         bottomLeftRect.IsVisible = true;
         bottomRightRect.IsVisible = true;
+        topEdgeRect.IsVisible = true;
+        bottomEdgeRect.IsVisible = true;
+        leftEdgeRect.IsVisible = true;
+        rightEdgeRect.IsVisible = true;
         ElementBorder.Stroke = Colors.Yellow;
         AllowOperations = true;
         
+        // Update size label
+        UpdateSizeLabel();
     }
 
     private void OnFocusLost()
@@ -135,8 +141,24 @@ public partial class ElementDesignerView : ContentView
         topRightRect.IsVisible = false;
         bottomLeftRect.IsVisible = false;
         bottomRightRect.IsVisible = false;
+        topEdgeRect.IsVisible = false;
+        bottomEdgeRect.IsVisible = false;
+        leftEdgeRect.IsVisible = false;
+        rightEdgeRect.IsVisible = false;
+        sizeLabel.IsVisible = false;
         ElementBorder.Stroke = Colors.Transparent;
         AllowOperations = false;
+    }
+
+    private void UpdateSizeLabel()
+    {
+        if (View != null)
+        {
+            var width = View.WidthRequest > 0 ? View.WidthRequest : View.Width;
+            var height = View.HeightRequest > 0 ? View.HeightRequest : View.Height;
+            sizeLabel.Text = $"{width:F0} x {height:F0}";
+            sizeLabel.IsVisible = AllowOperations;
+        }
     }
 
     private void ScaleDirectionScaled(DragStartingEventArgs e, ScaleDirection scaleDirection)
@@ -147,6 +169,9 @@ public partial class ElementDesignerView : ContentView
             e.Data.Properties.Add("ScaleDirection", scaleDirection);
             e.Data.Properties.Add("IsScaling", true);
             e.Data.Properties.Add("DraggingView", EncapsulatingView);
+            
+            // Show size label during scaling
+            sizeLabel.IsVisible = true;
         }
     }
 
@@ -168,6 +193,26 @@ public partial class ElementDesignerView : ContentView
     private void BottomRightScaled(object sender, DragStartingEventArgs e)
     {
         ScaleDirectionScaled(e, ScaleDirection.BottomRight);
+    }
+
+    private void TopEdgeScaled(object sender, DragStartingEventArgs e)
+    {
+        ScaleDirectionScaled(e, ScaleDirection.Top);
+    }
+
+    private void BottomEdgeScaled(object sender, DragStartingEventArgs e)
+    {
+        ScaleDirectionScaled(e, ScaleDirection.Bottom);
+    }
+
+    private void LeftEdgeScaled(object sender, DragStartingEventArgs e)
+    {
+        ScaleDirectionScaled(e, ScaleDirection.Left);
+    }
+
+    private void RightEdgeScaled(object sender, DragStartingEventArgs e)
+    {
+        ScaleDirectionScaled(e, ScaleDirection.Right);
     }
 
     private void TapGestureRecognizer_Tapped(object sender, TappedEventArgs e)

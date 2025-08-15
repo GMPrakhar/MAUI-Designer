@@ -1,8 +1,24 @@
 <p><div class="xaml-editor">
   <div class="editor-toolbar">
-    <div class="toolbar-title">Generated XAML</div>
+    <div class="toolbar-title">XAML Editor</div>
     
     <div class="toolbar-actions">
+      <button 
+        class="action-button apply-button"
+        (click)="applyXaml()"
+        title="Apply XAML to design">
+        <span class="material-icons">play_arrow</span>
+        Apply
+      </button>
+      
+      <button 
+        class="action-button"
+        (click)="resetXaml()"
+        title="Reset to current design">
+        <span class="material-icons">refresh</span>
+        Reset
+      </button>
+      
       <button 
         class="action-button"
         (click)="copyToClipboard()"
@@ -21,7 +37,20 @@
     </div>
   </div>
   
+  <!-- Status Message -->
+  <div class="status-bar" *ngIf="statusMessage" [ngClass]="'status-' + statusType">
+    <span class="material-icons">
+      {{ statusType === 'success' ? 'check_circle' : statusType === 'error' ? 'error' : 'info' }}
+    </span>
+    {{ statusMessage }}
+  </div>
+  
   <div class="editor-content">
-    <pre class="xaml-code"><code>{{ xamlContent$ | async }}</code></pre>
+    <textarea 
+      class="xaml-editor-textarea"
+      [(ngModel)]="editableXamlContent"
+      placeholder="Enter your XAML code here..."
+      spellcheck="false">
+    </textarea>
   </div>
 </div>

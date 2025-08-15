@@ -27,10 +27,18 @@
       </div>
     </div>
     
+    <!-- Left Resize Handle -->
+    <div class="resize-handle horizontal" 
+         (mousedown)="onResizeStart($event, 'left')"></div>
+    
     <!-- Center Canvas -->
     <div class="center-panel">
       <app-designer-canvas></app-designer-canvas>
     </div>
+    
+    <!-- Right Resize Handle -->
+    <div class="resize-handle horizontal" 
+         (mousedown)="onResizeStart($event, 'right')"></div>
     
     <!-- Right Panel -->
     <div class="right-panel" [style.width.px]="rightPanelWidth">
@@ -43,6 +51,10 @@
       </div>
     </div>
   </div>
+  
+  <!-- Bottom Resize Handle -->
+  <div class="resize-handle vertical" 
+       (mousedown)="onResizeStart($event, 'bottom')"></div>
   
   <!-- Bottom Panel -->
   <div class="bottom-panel" [style.height.px]="bottomPanelHeight">

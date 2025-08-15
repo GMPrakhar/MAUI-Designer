@@ -13,6 +13,8 @@
         // Panel sizing constants  
         public const double MinimumPanelWidth = 50;
         public const double MinimumPanelHeight = 50;
+        public const double MaximumPanelWidthRatio = 0.8; // 80% of total width
+        public const double MaximumPanelHeightRatio = 0.8; // 80% of total height
         
         // Animation constants
         public const uint AnimationDuration = 100;

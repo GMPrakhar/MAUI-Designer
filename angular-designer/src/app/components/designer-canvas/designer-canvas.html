@@ -27,6 +27,14 @@
       Drop here
     </div>
   </div>
+  
+  <!-- Real-time size display during resize -->
+  <div class="size-display" 
+       *ngIf="showSizeDisplay"
+       [style.left.px]="sizeDisplayX"
+       [style.top.px]="sizeDisplayY">
+    {{ sizeDisplayText }}
+  </div>
 </div>
 
 <!-- Template for recursive element rendering -->
@@ -121,14 +129,25 @@
     
     <!-- Selection handles -->
     <div class="selection-handles" *ngIf="isSelected(element)">
-      <div class="handle handle-nw"></div>
-      <div class="handle handle-ne"></div>
-      <div class="handle handle-sw"></div>
-      <div class="handle handle-se"></div>
-      <div class="handle handle-n"></div>
-      <div class="handle handle-s"></div>
-      <div class="handle handle-w"></div>
-      <div class="handle handle-e"></div>
+      <!-- Corner handles (blue) -->
+      <div class="handle handle-corner handle-nw" 
+           (mousedown)="onResizeStart($event, 'nw', element)"></div>
+      <div class="handle handle-corner handle-ne" 
+           (mousedown)="onResizeStart($event, 'ne', element)"></div>
+      <div class="handle handle-corner handle-sw" 
+           (mousedown)="onResizeStart($event, 'sw', element)"></div>
+      <div class="handle handle-corner handle-se" 
+           (mousedown)="onResizeStart($event, 'se', element)"></div>
+      
+      <!-- Edge handles (green) -->
+      <div class="handle handle-edge handle-n" 
+           (mousedown)="onResizeStart($event, 'n', element)"></div>
+      <div class="handle handle-edge handle-s" 
+           (mousedown)="onResizeStart($event, 's', element)"></div>
+      <div class="handle handle-edge handle-w" 
+           (mousedown)="onResizeStart($event, 'w', element)"></div>
+      <div class="handle handle-edge handle-e" 
+           (mousedown)="onResizeStart($event, 'e', element)"></div>
     </div>
   </div>
 </ng-template>
