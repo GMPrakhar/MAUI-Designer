@@ -39,53 +39,95 @@
       border-color: #9ca3af;
     }
     
+    &.apply-button {
+      background-color: #2563eb;
+      color: white;
+      border-color: #2563eb;
+      
+      &:hover {
+        background-color: #1d4ed8;
+        border-color: #1d4ed8;
+      }
+    }
+    
     .material-icons {
       font-size: 16px;
     }
   }
 }
 
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 15px;
+  font-size: 0.875rem;
+  
+  &.status-success {
+    background-color: #dcfce7;
+    color: #166534;
+    border-bottom: 1px solid #bbf7d0;
+  }
+  
+  &.status-error {
+    background-color: #fef2f2;
+    color: #dc2626;
+    border-bottom: 1px solid #fecaca;
+  }
+  
+  &.status-info {
+    background-color: #e0f2fe;
+    color: #0369a1;
+    border-bottom: 1px solid #bae6fd;
+  }
+  
+  .material-icons {
+    font-size: 16px;
+  }
+}
+
 .editor-content {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   background-color: #f8f9fa;
   
-  .xaml-code {
+  .xaml-editor-textarea {
+    width: 100%;
+    height: 100%;
     margin: 0;
     padding: 15px;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 0.8rem;
+    font-size: 0.875rem;
     line-height: 1.4;
     color: #2d3748;
     background-color: #fff;
     border: none;
-    white-space: pre-wrap;
-    word-wrap: break-word;
+    resize: none;
+    outline: none;
+    box-sizing: border-box;
     
-    code {
-      background: none;
-      padding: 0;
-      font-family: inherit;
+    &::placeholder {
+      color: #9ca3af;
+      font-style: italic;
     }
   }
 }
 
-/* Syntax highlighting could be added here */
-.xaml-code {
-  .xml-tag {
-    color: #d73a49;
-  }
-  
-  .xml-attribute {
-    color: #6f42c1;
-  }
-  
-  .xml-value {
-    color: #032f62;
-  }
-  
-  .xml-comment {
-    color: #6a737d;
-    font-style: italic;
-  }
+/* Scrollbar styling for textarea */
+.xaml-editor-textarea::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.xaml-editor-textarea::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.xaml-editor-textarea::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 6px;
+}
+
+.xaml-editor-textarea::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }

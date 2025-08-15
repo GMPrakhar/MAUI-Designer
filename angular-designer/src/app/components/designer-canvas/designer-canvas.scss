@@ -179,14 +179,38 @@
   right: -4px;
   bottom: -4px;
   pointer-events: none;
+  z-index: 100;
   
   .handle {
     position: absolute;
     width: 8px;
     height: 8px;
-    background: #4299e1;
     border: 1px solid #fff;
     border-radius: 2px;
+    pointer-events: all;
+    z-index: 101;
+    
+    // Corner handles (blue)
+    &.handle-corner {
+      background: #2563eb;
+      width: 10px;
+      height: 10px;
+      
+      &:hover {
+        background: #1d4ed8;
+        transform: scale(1.2);
+      }
+    }
+    
+    // Edge handles (green)
+    &.handle-edge {
+      background: #059669;
+      
+      &:hover {
+        background: #047857;
+        transform: scale(1.2);
+      }
+    }
     
     &.handle-nw { top: 0; left: 0; cursor: nw-resize; }
     &.handle-ne { top: 0; right: 0; cursor: ne-resize; }
@@ -197,6 +221,20 @@
     &.handle-w { top: 50%; left: 0; transform: translateY(-50%); cursor: w-resize; }
     &.handle-e { top: 50%; right: 0; transform: translateY(-50%); cursor: e-resize; }
   }
+}
+
+.size-display {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.8);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  z-index: 10000;
+  pointer-events: none;
+  white-space: nowrap;
 }
 
 .grid-overlay {

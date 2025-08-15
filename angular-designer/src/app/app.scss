@@ -85,6 +85,36 @@
   padding: 10px;
 }
 
+// Resize handles
+.resize-handle {
+  background-color: #e2e8f0;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: #cbd5e0;
+  }
+  
+  &.horizontal {
+    width: 4px;
+    cursor: ew-resize;
+    
+    &:hover {
+      width: 6px;
+      background-color: #4299e1;
+    }
+  }
+  
+  &.vertical {
+    height: 4px;
+    cursor: ns-resize;
+    
+    &:hover {
+      height: 6px;
+      background-color: #4299e1;
+    }
+  }
+}
+
 // Scrollbar styling
 ::-webkit-scrollbar {
   width: 8px;

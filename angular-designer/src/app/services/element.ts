@@ -208,6 +208,13 @@ export class ElementService {
     return this.selectedElement;
   }
 
+  setRootElement(element: MauiElement): void {
+    this.rootElement = element;
+    this.elementsSubject.next(this.rootElement);
+    // Clear selection when setting new root
+    this.selectElement(null);
+  }
+
   // Grid specific methods
   addGridRow(gridElement: MauiElement): void {
     if (gridElement.type === ElementType.Grid) {
