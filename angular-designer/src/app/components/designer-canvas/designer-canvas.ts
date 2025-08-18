@@ -139,21 +139,25 @@ export class DesignerCanvasComponent implements OnInit {
 
   onDragEnded(element: MauiElement, event: any) {
     console.log("Drag released for element:", element, event);
-    this.dragDropService.endDrag();
-  }
-
-  onDragMoved(element: MauiElement, event: any) {
-    // Handle drag position updates for elements in absolute layouts
+    
+    // Update coordinates only when drag ends for elements in absolute layouts
     if (element.parent && element.parent.type === ElementType.AbsoluteLayout) {
       const newX = element.properties.x! + event.distance.x;
       const newY = element.properties.y! + event.distance.y;
       
-      // Update element properties immediately for visual feedback
+      // Update element properties on drop
       this.elementService.updateElementProperties(element, {
         x: Math.max(0, newX),
         y: Math.max(0, newY)
       });
     }
+    
+    this.dragDropService.endDrag();
+  }
+
+  onDragMoved(element: MauiElement, event: any) {
+    // Visual feedback during drag can be handled here if needed
+    // Coordinates are updated only on drop, not during drag
   }
 
   onElementDroppedOnLayout(targetLayout: MauiElement, event: CdkDragDrop<MauiElement[]>) {

@@ -84,14 +84,11 @@ ${xamlContent}
       attributes.push(`x:Name="${element.name}"`);
     }
     
-    // Layout attributes
-    if (element.type === ElementType.AbsoluteLayout) {
-      // For children of AbsoluteLayout
-      if (element.parent?.type === ElementType.AbsoluteLayout) {
-        if (props.x !== undefined && props.y !== undefined && props.width !== undefined && props.height !== undefined) {
-          attributes.push(`AbsoluteLayout.LayoutBounds="${props.x},${props.y},${props.width},${props.height}"`);
-          attributes.push(`AbsoluteLayout.LayoutFlags="None"`);
-        }
+    // For children of AbsoluteLayout
+    if (element.parent?.type === ElementType.AbsoluteLayout) {
+      if (props.x !== undefined && props.y !== undefined && props.width !== undefined && props.height !== undefined) {
+        attributes.push(`AbsoluteLayout.LayoutBounds="${props.x},${props.y},${props.width},${props.height}"`);
+        attributes.push(`AbsoluteLayout.LayoutFlags="None"`);
       }
     }
     
