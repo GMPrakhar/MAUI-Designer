@@ -47,6 +47,7 @@
     cdkDrag
     [cdkDragDisabled]="!isSelected(element)"
     (cdkDragStarted)="onDragStarted(element)"
+    (cdkDragMoved)="onDragMoved(element, $event)"
     (cdkDragEnded)="onDragEnded(element, $event)"
     (click)="onElementClick(element, $event)"
     (mouseover)="onLayoutHover($event, element)"
@@ -100,13 +101,19 @@
       </div>
       
       <!-- Layout containers -->
-      <div *ngSwitchCase="'StackLayout'" class="element-stack-layout">
+      <div *ngSwitchCase="'StackLayout'" class="element-stack-layout"
+           cdkDropList
+           [cdkDropListData]="element.children"
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)">
         <ng-container *ngFor="let child of element.children">
           <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
         </ng-container>
       </div>
       
-      <div *ngSwitchCase="'Grid'" class="element-grid">
+      <div *ngSwitchCase="'Grid'" class="element-grid"
+           cdkDropList
+           [cdkDropListData]="element.children"
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)">
         <!-- Grid visualization -->
         <div *ngIf="shouldShowGrid(element)" class="grid-visualization">
           <ng-container *ngFor="let rowIndex of getRowArray(getGridDimensions(element).rows)">
@@ -124,7 +131,10 @@
         </ng-container>
       </div>
       
-      <div *ngSwitchCase="'AbsoluteLayout'" class="element-absolute-layout">
+      <div *ngSwitchCase="'AbsoluteLayout'" class="element-absolute-layout"
+           cdkDropList
+           [cdkDropListData]="element.children"
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)">
         <ng-container *ngFor="let child of element.children">
           <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
         </ng-container>

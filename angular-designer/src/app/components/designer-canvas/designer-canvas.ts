@@ -138,20 +138,42 @@ export class DesignerCanvasComponent implements OnInit {
   }
 
   onDragEnded(element: MauiElement, event: any) {
-    console.log("Drag released for element:", element);
-    
-    // Get the drop position
-    const dropEvent = event.source.dropContainer._dragRef._dropContainer?._element?.nativeElement;
-    if (dropEvent && event.distance) {
-      const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
-      const dropX = event.source.dropContainer._dragRef._initialTransform.x + event.distance.x;
-      const dropY = event.source.dropContainer._dragRef._initialTransform.y + event.distance.y;
+    console.log("Drag released for element:", element, event);
+    this.dragDropService.endDrag();
+  }
+
+  onDragMoved(element: MauiElement, event: any) {
+    // Handle drag position updates for elements in absolute layouts
+    if (element.parent && element.parent.type === ElementType.AbsoluteLayout) {
+      const newX = element.properties.x! + event.distance.x;
+      const newY = element.properties.y! + event.distance.y;
       
-      // Handle the canvas drop with layout detection
-      this.dragDropService.handleCanvasDrop(element, dropX, dropY, this.canvas.nativeElement);
+      // Update element properties immediately for visual feedback
+      this.elementService.updateElementProperties(element, {
+        x: Math.max(0, newX),
+        y: Math.max(0, newY)
+      });
+    }
+  }
+
+  onElementDroppedOnLayout(targetLayout: MauiElement, event: CdkDragDrop<MauiElement[]>) {
+    console.log("Element dropped on layout:", targetLayout, event);
+    
+    if (event.previousContainer === event.container) {
+      // Moving within the same container
+      return;
     }
     
-    this.dragDropService.endDrag();
+    const draggedElement = event.item.data as MauiElement;
+    
+    if (draggedElement && this.dragDropService.canDropOn(targetLayout, draggedElement)) {
+      // Calculate drop position based on the event
+      const dropX = event.dropPoint?.x || 0;
+      const dropY = event.dropPoint?.y || 0;
+      
+      // Use the drag-drop service to handle the move
+      this.dragDropService.handleElementMove(draggedElement, dropX, dropY, targetLayout);
+    }
   }
 
   // Resize handle interactions
