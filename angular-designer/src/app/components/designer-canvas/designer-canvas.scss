@@ -315,3 +315,25 @@
   background: rgba(0,0,0,0); /* invisible overlay */
   z-index: 50;
 }
+
+// Grid visualization styles
+.grid-visualization {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  pointer-events: none;
+  z-index: 1;
+  
+  .grid-cell {
+    border: 1px dashed rgba(66, 153, 225, 0.3);
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background-color: rgba(66, 153, 225, 0.1);
+      border-color: rgba(66, 153, 225, 0.6);
+    }
+  }
+}

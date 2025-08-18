@@ -182,7 +182,7 @@ export class ElementService {
     return null;
   }
 
-  moveElement(element: MauiElement, newParent: MauiElement, x: number, y: number): void {
+  moveElement(element: MauiElement, newParent: MauiElement, x: number, y: number, insertionIndex?: number): void {
     // Remove from current parent
     if (element.parent) {
       const index = element.parent.children.indexOf(element);
@@ -195,7 +195,13 @@ export class ElementService {
     element.parent = newParent;
     element.properties.x = x;
     element.properties.y = y;
-    newParent.children.push(element);
+    
+    // Insert at specific index if provided, otherwise append
+    if (insertionIndex !== undefined && insertionIndex >= 0 && insertionIndex <= newParent.children.length) {
+      newParent.children.splice(insertionIndex, 0, element);
+    } else {
+      newParent.children.push(element);
+    }
     
     this.elementsSubject.next(this.rootElement);
   }

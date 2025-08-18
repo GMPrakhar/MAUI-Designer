@@ -44,6 +44,7 @@ export interface ElementProperties {
   column?: number;
   rowSpan?: number;
   columnSpan?: number;
+  gridDefinition?: GridDefinition;
   
   // Layout-specific properties
   orientation?: Orientation;

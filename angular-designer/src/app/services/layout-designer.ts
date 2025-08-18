@@ -60,18 +60,23 @@ export class LayoutDesignerService {
     }
   }
 
-  calculateDropPosition(element: MauiElement, event: MouseEvent, containerElement: HTMLElement): { x: number, y: number } {
+  calculateDropPosition(parentElement: MauiElement, event: MouseEvent, containerElement: HTMLElement | null): { x: number, y: number } {
+    if (!containerElement) {
+      // Fallback for cases where container element is not available
+      return { x: event.clientX, y: event.clientY };
+    }
+    
     const rect = containerElement.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
     
-    const layoutInfo = this.getLayoutInfo(element.type);
+    const layoutInfo = this.getLayoutInfo(parentElement.type);
     
     if (layoutInfo.supportsAbsolutePositioning) {
       return { x, y };
     } else if (layoutInfo.supportsGridPositioning) {
       // For grid layouts, calculate grid cell
-      return this.calculateGridPosition(element, x, y, containerElement);
+      return this.calculateGridPosition(parentElement, x, y, containerElement);
     } else {
       // For stack layouts, position is managed by the layout
       return { x: 0, y: 0 };
@@ -79,14 +84,21 @@ export class LayoutDesignerService {
   }
 
   private calculateGridPosition(gridElement: MauiElement, x: number, y: number, containerElement: HTMLElement): { x: number, y: number } {
-    // Simple implementation - assumes 2x2 grid for now
-    // This should be enhanced to read actual grid definitions
-    const rect = containerElement.getBoundingClientRect();
-    const cellWidth = rect.width / 2;
-    const cellHeight = rect.height / 2;
+    // Get grid dimensions from element properties or use defaults
+    const gridDefinition = gridElement.properties.gridDefinition || {
+      rows: [{ height: { value: 1, type: 'Star' } }, { height: { value: 1, type: 'Star' } }],
+      columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
+    };
     
-    const column = Math.floor(x / cellWidth);
-    const row = Math.floor(y / cellHeight);
+    const rect = containerElement.getBoundingClientRect();
+    const rows = gridDefinition.rows.length;
+    const columns = gridDefinition.columns.length;
+    
+    const cellWidth = rect.width / columns;
+    const cellHeight = rect.height / rows;
+    
+    const column = Math.min(Math.floor(x / cellWidth), columns - 1);
+    const row = Math.min(Math.floor(y / cellHeight), rows - 1);
     
     return { x: column, y: row }; // These represent grid coordinates, not pixel coordinates
   }
@@ -102,11 +114,16 @@ export class LayoutDesignerService {
     } else if (layoutInfo.supportsGridPositioning) {
       return {
         column: position.x,
-        row: position.y
+        row: position.y,
+        x: 0, // Reset absolute positioning in grid
+        y: 0
       };
     } else {
-      // For stack layouts, no special positioning needed
-      return {};
+      // For stack layouts, clear absolute positioning
+      return {
+        x: 0,
+        y: 0
+      };
     }
   }
 
@@ -143,5 +160,44 @@ export class LayoutDesignerService {
       showGrid: layoutInfo.supportsGridPositioning,
       showDropZones: layoutInfo.supportsDragDrop
     };
+  }
+
+  /**
+   * Calculate which grid cell would be highlighted during hover
+   */
+  getGridCellAtPosition(gridElement: MauiElement, x: number, y: number, containerElement: HTMLElement): { row: number, column: number } | null {
+    if (!this.getLayoutInfo(gridElement.type).supportsGridPositioning) {
+      return null;
+    }
+
+    const position = this.calculateGridPosition(gridElement, x, y, containerElement);
+    return { row: position.y, column: position.x };
+  }
+
+  /**
+   * For stack layouts, determine insertion index based on position
+   */
+  getStackInsertionIndex(stackElement: MauiElement, x: number, y: number, containerElement: HTMLElement): number {
+    const layoutInfo = this.getLayoutInfo(stackElement.type);
+    if (layoutInfo.supportsAbsolutePositioning || layoutInfo.supportsGridPositioning) {
+      return stackElement.children.length; // Append at end for non-stack layouts
+    }
+
+    const isVertical = stackElement.properties.orientation !== 'Horizontal';
+    const rect = containerElement.getBoundingClientRect();
+    
+    let insertionIndex = 0;
+    
+    if (isVertical) {
+      // For vertical stack, use Y position
+      const relativeY = y / rect.height;
+      insertionIndex = Math.floor(relativeY * (stackElement.children.length + 1));
+    } else {
+      // For horizontal stack, use X position
+      const relativeX = x / rect.width;
+      insertionIndex = Math.floor(relativeX * (stackElement.children.length + 1));
+    }
+    
+    return Math.min(insertionIndex, stackElement.children.length);
   }
 }
