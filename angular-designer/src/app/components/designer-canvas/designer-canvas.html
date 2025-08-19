@@ -39,6 +39,7 @@
 <!-- Template for recursive element rendering -->
 <ng-template #elementTemplate let-element>
   <div 
+    #elementDiv
     class="canvas-element"
     [class.selected]="isSelected(element)"
     [class.layout-element]="isLayoutElement(element)"
@@ -46,7 +47,7 @@
     [attr.data-element-id]="element.id"
     cdkDrag
     [cdkDragDisabled]="!isSelected(element)"
-    (cdkDragStarted)="onDragStarted(element)"
+    (cdkDragStarted)="onDragStarted(element); setElementRef(element, elementDiv)"
     (cdkDragMoved)="onDragMoved(element, $event)"
     (cdkDragEnded)="onDragEnded(element, $event)"
     (click)="onElementClick(element, $event)"
@@ -102,18 +103,22 @@
       
       <!-- Layout containers -->
       <div *ngSwitchCase="'StackLayout'" class="element-stack-layout"
+           #layoutDiv
            cdkDropList
            [cdkDropListData]="element.children"
-           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)">
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
+           (mouseenter)="setElementRef(element, layoutDiv)">
         <ng-container *ngFor="let child of element.children">
           <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
         </ng-container>
       </div>
       
       <div *ngSwitchCase="'Grid'" class="element-grid"
+           #layoutDiv
            cdkDropList
            [cdkDropListData]="element.children"
-           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)">
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
+           (mouseenter)="setElementRef(element, layoutDiv)">
         <!-- Grid visualization -->
         <div *ngIf="shouldShowGrid(element)" class="grid-visualization">
           <ng-container *ngFor="let rowIndex of getRowArray(getGridDimensions(element).rows)">
@@ -132,9 +137,11 @@
       </div>
       
       <div *ngSwitchCase="'AbsoluteLayout'" class="element-absolute-layout"
+           #layoutDiv
            cdkDropList
            [cdkDropListData]="element.children"
-           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)">
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
+           (mouseenter)="setElementRef(element, layoutDiv)">
         <ng-container *ngFor="let child of element.children">
           <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
         </ng-container>

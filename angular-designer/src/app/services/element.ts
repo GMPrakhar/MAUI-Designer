@@ -50,8 +50,8 @@ export class ElementService {
 
   private getDefaultProperties(type: ElementType): ElementProperties {
     const common = {
-      x: 50,
-      y: 50,
+      x: 0,
+      y: 0,
       width: 100,
       height: 30,
       isVisible: true,
@@ -163,6 +163,13 @@ export class ElementService {
   updateElementProperties(element: MauiElement, properties: Partial<ElementProperties>): void {
     element.properties = { ...element.properties, ...properties };
     this.elementsSubject.next(this.rootElement);
+  }
+
+  updateElementCoordinatesSilently(element: MauiElement, x: number, y: number): void {
+    // Update X and Y coordinates without triggering UI updates
+    element.properties.x = x;
+    element.properties.y = y;
+    // Note: We deliberately do NOT call this.elementsSubject.next() to avoid UI updates
   }
 
   findElementById(id: string, root?: MauiElement): MauiElement | null {

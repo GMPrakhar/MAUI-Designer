@@ -27,7 +27,7 @@ export class ToolboxComponent {
     if (rootElement) {
       const newElement = this.elementService.createElement(
         item.type as ElementType,
-        { x: 50, y: 50 }
+        { x: 0, y: 0 }
       );
       this.elementService.addElement(newElement, rootElement);
       this.elementService.selectElement(newElement);

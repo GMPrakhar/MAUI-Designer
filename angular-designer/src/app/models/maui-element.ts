@@ -5,6 +5,7 @@ export interface MauiElement {
   properties: ElementProperties;
   children: MauiElement[];
   parent?: MauiElement;
+  domElement?: HTMLElement;
 }
 
 export enum ElementType {

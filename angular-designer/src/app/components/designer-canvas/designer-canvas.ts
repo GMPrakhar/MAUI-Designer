@@ -71,16 +71,19 @@ export class DesignerCanvasComponent implements OnInit {
     this.elementService.selectElement(null);
   }
 
+  // Set DOM element reference for position calculations
+  setElementRef(element: MauiElement, domElement: HTMLElement) {
+    element.domElement = domElement;
+  }
+
   getElementStyles(element: MauiElement): any {
     const props = element.properties;
     
     const styles: any = {
-      position: 'absolute',
-      left: props.x + 'px',
-      top: props.y + 'px',
       width: props.width + 'px',
       height: props.height + 'px',
-      zIndex: this.isSelected(element) ? 9999 : 'auto'
+      zIndex: this.isSelected(element) ? 9999 : 'auto',
+      transform: `translate3d(${props.x}px, ${props.y}px, 0px)`
     };
 
     if (props.backgroundColor) {
@@ -127,36 +130,23 @@ export class DesignerCanvasComponent implements OnInit {
   onElementPointerDown(element: MauiElement, event: PointerEvent) {
     // Prevent the pointer event from bubbling to parent elements which may start a drag
     event.stopPropagation();
-    // Do not call preventDefault so interactive children (inputs/buttons) still work
-    this.elementService.selectElement(element);
   }
   
   onDragStarted(element: MauiElement) {
     console.log("Drag started for element:", element);
-    // Start tracking the drag for layout-specific behavior
-    this.dragDropService.startDrag({ element, isFromToolbox: false });
   }
 
   onDragEnded(element: MauiElement, event: any) {
     console.log("Drag released for element:", element, event);
-    
-    // Update coordinates only when drag ends for elements in absolute layouts
-    if (element.parent && element.parent.type === ElementType.AbsoluteLayout) {
-      const newX = element.properties.x! + event.distance.x;
-      const newY = element.properties.y! + event.distance.y;
-      
-      // Update element properties on drop
-      this.elementService.updateElementProperties(element, {
-        x: Math.max(0, newX),
-        y: Math.max(0, newY)
-      });
-    }
-    
+    this.elementService.moveElement(element, element.parent!,  element.properties.x! + event.distance.x,  element.properties.y! + event.distance.y)
+
     this.dragDropService.endDrag();
   }
 
   onDragMoved(element: MauiElement, event: any) {
-    // Visual feedback during drag can be handled here if needed
+
+    //this.elementService.moveElement(element, element.parent!,  element.properties.x! + event.delta.x,  element.properties.y! + event.delta.y)
+      
     // Coordinates are updated only on drop, not during drag
   }
 
