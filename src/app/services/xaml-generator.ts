@@ -52,6 +52,8 @@ ${xamlContent}
     switch (type) {
       case ElementType.StackLayout:
         return 'VerticalStackLayout'; // or HorizontalStackLayout based on orientation
+      case ElementType.VerticalStackLayout:
+        return 'VerticalStackLayout';
       case ElementType.AbsoluteLayout:
         return 'AbsoluteLayout';
       case ElementType.Grid:
@@ -166,6 +168,12 @@ ${xamlContent}
       if (props.orientation === 'Horizontal') {
         // Use HorizontalStackLayout instead
       }
+      if (props.spacing !== undefined) {
+        attributes.push(`Spacing="${props.spacing}"`);
+      }
+    }
+    
+    if (element.type === ElementType.VerticalStackLayout) {
       if (props.spacing !== undefined) {
         attributes.push(`Spacing="${props.spacing}"`);
       }

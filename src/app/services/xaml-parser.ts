@@ -54,6 +54,7 @@ export class XamlParserService {
     return type === ElementType.AbsoluteLayout ||
            type === ElementType.Grid ||
            type === ElementType.StackLayout ||
+           type === ElementType.VerticalStackLayout ||
            type === ElementType.Frame ||
            type === ElementType.ScrollView;
   }
@@ -106,6 +107,7 @@ export class XamlParserService {
       case 'grid':
         return ElementType.Grid;
       case 'verticalstacklayout':
+        return ElementType.VerticalStackLayout;
       case 'horizontalstacklayout':
       case 'stacklayout':
         return ElementType.StackLayout;

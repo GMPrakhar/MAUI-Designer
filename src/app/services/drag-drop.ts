@@ -64,7 +64,7 @@ export class DragDropService {
     
     // For stack layouts, calculate insertion index
     let insertionIndex: number | undefined;
-    if (targetParent.type === ElementType.StackLayout) {
+    if (targetParent.type === ElementType.StackLayout || targetParent.type === ElementType.VerticalStackLayout) {
       // For stack layouts, we need the container element to calculate insertion index
       // This is a simplified approach - in practice you'd pass the actual container element
       insertionIndex = targetParent.children.length; // Append to end for now
@@ -175,6 +175,7 @@ export class DragDropService {
   private canHaveChildren(elementType: ElementType): boolean {
     switch (elementType) {
       case ElementType.StackLayout:
+      case ElementType.VerticalStackLayout:
       case ElementType.Grid:
       case ElementType.AbsoluteLayout:
       case ElementType.Frame:

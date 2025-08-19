@@ -149,6 +149,7 @@
   }
   
   .element-stack-layout,
+  .element-vertical-stack-layout,
   .element-grid,
   .element-absolute-layout,
   .element-scroll-view {
@@ -157,6 +158,17 @@
     position: relative;
     background: rgba(240, 240, 240, 0.3);
     border: 1px dashed #cbd5e0;
+  }
+  
+  .element-vertical-stack-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 4px; // Add some default spacing between children
+    
+    > .canvas-element {
+      position: relative !important; // Override absolute positioning for children
+      flex-shrink: 0;
+    }
   }
   
   .element-default {

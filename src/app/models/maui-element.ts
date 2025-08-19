@@ -15,6 +15,7 @@ export enum ElementType {
   Editor = 'Editor',
   Image = 'Image',
   StackLayout = 'StackLayout',
+  VerticalStackLayout = 'VerticalStackLayout',
   Grid = 'Grid',
   AbsoluteLayout = 'AbsoluteLayout',
   Frame = 'Frame',

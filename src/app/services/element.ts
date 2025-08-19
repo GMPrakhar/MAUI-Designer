@@ -103,6 +103,13 @@ export class ElementService {
           orientation: 'Vertical' as any,
           spacing: 5
         };
+      case ElementType.VerticalStackLayout:
+        return {
+          ...common,
+          width: 200,
+          height: 200,
+          spacing: 5
+        };
       case ElementType.Grid:
         return {
           ...common,

@@ -34,6 +34,7 @@ export class LayoutDesignerService {
         };
       
       case ElementType.StackLayout:
+      case ElementType.VerticalStackLayout:
         return {
           canHaveChildren: true,
           supportsDragDrop: true,
@@ -183,7 +184,9 @@ export class LayoutDesignerService {
       return stackElement.children.length; // Append at end for non-stack layouts
     }
 
-    const isVertical = stackElement.properties.orientation !== 'Horizontal';
+    // VerticalStackLayout is always vertical
+    const isVertical = stackElement.type === ElementType.VerticalStackLayout || 
+                      stackElement.properties.orientation !== 'Horizontal';
     const rect = containerElement.getBoundingClientRect();
     
     let insertionIndex = 0;
