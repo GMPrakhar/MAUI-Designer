@@ -229,8 +229,8 @@ export class XamlParserService {
 
   private setDefaultValues(properties: ElementProperties, elementType: ElementType) {
     // Set default position and size if not specified
-    if (properties.x === undefined) properties.x = 50;
-    if (properties.y === undefined) properties.y = 50;
+    if (properties.x === undefined) properties.x = 0;
+    if (properties.y === undefined) properties.y = 0;
 
     switch (elementType) {
       case ElementType.Label:

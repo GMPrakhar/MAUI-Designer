@@ -50,8 +50,8 @@ export class ElementService {
 
   private getDefaultProperties(type: ElementType): ElementProperties {
     const common = {
-      x: 50,
-      y: 50,
+      x: 0,
+      y: 0,
       width: 100,
       height: 30,
       isVisible: true,
@@ -165,6 +165,13 @@ export class ElementService {
     this.elementsSubject.next(this.rootElement);
   }
 
+  updateElementCoordinatesSilently(element: MauiElement, x: number, y: number): void {
+    // Update X and Y coordinates without triggering UI updates
+    element.properties.x = x;
+    element.properties.y = y;
+    // Note: We deliberately do NOT call this.elementsSubject.next() to avoid UI updates
+  }
+
   findElementById(id: string, root?: MauiElement): MauiElement | null {
     const searchRoot = root || this.rootElement;
     
@@ -182,7 +189,7 @@ export class ElementService {
     return null;
   }
 
-  moveElement(element: MauiElement, newParent: MauiElement, x: number, y: number): void {
+  moveElement(element: MauiElement, newParent: MauiElement, x: number, y: number, insertionIndex?: number): void {
     // Remove from current parent
     if (element.parent) {
       const index = element.parent.children.indexOf(element);
@@ -195,7 +202,13 @@ export class ElementService {
     element.parent = newParent;
     element.properties.x = x;
     element.properties.y = y;
-    newParent.children.push(element);
+    
+    // Insert at specific index if provided, otherwise append
+    if (insertionIndex !== undefined && insertionIndex >= 0 && insertionIndex <= newParent.children.length) {
+      newParent.children.splice(insertionIndex, 0, element);
+    } else {
+      newParent.children.push(element);
+    }
     
     this.elementsSubject.next(this.rootElement);
   }
