@@ -1,115 +1,128 @@
-# MAUI Designer
-MAUI Designer is a .NET 8.0 MAUI application for designing XAML-based user interfaces with drag-and-drop functionality. It provides a visual XAML editor, element toolbox, properties panel, and real-time preview capabilities for creating MAUI UI layouts.
+# MAUI Designer - Angular
+MAUI Designer is an Angular 18.2.0 web application for designing XAML-based user interfaces with drag-and-drop functionality. It provides a visual XAML editor, element toolbox, properties panel, and real-time preview capabilities for creating MAUI UI layouts in a web browser.
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
 ## Working Effectively
 
-### Platform Requirements - CRITICAL
-- **Windows ONLY**: This application targets `net8.0-windows10.0.19041.0` exclusively and uses Windows-specific dependencies
-- **DO NOT attempt to build on Linux or macOS** - it will fail due to missing Windows assemblies (Microsoft.UI, UWP compatibility)
-- **Requires Windows 10 version 19041 or later** for development and runtime
+### Platform Requirements
+- **Cross-Platform**: This Angular application runs on any platform with Node.js support (Windows, macOS, Linux)
+- **Modern Web Browser**: Requires a modern browser with JavaScript support
+- **Internet Connection**: Initial setup requires network access for package downloads
 
 ### Prerequisites and Setup
-- Install .NET 8.0 SDK: Download from https://dot.net/v1/dotnet-install.ps1 and run on Windows
-- Install MAUI workloads: `dotnet workload install maui` -- takes 3-5 minutes. NEVER CANCEL. Set timeout to 10+ minutes.
-- Verify installation: `dotnet workload list` should show maui workloads installed
+- Install **Node.js** (version 16.x or higher): Download from https://nodejs.org/
+- Install **npm** (version 8.x or higher): Usually comes with Node.js
+- Install **Angular CLI** globally: `npm install -g @angular/cli` (version 18.x)
+- Verify installation: `ng version` should show Angular CLI and core versions
 
 ### Building the Application
 - **Bootstrap and build**:
   - `cd /path/to/MAUI-Designer`
-  - `dotnet restore` -- takes 30-60 seconds for package restoration
-  - `dotnet build` -- takes 2-5 minutes depending on system. NEVER CANCEL. Set timeout to 10+ minutes.
+  - `npm install` -- takes 30-90 seconds for package installation
+  - `npm run build` or `ng build` -- takes 1-3 minutes. Set timeout to 5+ minutes.
 - **Build for specific configuration**:
-  - Debug: `dotnet build --configuration Debug`
-  - Release: `dotnet build --configuration Release`
+  - Development: `ng build` or `ng build --configuration development`
+  - Production: `ng build --configuration production` or `npm run build`
 
 ### Running the Application
-- **Run in debug mode**: `dotnet run` or press F5 in Visual Studio
-- **Windows Machine profile**: Configured in Properties/launchSettings.json for MSIX packaging
-- The application will launch as a Windows desktop application with the XAML designer interface
+- **Development server**: `npm start` or `ng serve` -- starts dev server on http://localhost:4200
+- **Production build**: `ng build` then serve the `dist/` folder with any web server
+- The application will launch in a web browser with the XAML designer interface
 
 ## Validation
 - **Manual Testing Required**: After making changes, always test these core scenarios:
-  1. **XAML Editor**: Write XAML in the text editor and click "Render" to see the preview
-  2. **Drag and Drop**: Select elements from the toolbox and drag them to the design surface
-  3. **Element Scaling**: Select an element and use border anchors to resize it  
+  1. **XAML Editor**: Write XAML in the text editor and click "Apply" to see the preview
+  2. **Drag and Drop**: Select elements from the toolbox and drag them to the design canvas
+  3. **Element Scaling**: Select an element and use handles to resize it  
   4. **Properties Panel**: Select an element and modify properties like color, margin, padding, text
-  5. **XAML Generation**: Use the "Generate XAML" feature to export the designed layout
+  5. **XAML Generation**: Use the "Download" feature to export the designed layout
   6. **Load Design**: Import existing XAML to recreate the visual design
-- **AbsoluteLayout Focus**: Currently only supports AbsoluteLayout as the base container
-- **No Automated Tests**: This repository has no test infrastructure - all validation must be manual
-- **Post-Build Validation**: Always run the application after building to ensure UI components load correctly
+- **Layout Support**: Supports multiple layout types including StackLayout, Grid, and AbsoluteLayout
+- **Limited Automated Tests**: This repository has minimal test infrastructure - validation is primarily manual
+- **Post-Build Validation**: Always run `ng serve` after building to ensure UI components load correctly in browser
 - **Designer Workflow Test**: Create a simple layout with Label, Button, and Entry controls to verify basic functionality
 
-### Build Time Expectations
-- **First build**: 5-10 minutes (includes package downloads). NEVER CANCEL. Set timeout to 15+ minutes.
-- **Incremental builds**: 1-3 minutes. NEVER CANCEL. Set timeout to 5+ minutes.
-- **Clean rebuild**: 3-7 minutes. NEVER CANCEL. Set timeout to 10+ minutes.
+### Running Tests
+- **Unit Tests**: `npm test` or `ng test` -- runs Jasmine/Karma tests in watch mode
+- **Build Tests**: `ng build` -- verifies TypeScript compilation and bundling
+- **E2E Tests**: Currently no E2E test infrastructure configured
+- **Linting**: Use `ng lint` if ESLint is configured, or standard TypeScript compiler checks
 
-## Cross-Platform Limitations
-- **Linux/macOS**: Cannot build or run due to Windows-specific dependencies:
-  - Microsoft.UI.Input and Microsoft.UI.Xaml assemblies
-  - UWP compatibility platform requirements
-  - Windows-specific cursor and UI element APIs
-- **Android/iOS**: While MAUI supports these platforms, this specific project uses Windows-only APIs
-- **DO NOT modify TargetFrameworks** - the app architecture requires Windows-specific features
+### Browser Compatibility
+- **Modern Browsers**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
+- **JavaScript Required**: Application requires JavaScript enabled
+- **Local Storage**: Uses browser local storage for user preferences
+- **Responsive Design**: Designed primarily for desktop/tablet screen sizes
+
+### Build Time Expectations
+- **First npm install**: 30-90 seconds (includes package downloads). Set timeout to 3+ minutes.
+- **Incremental builds**: 10-30 seconds for development builds
+- **Production builds**: 1-3 minutes. Set timeout to 5+ minutes.
+- **Development server startup**: 5-15 seconds
 
 ## Repository Structure
 
 ### Key Projects and Files
-- **MAUIDesigner.csproj**: Main project file targeting net8.0-windows10.0.19041.0
-- **Designer.xaml/.cs**: Main designer interface with toolbox, properties, and canvas
-- **ElementCreator.cs**: Factory for creating MAUI UI elements (343 lines)
-- **ToolBox.cs**: Element selection and drag-and-drop functionality (445 lines) 
-- **PropertyManager.cs**: Property editing and binding system (150 lines)
+- **package.json**: NPM package configuration with Angular dependencies
+- **angular.json**: Angular CLI workspace configuration
+- **src/app/app.ts**: Main application component with resizable panels
+- **src/app/components/**: UI component modules
+- **src/app/services/**: Business logic and data services
+- **src/app/models/**: TypeScript interfaces and data models
 
 ### Important Directories
-- **LayoutDesigners/**: AbsoluteLayout, GridLayout, VerticalStackLayout designers
-- **DnDHelper/**: Drag-and-drop operations, scaling, and hover behaviors
-- **HelperViews/**: Context menus, element designer views, tab management
-- **XamlHelpers/**: XAML generation and color conversion utilities
-- **Services/**: Cursor, gesture, and tab setup services
-- **Platforms/**: Platform-specific code for Android, iOS, Windows, MacCatalyst, Tizen
+- **src/app/components/**: Angular components for the designer interface
+  - **designer-canvas/**: Main design surface component
+  - **hierarchy-panel/**: Element tree view component
+  - **properties-panel/**: Property editor component
+  - **toolbox/**: Element selection toolbox component
+  - **xaml-editor/**: XAML code editor component
+- **src/app/services/**: Business logic services
+  - **drag-drop.ts**: Drag-and-drop functionality
+  - **element.ts**: Element management service
+  - **layout-designer.ts**: Layout calculation service
+  - **xaml-generator.ts**: XAML code generation
+  - **xaml-parser.ts**: XAML parsing service
+- **src/app/models/**: Data models and interfaces
+  - **maui-element.ts**: MAUI element definitions
+  - **toolbox.ts**: Toolbox item definitions
 
 ### Common Commands Reference
 ```
 # Repository root contents
 ls -la
-App.xaml                 # Application definition
-Designer.xaml            # Main designer interface  
-ElementCreator.cs         # UI element factory
-ToolBox.cs               # Toolbox functionality
-PropertyManager.cs        # Property editing
-MAUIDesigner.csproj      # Project file
-MAUIDesigner.sln         # Solution file
-README.md                # Project documentation
+package.json              # NPM package configuration
+angular.json              # Angular workspace config
+tsconfig.json             # TypeScript configuration
+src/                      # Source code directory
+README.md                 # Project documentation
 
-# Package dependencies (from MAUIDesigner.csproj)
-CommunityToolkit.Maui (9.0.3)
-Microsoft.Maui.Controls
-Microsoft.Maui.Controls.Compatibility  
-Microsoft.Extensions.Logging.Debug (8.0.0)
-AathifMahir.Maui.MauiIcons.Fluent (3.0.0)
+# Key NPM dependencies (from package.json)
+@angular/core (18.2.0)
+@angular/cdk (18.2.0)
+@angular/material (18.2.0)
+typescript (5.5.4)
 ```
 
 ## Development Workflow
-- **Always work on Windows**: Use Visual Studio 2022 or VS Code with C# Dev Kit
-- **Test all UI changes**: The application is a visual designer - always verify UI functionality
+- **Cross-platform development**: Use VS Code, WebStorm, or any editor with Angular/TypeScript support
+- **Test all UI changes**: The application is a visual designer - always verify UI functionality in browser
 - **Focus on XAML designer workflow**: Test element creation, property editing, and layout generation
-- **No linting required**: No specific linting tools configured
+- **Angular CLI**: Use `ng generate` commands for creating new components and services
+- **Hot reloading**: Development server auto-reloads on file changes
 - **No CI/CD**: Repository has no GitHub Actions or automated build pipeline
 
 ## Troubleshooting
-- **Build fails with "EnableWindowsTargeting"**: You're not on Windows - this app requires Windows
-- **Missing MAUI workload**: Run `dotnet workload install maui` and wait for completion
-- **XAML compilation errors**: Ensure Windows SDK components are installed
-- **UI elements not rendering**: Check that all Windows-specific dependencies are available
-- **Package restore failures**: Delete bin/ and obj/ folders, then run `dotnet restore` again
-- **Long build times**: First builds include package downloads - expect 5-10 minutes initially
+- **Build fails with module not found**: Run `npm install` to ensure all dependencies are installed
+- **Port already in use**: The dev server uses port 4200 by default, use `ng serve --port <port>` for different port
+- **TypeScript compilation errors**: Check tsconfig.json settings and ensure Angular version compatibility
+- **UI elements not rendering**: Check browser console for JavaScript errors
+- **Package installation failures**: Delete node_modules/ and package-lock.json, then run `npm install` again
+- **Slow build times**: First builds include package downloads - expect 1-3 minutes initially
 
 ## Additional Information
-- **Repository size**: ~1550 lines of C# code across main files
-- **No custom build scripts**: Uses standard dotnet CLI commands
-- **Target audience**: MAUI developers creating Windows desktop applications
-- **Project maturity**: Active development, no formal release versioning yet
+- **Repository size**: ~50+ TypeScript files across main components and services
+- **Technology stack**: Angular 18.2.0, TypeScript 5.5.4, Angular Material, RxJS
+- **Target audience**: Web developers creating MAUI design tools
+- **Project maturity**: Active development, migrated from .NET to Angular
