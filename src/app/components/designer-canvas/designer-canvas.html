@@ -3,7 +3,9 @@
     class="designer-canvas"
     #canvas
     cdkDropList
+    id="canvas-drop-list"
     [cdkDropListData]="[]"
+    [cdkDropListConnectedTo]="['toolbox-drop-list']"
     (cdkDropListDropped)="onCanvasDropped($event)"
     (click)="onCanvasClick()">
     

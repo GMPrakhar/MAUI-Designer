@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { DragDropModule, CdkDragStart } from '@angular/cdk/drag-drop';
+import { DragDropModule, CdkDragStart, CdkDragDrop } from '@angular/cdk/drag-drop';
 import { MAUI_CONTROLS, ToolboxItem, ToolboxCategory } from '../../models/toolbox';
 import { ElementType } from '../../models/maui-element';
 import { ElementService } from '../../services/element';
@@ -49,5 +49,10 @@ export class ToolboxComponent {
 
   onDragEnd() {
     this.dragDropService.endDrag();
+  }
+
+  onToolboxDropped(event: any) {
+    // Handle dropped items back to toolbox (not implemented for this use case)
+    console.log('Item dropped back to toolbox:', event);
   }
 }
