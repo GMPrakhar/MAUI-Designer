@@ -138,7 +138,18 @@ export class DesignerCanvasComponent implements OnInit {
 
   onDragEnded(element: MauiElement, event: any) {
     console.log("Drag released for element:", element, event);
-    this.elementService.moveElement(element, element.parent!,  element.properties.x! + event.distance.x,  element.properties.y! + event.distance.y)
+    
+    // Calculate new position
+    const newX = element.properties.x! + event.distance.x;
+    const newY = element.properties.y! + event.distance.y;
+    
+    // Check if element should be moved out of its current layout to AbsoluteLayout
+    const movedOutOfLayout = this.dragDropService.handleElementMoveOutOfLayout(element, newX, newY, this.canvas.nativeElement);
+    
+    if (!movedOutOfLayout) {
+      // Normal move within current parent
+      this.elementService.moveElement(element, element.parent!, newX, newY);
+    }
 
     this.dragDropService.endDrag();
   }
@@ -154,7 +165,14 @@ export class DesignerCanvasComponent implements OnInit {
     console.log("Element dropped on layout:", targetLayout, event);
     
     if (event.previousContainer === event.container) {
-      // Moving within the same container
+      // Moving within the same container - handle reordering for stack layouts
+      const draggedElement = event.item.data as MauiElement;
+      if (draggedElement && (targetLayout.type === ElementType.StackLayout || targetLayout.type === ElementType.VerticalStackLayout)) {
+        // Calculate drop position for stack reordering
+        const dropX = event.dropPoint?.x || 0;
+        const dropY = event.dropPoint?.y || 0;
+        this.dragDropService.handleElementMove(draggedElement, dropX, dropY, targetLayout);
+      }
       return;
     }
     
@@ -165,7 +183,7 @@ export class DesignerCanvasComponent implements OnInit {
       const dropX = event.dropPoint?.x || 0;
       const dropY = event.dropPoint?.y || 0;
       
-      // Use the drag-drop service to handle the move
+      // Use the drag-drop service to handle the move with improved layout-specific logic
       this.dragDropService.handleElementMove(draggedElement, dropX, dropY, targetLayout);
     }
   }
