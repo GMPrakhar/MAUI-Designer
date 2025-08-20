@@ -119,7 +119,12 @@ ${xamlContent}
     
     // Text content
     if (props.text !== undefined) {
-      attributes.push(`Text="${this.escapeXml(props.text)}"`);
+      if (element.type === ElementType.Entry) {
+        // For Entry elements, use Placeholder attribute instead of Text
+        attributes.push(`Placeholder="${this.escapeXml(props.text)}"`);
+      } else {
+        attributes.push(`Text="${this.escapeXml(props.text)}"`);
+      }
     }
     
     // Colors
