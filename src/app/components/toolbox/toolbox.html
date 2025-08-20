@@ -1,4 +1,4 @@
-<p><div class="toolbox">
+<p><div class="toolbox" cdkDropList id="toolbox-drop-list" [cdkDropListData]="toolboxItems" [cdkDropListConnectedTo]="['canvas-drop-list']" (cdkDropListDropped)="onToolboxDropped($event)">
   <div class="category-group" *ngFor="let category of categories">
     <h3 class="category-title">{{ category }}</h3>
     
@@ -6,6 +6,10 @@
       <div 
         class="toolbox-item"
         *ngFor="let item of getItemsByCategory(category)"
+        cdkDrag
+        [cdkDragData]="item"
+        (cdkDragStarted)="onDragStart(item, $event)"
+        (cdkDragEnded)="onDragEnd()"
         (click)="onItemClick(item)"
         [title]="item.description">
         

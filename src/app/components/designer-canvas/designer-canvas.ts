@@ -71,6 +71,51 @@ export class DesignerCanvasComponent implements OnInit {
     this.elementService.selectElement(null);
   }
 
+  onCanvasDropped(event: CdkDragDrop<any>) {
+    console.log("Canvas dropped:", event);
+    
+    // Calculate drop position based on event coordinates
+    const dropX = event.dropPoint?.x || 0;
+    const dropY = event.dropPoint?.y || 0;
+    
+    console.log("Drop position:", dropX, dropY);
+    
+    const dragData = this.dragDropService.getDragData();
+    console.log("Drag data:", dragData);
+    
+    if (dragData?.isFromToolbox && dragData.elementType) {
+      // Handle toolbox drop - find target layout at drop position
+      const targetLayout = this.findLayoutAtDropPosition(dropX, dropY);
+      console.log("Target layout for toolbox drop:", targetLayout.type);
+      
+      // Use drag-drop service to handle the drop with proper parenting
+      this.dragDropService.handleToolboxDrop(event, dropX, dropY, targetLayout);
+      
+    } else if (event.item.data) {
+      // Handle existing element drop
+      const draggedElement = event.item.data as MauiElement;
+      console.log("Dragged element:", draggedElement.type, "from parent:", draggedElement.parent?.type);
+      
+      const targetLayout = this.findLayoutAtDropPosition(dropX, dropY);
+      console.log("Target layout for element move:", targetLayout.type);
+      
+      if (this.dragDropService.canDropOn(targetLayout, draggedElement)) {
+        console.log("Can drop on target, handling element move");
+        this.dragDropService.handleElementMove(draggedElement, dropX, dropY, targetLayout);
+      } else {
+        console.log("Cannot drop on target layout");
+      }
+    }
+  }
+
+  private findLayoutAtDropPosition(x: number, y: number): MauiElement {
+    // Use the drag-drop service to find the appropriate layout at the position
+    // If none found, default to root element
+    const canvasElement = this.canvas.nativeElement;
+    const targetLayout = this.dragDropService.findLayoutAtPosition(x, y, canvasElement);
+    return targetLayout || this.elementService.getRootElement();
+  }
+
   // Set DOM element reference for position calculations
   setElementRef(element: MauiElement, domElement: HTMLElement) {
     element.domElement = domElement;
@@ -138,7 +183,26 @@ export class DesignerCanvasComponent implements OnInit {
 
   onDragEnded(element: MauiElement, event: any) {
     console.log("Drag released for element:", element, event);
-    this.elementService.moveElement(element, element.parent!,  element.properties.x! + event.distance.x,  element.properties.y! + event.distance.y)
+    
+    // Calculate new position
+    const newX = element.properties.x! + event.distance.x;
+    const newY = element.properties.y! + event.distance.y;
+    
+    // Find the layout at the new position
+    const targetLayout = this.findLayoutAtDropPosition(newX, newY);
+    
+    // If we found a different target layout and can drop on it, use the drag-drop service
+    if (targetLayout && targetLayout !== element.parent && this.dragDropService.canDropOn(targetLayout, element)) {
+      this.dragDropService.handleElementMove(element, newX, newY, targetLayout);
+    } else {
+      // Check if element should be moved out of its current layout to AbsoluteLayout
+      const movedOutOfLayout = this.dragDropService.handleElementMoveOutOfLayout(element, newX, newY, this.canvas.nativeElement);
+      
+      if (!movedOutOfLayout) {
+        // Normal move within current parent
+        this.elementService.moveElement(element, element.parent!, newX, newY);
+      }
+    }
 
     this.dragDropService.endDrag();
   }
@@ -154,7 +218,14 @@ export class DesignerCanvasComponent implements OnInit {
     console.log("Element dropped on layout:", targetLayout, event);
     
     if (event.previousContainer === event.container) {
-      // Moving within the same container
+      // Moving within the same container - handle reordering for stack layouts
+      const draggedElement = event.item.data as MauiElement;
+      if (draggedElement && (targetLayout.type === ElementType.StackLayout || targetLayout.type === ElementType.VerticalStackLayout)) {
+        // Calculate drop position for stack reordering
+        const dropX = event.dropPoint?.x || 0;
+        const dropY = event.dropPoint?.y || 0;
+        this.dragDropService.handleElementMove(draggedElement, dropX, dropY, targetLayout);
+      }
       return;
     }
     
@@ -165,7 +236,7 @@ export class DesignerCanvasComponent implements OnInit {
       const dropX = event.dropPoint?.x || 0;
       const dropY = event.dropPoint?.y || 0;
       
-      // Use the drag-drop service to handle the move
+      // Use the drag-drop service to handle the move with improved layout-specific logic
       this.dragDropService.handleElementMove(draggedElement, dropX, dropY, targetLayout);
     }
   }
