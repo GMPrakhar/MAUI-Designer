@@ -44,25 +44,34 @@ export class DragDropService {
 
   handleToolboxDrop(event: CdkDragDrop<any>, x: number, y: number, targetParent: MauiElement): void {
     if (this.currentDragData?.isFromToolbox && this.currentDragData.elementType) {
+      console.log("Creating element of type:", this.currentDragData.elementType, "at position:", x, y);
+      
       const newElement = this.elementService.createElement(
         this.currentDragData.elementType,
         { x: x, y: y }
       );
       
+      console.log("Created element with properties:", newElement.properties);
+      
       // Use the layout-specific drop handler to properly position the element
       const dropHandler = this.dropHandlerFactory.getHandler(targetParent.type);
+      
+      console.log("Using drop handler for layout type:", targetParent.type, "handler found:", !!dropHandler);
       
       if (dropHandler) {
         // Add element to parent first so it has a parent reference
         this.elementService.addElement(newElement, targetParent);
+        console.log("Added element to parent, element parent is now:", newElement.parent?.type);
         // Then use drop handler to position it correctly
         dropHandler.handleDrop(newElement, targetParent, x, y, targetParent.domElement || null);
       } else {
         // Fallback behavior for unsupported layouts
+        console.log("No drop handler found, using fallback");
         this.elementService.addElement(newElement, targetParent);
       }
       
       this.elementService.selectElement(newElement);
+      console.log("Element creation complete, final properties:", newElement.properties);
     }
   }
 
@@ -87,7 +96,7 @@ export class DragDropService {
     const layoutInfo = this.layoutDesigner.getLayoutInfo(targetParent.type);
     
     // Calculate appropriate position based on layout type
-    const position = this.layoutDesigner.calculateDropPosition(targetParent, { clientX: x, clientY: y } as MouseEvent, null!);
+    const position = this.layoutDesigner.calculateDropPosition(targetParent, x, y, null);
     
     // Get layout-specific properties for the child element
     const layoutProperties = this.layoutDesigner.getChildLayoutProperties(targetParent, element, position);
@@ -164,21 +173,27 @@ export class DragDropService {
     let maxZIndex = -1;
     let smallestArea = Infinity;
 
+    console.log("Looking for layout at position:", x, y, "found layout elements:", layoutElements.length);
+
     for (const element of layoutElements) {
       const rect = element.getBoundingClientRect();
       const canvasRect = canvasElement.getBoundingClientRect();
       
-      // Convert absolute coordinates to relative coordinates within the canvas
-      const relativeX = x - (rect.left - canvasRect.left);
-      const relativeY = y - (rect.top - canvasRect.top);
+      // Calculate element's position relative to canvas
+      const elementLeft = rect.left - canvasRect.left;
+      const elementTop = rect.top - canvasRect.top;
+      const elementRight = elementLeft + rect.width;
+      const elementBottom = elementTop + rect.height;
       
-      // Check if point is within this element's bounds
-      if (relativeX >= 0 && relativeX <= rect.width && relativeY >= 0 && relativeY <= rect.height) {
+      // Check if point is within this element's bounds (relative to canvas)
+      if (x >= elementLeft && x <= elementRight && y >= elementTop && y <= elementBottom) {
         const zIndex = parseInt(window.getComputedStyle(element).zIndex) || 0;
         const area = rect.width * rect.height;
         
         // Get the MauiElement from the DOM element
         const mauiElement = this.getMauiElementFromDOMElement(element);
+        
+        console.log("Found element at position:", mauiElement?.type, "zIndex:", zIndex, "area:", area);
         
         if (mauiElement) {
           const layoutInfo = this.layoutDesigner.getLayoutInfo(mauiElement.type);
@@ -195,6 +210,7 @@ export class DragDropService {
       }
     }
 
+    console.log("Selected deepest layout:", deepestLayout?.type || "root");
     // If no specific layout found, return root element
     return deepestLayout || this.elementService.getRootElement();
   }

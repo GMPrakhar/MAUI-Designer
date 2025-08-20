@@ -51,7 +51,8 @@ export class AbsoluteLayoutDropHandler implements ILayoutDropHandler {
     // For absolute layout, use the exact drop position
     const position = this.layoutDesigner.calculateDropPosition(
       targetLayout, 
-      { clientX: dropX, clientY: dropY } as MouseEvent, 
+      dropX, 
+      dropY, 
       containerElement
     );
 
@@ -92,7 +93,8 @@ export class GridLayoutDropHandler implements ILayoutDropHandler {
     // Calculate which grid cell the element was dropped into
     const position = this.layoutDesigner.calculateDropPosition(
       targetLayout, 
-      { clientX: dropX, clientY: dropY } as MouseEvent, 
+      dropX, 
+      dropY, 
       containerElement
     );
 
