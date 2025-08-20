@@ -28,14 +28,31 @@ export class ToolboxComponent {
 
   onItemClick(item: ToolboxItem) {
     // Create element at default position when clicked
-    const rootElement = this.elementService.getRootElement();
-    if (rootElement) {
+    const selectedElement = this.elementService.getSelectedElement();
+    
+    // If a layout element is selected and can accept children, add to it
+    // Otherwise, add to root element
+    let targetParent = this.elementService.getRootElement();
+    
+    if (selectedElement && this.dragDropService.canDropOn(selectedElement)) {
+      targetParent = selectedElement;
+    }
+    
+    if (targetParent) {
+      console.log("Creating element via click, target parent:", targetParent.type);
+      
       const newElement = this.elementService.createElement(
         item.type as ElementType,
         { x: 0, y: 0 }
       );
-      this.elementService.addElement(newElement, rootElement);
+      
+      console.log("Created element with properties:", newElement.properties);
+      
+      // Add element to target parent 
+      this.elementService.addElement(newElement, targetParent);
       this.elementService.selectElement(newElement);
+      
+      console.log("Element added to parent:", newElement.parent?.type);
     }
   }
 
