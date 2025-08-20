@@ -113,6 +113,17 @@
         </ng-container>
       </div>
       
+      <div *ngSwitchCase="'VerticalStackLayout'" class="element-vertical-stack-layout"
+           #layoutDiv
+           cdkDropList
+           [cdkDropListData]="element.children"
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
+           (mouseenter)="setElementRef(element, layoutDiv)">
+        <ng-container *ngFor="let child of element.children">
+          <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
+        </ng-container>
+      </div>
+      
       <div *ngSwitchCase="'Grid'" class="element-grid"
            #layoutDiv
            cdkDropList

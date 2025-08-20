@@ -59,6 +59,13 @@ export const MAUI_CONTROLS: ToolboxItem[] = [
     category: ToolboxCategory.Layouts
   },
   {
+    type: 'VerticalStackLayout',
+    displayName: 'VerticalStackLayout',
+    icon: 'view_week',
+    description: 'Arranges children vertically in rows',
+    category: ToolboxCategory.Layouts
+  },
+  {
     type: 'Grid',
     displayName: 'Grid',
     icon: 'grid_view',
