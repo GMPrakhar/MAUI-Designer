@@ -40,6 +40,13 @@ export class XamlParserService {
   }
 
   private findRootLayoutElement(contentPage: Element): Element | null {
+    // Check if the contentPage itself is a layout element
+    const contentPageType = this.getElementTypeFromTag(contentPage.tagName);
+    if (this.isLayoutType(contentPageType)) {
+      return contentPage;
+    }
+    
+    // Otherwise look for layout elements in children
     for (let i = 0; i < contentPage.children.length; i++) {
       const child = contentPage.children[i];
       const elementType = this.getElementTypeFromTag(child.tagName);
@@ -139,6 +146,9 @@ export class XamlParserService {
     // Parse basic properties
     const text = xmlElement.getAttribute('Text');
     if (text) properties.text = text;
+
+    const placeholder = xmlElement.getAttribute('Placeholder');
+    if (placeholder) properties.text = placeholder; // Entry placeholder becomes text property
 
     const widthRequest = xmlElement.getAttribute('WidthRequest');
     if (widthRequest) properties.width = parseFloat(widthRequest);
