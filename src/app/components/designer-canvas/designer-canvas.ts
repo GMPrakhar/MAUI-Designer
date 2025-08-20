@@ -71,6 +71,41 @@ export class DesignerCanvasComponent implements OnInit {
     this.elementService.selectElement(null);
   }
 
+  onCanvasDropped(event: CdkDragDrop<any>) {
+    console.log("Canvas dropped:", event);
+    
+    // Calculate drop position based on event coordinates
+    const dropX = event.dropPoint?.x || 0;
+    const dropY = event.dropPoint?.y || 0;
+    
+    const dragData = this.dragDropService.getDragData();
+    
+    if (dragData?.isFromToolbox && dragData.elementType) {
+      // Handle toolbox drop - find target layout at drop position
+      const targetLayout = this.findLayoutAtDropPosition(dropX, dropY);
+      
+      // Use drag-drop service to handle the drop with proper parenting
+      this.dragDropService.handleToolboxDrop(event, dropX, dropY, targetLayout);
+      
+    } else if (event.item.data) {
+      // Handle existing element drop
+      const draggedElement = event.item.data as MauiElement;
+      const targetLayout = this.findLayoutAtDropPosition(dropX, dropY);
+      
+      if (this.dragDropService.canDropOn(targetLayout, draggedElement)) {
+        this.dragDropService.handleElementMove(draggedElement, dropX, dropY, targetLayout);
+      }
+    }
+  }
+
+  private findLayoutAtDropPosition(x: number, y: number): MauiElement {
+    // Use the drag-drop service to find the appropriate layout at the position
+    // If none found, default to root element
+    const canvasElement = this.canvas.nativeElement;
+    const targetLayout = this.dragDropService.findLayoutAtPosition(x, y, canvasElement);
+    return targetLayout || this.elementService.getRootElement();
+  }
+
   // Set DOM element reference for position calculations
   setElementRef(element: MauiElement, domElement: HTMLElement) {
     element.domElement = domElement;

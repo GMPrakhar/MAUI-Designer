@@ -4,6 +4,7 @@
     #canvas
     cdkDropList
     [cdkDropListData]="[]"
+    (cdkDropListDropped)="onCanvasDropped($event)"
     (click)="onCanvasClick()">
     
     <!-- Root element content -->

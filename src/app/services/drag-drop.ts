@@ -48,7 +48,20 @@ export class DragDropService {
         this.currentDragData.elementType,
         { x: x, y: y }
       );
-      this.elementService.addElement(newElement, targetParent);
+      
+      // Use the layout-specific drop handler to properly position the element
+      const dropHandler = this.dropHandlerFactory.getHandler(targetParent.type);
+      
+      if (dropHandler) {
+        // Add element to parent first so it has a parent reference
+        this.elementService.addElement(newElement, targetParent);
+        // Then use drop handler to position it correctly
+        dropHandler.handleDrop(newElement, targetParent, x, y, targetParent.domElement || null);
+      } else {
+        // Fallback behavior for unsupported layouts
+        this.elementService.addElement(newElement, targetParent);
+      }
+      
       this.elementService.selectElement(newElement);
     }
   }
@@ -144,7 +157,7 @@ export class DragDropService {
    * Finds the layout element at a specific position on the canvas
    * Improved to better detect the deepest layout container
    */
-  private findLayoutAtPosition(x: number, y: number, canvasElement: HTMLElement): MauiElement | null {
+  findLayoutAtPosition(x: number, y: number, canvasElement: HTMLElement): MauiElement | null {
     // Get all layout elements from the DOM, ordered by z-index (deepest first)
     const layoutElements = Array.from(canvasElement.querySelectorAll('.layout-element'));
     let deepestLayout: MauiElement | null = null;
