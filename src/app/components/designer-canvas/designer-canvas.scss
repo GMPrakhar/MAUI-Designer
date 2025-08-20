@@ -12,15 +12,14 @@
   position: relative;
   background: #ffffff;
   min-height: 600px;
-  background-image: 
-    linear-gradient(rgba(0,0,0,.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,0,0,.1) 1px, transparent 1px);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, .1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, .1) 1px, transparent 1px);
   background-size: 20px 20px;
   background-position: -1px -1px;
 }
 
-.selected
-{
+.selected {
   pointer-events: all;
 }
 
@@ -28,34 +27,34 @@
   position: absolute;
   border: 1px transparent solid;
   transition: border-color 0.2s ease;
-  pointer-events:painted;
+  pointer-events: painted;
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
   -ms-user-select: none;
-  
+
   &:hover {
     border-color: #cbd5e0;
   }
-  
+
   &.selected {
     border-color: #4299e1;
     border-width: 2px;
   }
-  
+
   &.layout-element {
     border-style: dashed;
     border-color: #a0aec0;
-    
+
     &:hover {
       border-color: #718096;
     }
-    
+
     &.selected {
       border-color: #4299e1;
     }
   }
-  
+
   &.root-element {
     position: static;
     width: 100% !important;
@@ -71,13 +70,13 @@
   align-items: center;
   justify-content: center;
   pointer-events: none;
-  
+
   .element-text {
     color: inherit;
     font-size: inherit;
     pointer-events: none;
   }
-  
+
   .element-button {
     width: 100%;
     height: 100%;
@@ -86,12 +85,12 @@
     background: #f9fafb;
     cursor: pointer;
     pointer-events: none;
-    
+
     &:hover {
       background: #f3f4f6;
     }
   }
-  
+
   .element-input {
     width: 100%;
     height: 100%;
@@ -100,7 +99,7 @@
     padding: 4px 8px;
     pointer-events: none;
   }
-  
+
   .element-textarea {
     width: 100%;
     height: 100%;
@@ -110,7 +109,7 @@
     resize: none;
     pointer-events: none;
   }
-  
+
   .element-image {
     width: 100%;
     height: 100%;
@@ -121,33 +120,33 @@
     align-items: center;
     justify-content: center;
     background: #f9fafb;
-    
+
     .material-icons {
       font-size: 32px;
       color: #9ca3af;
       margin-bottom: 4px;
     }
-    
+
     .placeholder-text {
       font-size: 12px;
       color: #6b7280;
     }
   }
-  
+
   .element-frame {
     width: 100%;
     height: 100%;
     border: 2px solid #e5e7eb;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.8);
-    
+
     .frame-content {
       width: 100%;
       height: 100%;
       position: relative;
     }
   }
-  
+
   .element-stack-layout,
   .element-vertical-stack-layout,
   .element-grid,
@@ -158,19 +157,30 @@
     position: relative;
     background: rgba(240, 240, 240, 0.3);
     border: 1px dashed #cbd5e0;
+    overflow: hidden;
   }
-  
+
+  .element-scroll-view {
+    .element-stack-layout,
+    .element-vertical-stack-layout,
+    .element-grid,
+    .element-absolute-layout,
+    .element-scroll-view {
+      overflow: auto !important;
+    }
+  }
+
   .element-vertical-stack-layout {
     display: flex;
     flex-direction: column;
     gap: 4px; // Add some default spacing between children
-    
-    > .canvas-element {
+
+    >.canvas-element {
       position: relative !important; // Override absolute positioning for children
       flex-shrink: 0;
     }
   }
-  
+
   .element-default {
     width: 100%;
     height: 100%;
@@ -192,7 +202,7 @@
   bottom: -4px;
   pointer-events: none;
   z-index: 100;
-  
+
   .handle {
     position: absolute;
     width: 8px;
@@ -201,37 +211,80 @@
     border-radius: 2px;
     pointer-events: all;
     z-index: 101;
-    
+
     // Corner handles (blue)
     &.handle-corner {
       background: #2563eb;
       width: 10px;
       height: 10px;
-      
+
       &:hover {
         background: #1d4ed8;
         transform: scale(1.2);
       }
     }
-    
+
     // Edge handles (green)
     &.handle-edge {
       background: #059669;
-      
+
       &:hover {
         background: #047857;
         transform: scale(1.2);
       }
     }
-    
-    &.handle-nw { top: 0; left: 0; cursor: nw-resize; }
-    &.handle-ne { top: 0; right: 0; cursor: ne-resize; }
-    &.handle-sw { bottom: 0; left: 0; cursor: sw-resize; }
-    &.handle-se { bottom: 0; right: 0; cursor: se-resize; }
-    &.handle-n { top: 0; left: 50%; transform: translateX(-50%); cursor: n-resize; }
-    &.handle-s { bottom: 0; left: 50%; transform: translateX(-50%); cursor: s-resize; }
-    &.handle-w { top: 50%; left: 0; transform: translateY(-50%); cursor: w-resize; }
-    &.handle-e { top: 50%; right: 0; transform: translateY(-50%); cursor: e-resize; }
+
+    &.handle-nw {
+      top: 0;
+      left: 0;
+      cursor: nw-resize;
+    }
+
+    &.handle-ne {
+      top: 0;
+      right: 0;
+      cursor: ne-resize;
+    }
+
+    &.handle-sw {
+      bottom: 0;
+      left: 0;
+      cursor: sw-resize;
+    }
+
+    &.handle-se {
+      bottom: 0;
+      right: 0;
+      cursor: se-resize;
+    }
+
+    &.handle-n {
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: n-resize;
+    }
+
+    &.handle-s {
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      cursor: s-resize;
+    }
+
+    &.handle-w {
+      top: 50%;
+      left: 0;
+      transform: translateY(-50%);
+      cursor: w-resize;
+    }
+
+    &.handle-e {
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      cursor: e-resize;
+    }
   }
 }
 
@@ -258,7 +311,7 @@
   pointer-events: none;
   border: 1px dashed #4299e1;
   opacity: 0.5;
-  
+
   &::after {
     content: '';
     position: absolute;
@@ -269,7 +322,7 @@
     background: #4299e1;
     opacity: 0.3;
   }
-  
+
   &::before {
     content: '';
     position: absolute;
@@ -324,7 +377,8 @@
   right: 0;
   bottom: 0;
   cursor: move;
-  background: rgba(0,0,0,0); /* invisible overlay */
+  background: rgba(0, 0, 0, 0);
+  /* invisible overlay */
   z-index: 50;
 }
 
@@ -338,11 +392,11 @@
   display: grid;
   pointer-events: none;
   z-index: 1;
-  
+
   .grid-cell {
     border: 1px dashed rgba(66, 153, 225, 0.3);
     transition: all 0.2s ease;
-    
+
     &:hover {
       background-color: rgba(66, 153, 225, 0.1);
       border-color: rgba(66, 153, 225, 0.6);
