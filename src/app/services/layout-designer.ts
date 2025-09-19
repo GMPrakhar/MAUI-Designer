@@ -206,4 +206,83 @@ export class LayoutDesignerService {
     
     return Math.min(insertionIndex, stackElement.children.length);
   }
+
+  /**
+   * Calculate the maximum allowed dimensions for a grid child element
+   * based on its grid position and span
+   */
+  getGridChildMaxDimensions(childElement: MauiElement, gridElement: MauiElement, gridContainerElement: HTMLElement): { maxWidth: number, maxHeight: number } | null {
+    if (!this.getLayoutInfo(gridElement.type).supportsGridPositioning) {
+      return null;
+    }
+
+    const gridDefinition = gridElement.properties.gridDefinition || {
+      rows: [{ height: { value: 1, type: 'Star' } }, { height: { value: 1, type: 'Star' } }],
+      columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
+    };
+
+    const rect = gridContainerElement.getBoundingClientRect();
+    const totalColumns = gridDefinition.columns.length;
+    const totalRows = gridDefinition.rows.length;
+
+    // Get child's grid position and span
+    const column = childElement.properties.column || 0;
+    const row = childElement.properties.row || 0;
+    const columnSpan = childElement.properties.columnSpan || 1;
+    const rowSpan = childElement.properties.rowSpan || 1;
+
+    // Calculate column widths
+    const columnWidths = this.calculateGridSizes(gridDefinition.columns.map(c => c.width), rect.width);
+    const rowHeights = this.calculateGridSizes(gridDefinition.rows.map(r => r.height), rect.height);
+
+    // Calculate max width by summing up the widths of spanned columns
+    let maxWidth = 0;
+    for (let i = column; i < Math.min(column + columnSpan, totalColumns); i++) {
+      maxWidth += columnWidths[i];
+    }
+
+    // Calculate max height by summing up the heights of spanned rows
+    let maxHeight = 0;
+    for (let i = row; i < Math.min(row + rowSpan, totalRows); i++) {
+      maxHeight += rowHeights[i];
+    }
+
+    return { maxWidth, maxHeight };
+  }
+
+  /**
+   * Calculate actual sizes for grid columns/rows based on their definitions
+   */
+  private calculateGridSizes(definitions: { value: number, type: string }[], totalSize: number): number[] {
+    const sizes: number[] = [];
+    let starCount = 0;
+    let fixedSize = 0;
+
+    // First pass: calculate fixed sizes and count star units
+    definitions.forEach(def => {
+      if (def.type === 'Star') {
+        starCount += def.value;
+      } else if (def.type === 'Absolute') {
+        fixedSize += def.value;
+      }
+      // Auto sizing is complex and would need content measurement, treating as 1 star for now
+    });
+
+    // Calculate size per star unit
+    const remainingSize = Math.max(0, totalSize - fixedSize);
+    const starSize = starCount > 0 ? remainingSize / starCount : 0;
+
+    // Second pass: assign actual sizes
+    definitions.forEach(def => {
+      if (def.type === 'Star') {
+        sizes.push(def.value * starSize);
+      } else if (def.type === 'Absolute') {
+        sizes.push(def.value);
+      } else { // Auto
+        sizes.push(starSize); // Fallback to 1 star unit
+      }
+    });
+
+    return sizes;
+  }
 }

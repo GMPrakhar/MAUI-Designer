@@ -286,6 +286,38 @@ export class DesignerCanvasComponent implements OnInit {
       newHeight = this.MIN_SIZE;
     }
 
+    // Apply grid cell constraints if element is in a grid
+    if (this.resizeElement.parent && this.resizeElement.parent.type === ElementType.Grid) {
+      const gridElement = this.resizeElement.parent;
+      const gridElementRef = gridElement.domElement;
+      
+      if (gridElementRef) {
+        const maxDimensions = this.layoutDesigner.getGridChildMaxDimensions(
+          this.resizeElement,
+          gridElement,
+          gridElementRef
+        );
+        
+        if (maxDimensions) {
+          // Constrain width to grid cell boundaries
+          if (newWidth > maxDimensions.maxWidth) {
+            if (this.resizeDirection.includes('w')) {
+              newX = this.startX + this.startWidth - maxDimensions.maxWidth;
+            }
+            newWidth = maxDimensions.maxWidth;
+          }
+          
+          // Constrain height to grid cell boundaries
+          if (newHeight > maxDimensions.maxHeight) {
+            if (this.resizeDirection.includes('n')) {
+              newY = this.startY + this.startHeight - maxDimensions.maxHeight;
+            }
+            newHeight = maxDimensions.maxHeight;
+          }
+        }
+      }
+    }
+
     // Update element properties
     this.elementService.updateElementProperties(this.resizeElement, {
       x: newX,
