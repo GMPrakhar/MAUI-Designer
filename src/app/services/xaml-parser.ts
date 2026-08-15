@@ -179,7 +179,6 @@ export class XamlParserService {
           width: size.width,
           height: size.height,
           pathData: pathElement.getAttribute('d') || '',
-          viewBox: size.viewBox,
           fillColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'fill'), '#000000', '#000000'),
           strokeColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'stroke'), 'Transparent', '#000000'),
           strokeThickness: this.parseNumber(this.getInheritedAttribute(pathElement, 'stroke-width'), 0),
@@ -195,12 +194,12 @@ export class XamlParserService {
     return rootElement;
   }
 
-  private getSvgSize(svgElement: Element): { width: number; height: number; viewBox: string } {
+  private getSvgSize(svgElement: Element): { width: number; height: number } {
     const viewBox = svgElement.getAttribute('viewBox');
     if (viewBox) {
       const values = viewBox.split(/[\s,]+/).map(value => parseFloat(value)).filter(value => !Number.isNaN(value));
       if (values.length >= 4 && values[2] > 0 && values[3] > 0) {
-        return { width: values[2], height: values[3], viewBox };
+        return { width: values[2], height: values[3] };
       }
     }
 
@@ -208,8 +207,7 @@ export class XamlParserService {
     const height = this.parseNumber(svgElement.getAttribute('height'), 24);
     return {
       width,
-      height,
-      viewBox: `0 0 ${width} ${height}`
+      height
     };
   }
 
@@ -261,9 +259,6 @@ export class XamlParserService {
 
     const pathData = xmlElement.getAttribute('Data');
     if (pathData) properties.pathData = pathData;
-
-    const viewBox = xmlElement.getAttribute('ViewBox');
-    if (viewBox) properties.viewBox = viewBox;
 
     const fill = xmlElement.getAttribute('Fill');
     if (fill) properties.fillColor = fill;
@@ -404,7 +399,6 @@ export class XamlParserService {
         if (properties.width === undefined) properties.width = 24;
         if (properties.height === undefined) properties.height = 24;
         if (properties.pathData === undefined) properties.pathData = 'M12 2L2 22h20L12 2Z';
-        if (properties.viewBox === undefined) properties.viewBox = '0 0 24 24';
         if (properties.fillColor === undefined) properties.fillColor = '#000000';
         if (properties.strokeColor === undefined) properties.strokeColor = 'Transparent';
         if (properties.strokeThickness === undefined) properties.strokeThickness = 0;

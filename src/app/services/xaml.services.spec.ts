@@ -122,7 +122,6 @@ describe('XAML Services', () => {
       expect(parsed.type).toBe(ElementType.AbsoluteLayout);
       expect(icon.type).toBe(ElementType.Path);
       expect(icon.properties.pathData).toBe('M4.5 12.75l6 6 9-13.5');
-      expect(icon.properties.viewBox).toBe('0 0 24 24');
       expect(icon.properties.fillColor).toBe('Transparent');
       expect(icon.properties.strokeColor).toBe('#000000');
       expect(icon.properties.strokeThickness).toBe(1.5);

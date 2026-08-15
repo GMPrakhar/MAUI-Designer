@@ -101,7 +101,6 @@ export class ElementService {
           width: 24,
           height: 24,
           pathData: 'M12 2L2 22h20L12 2Z',
-          viewBox: '0 0 24 24',
           fillColor: '#000000',
           strokeColor: 'Transparent',
           strokeThickness: 0

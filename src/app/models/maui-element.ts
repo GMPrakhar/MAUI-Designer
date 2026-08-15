@@ -42,7 +42,6 @@ export interface ElementProperties {
   // Content properties
   text?: string;
   pathData?: string;
-  viewBox?: string;
   fillColor?: string;
   strokeColor?: string;
   strokeThickness?: number;

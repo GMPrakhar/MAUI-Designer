@@ -94,7 +94,7 @@
       <!-- Path/Icon -->
       <svg *ngSwitchCase="'Path'"
            class="element-path"
-           [attr.viewBox]="element.properties.viewBox || '0 0 24 24'"
+           [attr.viewBox]="'0 0 ' + (element.properties.width || 24) + ' ' + (element.properties.height || 24)"
            preserveAspectRatio="xMidYMid meet"
            aria-label="Icon path preview">
         <path [attr.d]="element.properties.pathData"
