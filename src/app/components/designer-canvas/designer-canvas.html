@@ -90,7 +90,19 @@
         <span class="material-icons">image</span>
         <span class="placeholder-text">Image</span>
       </div>
-      
+
+      <!-- Path/Icon -->
+      <svg *ngSwitchCase="'Path'"
+           class="element-path"
+           [attr.viewBox]="'0 0 ' + (element.properties.width || 24) + ' ' + (element.properties.height || 24)"
+           preserveAspectRatio="xMidYMid meet"
+           aria-label="Icon path preview">
+        <path [attr.d]="element.properties.pathData"
+              [attr.fill]="element.properties.fillColor || 'transparent'"
+              [attr.stroke]="element.properties.strokeColor || 'transparent'"
+              [attr.stroke-width]="element.properties.strokeThickness || 0"></path>
+      </svg>
+       
       <!-- Frame -->
       <div *ngSwitchCase="'Frame'" class="element-frame">
         <div class="frame-content">

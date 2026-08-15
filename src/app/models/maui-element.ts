@@ -14,6 +14,7 @@ export enum ElementType {
   Entry = 'Entry',
   Editor = 'Editor',
   Image = 'Image',
+  Path = 'Path',
   StackLayout = 'StackLayout',
   VerticalStackLayout = 'VerticalStackLayout',
   Grid = 'Grid',
@@ -21,6 +22,8 @@ export enum ElementType {
   Frame = 'Frame',
   ScrollView = 'ScrollView'
 }
+
+export const DEFAULT_ICON_PATH_DATA = 'M12 2L2 22h20L12 2Z';
 
 export interface ElementProperties {
   // Layout properties
@@ -40,6 +43,10 @@ export interface ElementProperties {
   
   // Content properties
   text?: string;
+  pathData?: string;
+  fillColor?: string;
+  strokeColor?: string;
+  strokeThickness?: number;
   
   // Grid-specific properties
   row?: number;

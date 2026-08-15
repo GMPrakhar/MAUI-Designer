@@ -49,7 +49,14 @@ export const MAUI_CONTROLS: ToolboxItem[] = [
     description: 'Displays images',
     category: ToolboxCategory.Controls
   },
-  
+  {
+    type: 'Path',
+    displayName: 'Icon',
+    icon: 'gesture',
+    description: 'Displays SVG/XAML path icons',
+    category: ToolboxCategory.Controls
+  },
+   
   // Layouts
   {
     type: 'StackLayout',

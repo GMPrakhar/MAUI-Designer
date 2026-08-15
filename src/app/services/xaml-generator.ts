@@ -72,6 +72,8 @@ ${xamlContent}
         return 'Editor';
       case ElementType.Image:
         return 'Image';
+      case ElementType.Path:
+        return 'Path';
       default:
         return type;
     }
@@ -124,6 +126,21 @@ ${xamlContent}
         attributes.push(`Placeholder="${this.escapeXml(props.text)}"`);
       } else {
         attributes.push(`Text="${this.escapeXml(props.text)}"`);
+      }
+    }
+
+    if (element.type === ElementType.Path) {
+      if (props.pathData) {
+        attributes.push(`Data="${this.escapeXml(props.pathData)}"`);
+      }
+      if (props.fillColor) {
+        attributes.push(`Fill="${this.escapeXml(props.fillColor)}"`);
+      }
+      if (props.strokeColor) {
+        attributes.push(`Stroke="${this.escapeXml(props.strokeColor)}"`);
+      }
+      if (props.strokeThickness !== undefined) {
+        attributes.push(`StrokeThickness="${props.strokeThickness}"`);
       }
     }
     

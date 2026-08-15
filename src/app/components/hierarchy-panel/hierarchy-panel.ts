@@ -45,6 +45,7 @@ export class HierarchyPanelComponent implements OnInit {
       case 'Entry': return 'input';
       case 'Editor': return 'edit_note';
       case 'Image': return 'image';
+      case 'Path': return 'gesture';
       case 'StackLayout': return 'view_agenda';
       case 'Grid': return 'grid_view';
       case 'AbsoluteLayout': return 'crop_free';

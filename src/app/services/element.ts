@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
-import { MauiElement, ElementType, ElementProperties, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
 
 @Injectable({
   providedIn: 'root'
@@ -94,6 +94,16 @@ export class ElementService {
           ...common,
           width: 100,
           height: 100
+        };
+      case ElementType.Path:
+        return {
+          ...common,
+          width: 24,
+          height: 24,
+          pathData: DEFAULT_ICON_PATH_DATA,
+          fillColor: '#000000',
+          strokeColor: 'Transparent',
+          strokeThickness: 0
         };
       case ElementType.StackLayout:
         return {

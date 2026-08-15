@@ -106,6 +106,46 @@
       </div>
     </div>
 
+    <!-- Icon Path Properties -->
+    <div class="property-section" *ngIf="element.type === 'Path'">
+      <h4 class="section-header">Icon Path</h4>
+
+      <div class="property-group">
+        <label class="property-label">Path Data</label>
+        <textarea
+          class="property-input"
+          [value]="element.properties.pathData || ''"
+          (input)="updateProperty(element, 'pathData', $any($event.target).value)"></textarea>
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Fill</label>
+        <input
+          type="text"
+          class="property-input"
+          [value]="element.properties.fillColor || '#000000'"
+          (input)="updateProperty(element, 'fillColor', $any($event.target).value)">
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Stroke</label>
+        <input
+          type="text"
+          class="property-input"
+          [value]="element.properties.strokeColor || 'Transparent'"
+          (input)="updateProperty(element, 'strokeColor', $any($event.target).value)">
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Stroke Thickness</label>
+        <input
+          type="number"
+          class="property-input"
+          [value]="element.properties.strokeThickness ?? 0"
+          (input)="updateProperty(element, 'strokeThickness', +$any($event.target).value)">
+      </div>
+    </div>
+
     <!-- Margin Properties -->
     <div class="property-section">
       <h4 class="section-header">Margin</h4>
