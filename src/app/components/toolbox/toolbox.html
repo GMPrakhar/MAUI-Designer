@@ -49,6 +49,53 @@
     </ng-container>
   </div>
 
+  <!-- Saved component templates -->
+  <div class="category-group" *ngIf="(templates$ | async) as templates" data-testid="templates-section">
+    <ng-container *ngIf="templates.length">
+      <h3 class="category-title">Templates</h3>
+      <div class="toolbox-list">
+        <div
+          class="toolbox-list-item"
+          *ngFor="let template of templates"
+          [attr.data-testid]="'template-' + template.name"
+          role="button"
+          tabindex="0"
+          (click)="insertTemplate(template)"
+          (keydown.enter)="insertTemplate(template)">
+          <span class="material-icons">bookmark</span>
+          <span class="item-name">{{ template.name }}</span>
+          <button
+            class="icon-button"
+            type="button"
+            [attr.data-testid]="'template-delete-' + template.name"
+            aria-label="Delete template"
+            (click)="deleteTemplate($event, template)">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
+  <!-- Starter pages -->
+  <div class="category-group" data-testid="starter-pages-section">
+    <h3 class="category-title">Starter pages</h3>
+    <div class="toolbox-list">
+      <div
+        class="toolbox-list-item"
+        *ngFor="let page of starterPages"
+        [attr.data-testid]="'starter-' + page.id"
+        role="button"
+        tabindex="0"
+        [title]="page.description"
+        (click)="applyStarterPage(page)"
+        (keydown.enter)="applyStarterPage(page)">
+        <span class="material-icons">auto_awesome_mosaic</span>
+        <span class="item-name">{{ page.name }}</span>
+      </div>
+    </div>
+  </div>
+
   <div class="empty-state" *ngIf="!hasAnyResult" data-testid="toolbox-empty">
     <p>No controls match "{{ searchTerm }}"</p>
   </div>

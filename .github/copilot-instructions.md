@@ -39,8 +39,10 @@ Always reference these instructions first and fallback to search or bash command
   4. **Properties Panel**: Select an element and modify properties like color, margin, padding, text
   5. **XAML Generation**: Use the "Download" feature to export the designed layout
   6. **Load Design**: Import existing XAML to recreate the visual design
+  7. **Multi-Selection**: Shift-click or marquee several elements, then align, bulk-edit and delete them
+  8. **Clipboard**: `Ctrl+C`/`Ctrl+X`/`Ctrl+V`, save a template from the toolbar, apply a starter page
+  9. **Viewport**: Zoom in/out, pick a device preset, toggle the dark preview and the rulers
 - **Layout Support**: Supports multiple layout types including StackLayout, Grid, and AbsoluteLayout
-- **Limited Automated Tests**: This repository has minimal test infrastructure - validation is primarily manual
 - **Post-Build Validation**: Always run `ng serve` after building to ensure UI components load correctly in browser
 - **Designer Workflow Test**: Create a simple layout with Label, Button, and Entry controls to verify basic functionality
 
@@ -49,6 +51,8 @@ Always reference these instructions first and fallback to search or bash command
 - **Build Tests**: `ng build` -- verifies TypeScript compilation and bundling
 - **E2E Tests**: `npm run e2e` -- headless Playwright suite in `e2e/`; it boots `ng serve` on port 4300 automatically. Run `npx playwright install chromium` once first. Use `E2E_BASE_URL` to target an existing server.
 - **Test hooks**: components expose `data-testid` attributes consumed by `e2e/helpers/designer-page.ts`. Preserve them when editing templates.
+- **Polling helpers**: the XAML pane and the properties panel re-render from RxJS streams, so assert with `expectXamlToContain`, `xamlWhen`, `expectProperty` or `expectPropertyNumber` instead of one-shot reads, otherwise the tests flake on CI.
+- **Canvas coordinates**: the canvas sits inside a zoomable wrapper - convert client coordinates with `toCanvasPoint` (divide by `viewport.zoom`) in components, and avoid canvas x > ~400 in tests because the right panel overlaps it.
 - **Linting**: Use `ng lint` if ESLint is configured, or standard TypeScript compiler checks
 
 ### Browser Compatibility
@@ -75,6 +79,7 @@ Always reference these instructions first and fallback to search or bash command
 
 ### Important Directories
 - **src/app/components/**: Angular components for the designer interface
+  - **canvas-toolbar/**: Device, zoom, theme, grid, align and clipboard toolbar
   - **designer-canvas/**: Main design surface component
   - **hierarchy-panel/**: Element tree view component
   - **properties-panel/**: Property editor component
@@ -86,6 +91,9 @@ Always reference these instructions first and fallback to search or bash command
   - **layout-designer.ts**: Layout calculation service
   - **xaml-generator.ts**: XAML code generation
   - **xaml-parser.ts**: XAML parsing service
+  - **alignment.ts**: Align, distribute, snap-to-grid and smart guides
+  - **viewport.ts**: Zoom, pan, device preset, theme and grid state (persisted in localStorage)
+  - **clipboard.ts**: Copy/cut/paste, component templates and starter pages
 - **src/app/models/**: Data models and interfaces
   - **maui-element.ts**: MAUI element definitions
   - **toolbox.ts**: Toolbox item definitions
@@ -113,6 +121,8 @@ typescript (5.5.4)
 - **Focus on XAML designer workflow**: Test element creation, property editing, and layout generation
 - **Angular CLI**: Use `ng generate` commands for creating new components and services
 - **Hot reloading**: Development server auto-reloads on file changes
+- **Keyboard shortcuts**: `Ctrl+Z`/`Ctrl+Y` undo-redo, `Ctrl+C`/`Ctrl+X`/`Ctrl+V` clipboard, `Ctrl+A` select all, `Ctrl+D` duplicate, `Delete` remove, arrow keys nudge, `Space`+drag or middle-drag to pan, `Ctrl`+wheel to zoom
+- **Bulk operations**: wrap multi-element changes in `elementService.runAsSingleChange()` with `{ recordHistory: false }` updates so they undo as one step
 - **CI/CD**: `.github/workflows/ci.yml` builds and runs unit + e2e tests; `.github/workflows/deploy-pages.yml` publishes the static build to GitHub Pages on pushes to `main`
 
 ## Troubleshooting

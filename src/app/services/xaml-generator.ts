@@ -38,13 +38,30 @@ ${xamlContent}
       xaml += this.generateGridDefinitions(element, indentLevel + 1);
     }
 
-    // Add children
-    for (const child of element.children) {
-      xaml += '\n' + this.generateElementXaml(child, indentLevel + 1);
+    // Add children (a CollectionView wraps them in a DataTemplate)
+    if (element.type === ElementType.CollectionView) {
+      xaml += this.generateItemTemplate(element, indentLevel + 1);
+    } else {
+      for (const child of element.children) {
+        xaml += '\n' + this.generateElementXaml(child, indentLevel + 1);
+      }
     }
 
     xaml += `\n${indent}</${elementName}>`;
 
+    return xaml;
+  }
+
+  private generateItemTemplate(element: MauiElement, indentLevel: number): string {
+    const indent = '    '.repeat(indentLevel + 1);
+    const inner = '    '.repeat(indentLevel + 2);
+    let xaml = `\n${indent}<CollectionView.ItemTemplate>`;
+    xaml += `\n${inner}<DataTemplate>`;
+    for (const child of element.children) {
+      xaml += '\n' + this.generateElementXaml(child, indentLevel + 2);
+    }
+    xaml += `\n${inner}</DataTemplate>`;
+    xaml += `\n${indent}</CollectionView.ItemTemplate>`;
     return xaml;
   }
 
@@ -84,6 +101,17 @@ ${xamlContent}
   private generateAttributes(element: MauiElement): string {
     const props = element.properties;
     const attributes: string[] = [];
+    const bindings = props.bindings || {};
+
+    /** A bound property wins over the literal designer value. */
+    const push = (name: string, value: string | number | undefined) => {
+      if (bindings[name]) {
+        return;
+      }
+      if (value !== undefined && value !== null && value !== '') {
+        attributes.push(`${name}="${value}"`);
+      }
+    };
     
     // Add name attribute
     if (element.name) {
@@ -122,13 +150,47 @@ ${xamlContent}
     }
     
     // Text content
-    if (props.text !== undefined) {
-      if (element.type === ElementType.Entry) {
-        // For Entry elements, use Placeholder attribute instead of Text
-        attributes.push(`Placeholder="${this.escapeXml(props.text)}"`);
-      } else {
-        attributes.push(`Text="${this.escapeXml(props.text)}"`);
+    if (props.text !== undefined && props.text !== '') {
+      push('Text', this.escapeXml(props.text));
+    }
+
+    if (props.placeholder) {
+      push('Placeholder', this.escapeXml(props.placeholder));
+    }
+
+    // Control state
+    if (props.isChecked !== undefined && element.type === ElementType.CheckBox) {
+      push('IsChecked', props.isChecked ? 'True' : 'False');
+    }
+    if (props.isToggled !== undefined && element.type === ElementType.Switch) {
+      push('IsToggled', props.isToggled ? 'True' : 'False');
+    }
+    if (element.type === ElementType.Slider || element.type === ElementType.Stepper) {
+      push('Minimum', props.minimum);
+      push('Maximum', props.maximum);
+      push('Value', props.value);
+      if (element.type === ElementType.Stepper) {
+        push('Increment', props.increment);
       }
+    }
+    if (element.type === ElementType.ProgressBar) {
+      push('Progress', props.progress);
+    }
+    if (element.type === ElementType.ActivityIndicator) {
+      push('IsRunning', props.isRunning === false ? 'False' : 'True');
+    }
+    if (element.type === ElementType.DatePicker && props.date) {
+      push('Date', props.date);
+    }
+    if (element.type === ElementType.Border) {
+      push('Stroke', props.borderColor);
+      push('StrokeThickness', props.borderWidth);
+      if (props.cornerRadius !== undefined) {
+        attributes.push(`StrokeShape="RoundRectangle ${props.cornerRadius}"`);
+      }
+    }
+    if (element.type === ElementType.Frame && props.cornerRadius !== undefined) {
+      push('CornerRadius', props.cornerRadius);
     }
 
     if (element.type === ElementType.Path) {
@@ -181,10 +243,10 @@ ${xamlContent}
     
     // Visibility and enabled state
     if (props.isVisible === false) {
-      attributes.push(`IsVisible="False"`);
+      push('IsVisible', 'False');
     }
     if (props.isEnabled === false) {
-      attributes.push(`IsEnabled="False"`);
+      push('IsEnabled', 'False');
     }
     
     // Layout specific attributes
@@ -203,6 +265,12 @@ ${xamlContent}
       }
     }
     
+    for (const [name, path] of Object.entries(bindings)) {
+      if (path) {
+        attributes.push(`${name}="{Binding ${this.escapeXml(path)}}"`);
+      }
+    }
+
     return attributes.length > 0 ? ' ' + attributes.join(' ') : '';
   }
 

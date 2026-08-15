@@ -1,11 +1,14 @@
-import { Component, OnInit, ElementRef, ViewChild, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, ElementRef, ViewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DragDropModule, CdkDropList, CdkDragDrop, CdkDragEnd, CdkDragMove } from '@angular/cdk/drag-drop';
 import { ElementService } from '../../services/element';
 import { DragDropService, TOOLBOX_DRAG_MIME } from '../../services/drag-drop';
 import { LayoutDesignerService } from '../../services/layout-designer';
 import { MauiElement, ElementType } from '../../models/maui-element';
-import { Observable } from 'rxjs';
+import { AlignmentService, AlignmentGuide } from '../../services/alignment';
+import { ClipboardService } from '../../services/clipboard';
+import { ViewportService, ViewportState } from '../../services/viewport';
+import { Observable, Subscription } from 'rxjs';
 
 type ResizeDirection = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e';
 
@@ -16,7 +19,7 @@ type ResizeDirection = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e';
   templateUrl: './designer-canvas.html',
   styleUrl: './designer-canvas.scss'
 })
-export class DesignerCanvasComponent implements OnInit {
+export class DesignerCanvasComponent implements OnInit, OnDestroy {
   @ViewChild('canvas', { static: true }) canvas!: ElementRef<HTMLDivElement>;
   
   rootElement$: Observable<MauiElement>;
@@ -48,29 +51,235 @@ export class DesignerCanvasComponent implements OnInit {
   // True while a toolbox control is dragged over the canvas
   isDragOver = false;
 
+  // Marquee selection state
+  marquee: { x: number, y: number, width: number, height: number } | null = null;
+  private marqueeOrigin = { x: 0, y: 0 };
+  private isMarqueeSelecting = false;
+  private marqueeAdditive = false;
+  private suppressNextCanvasClick = false;
+
   // Constants
   private readonly MIN_SIZE = 20;
+
+  // Viewport (zoom / pan / theme / grid) state
+  viewport!: ViewportState;
+  designWidth = 800;
+  designHeight = 600;
+  horizontalTicks: { offset: number, label: number }[] = [];
+  verticalTicks: { offset: number, label: number }[] = [];
+  alignmentGuides: AlignmentGuide[] = [];
+
+  private isPanning = false;
+  private panOrigin = { x: 0, y: 0 };
+  private spacePressed = false;
+  private subscription = new Subscription();
 
   constructor(
     private elementService: ElementService,
     private dragDropService: DragDropService,
-    private layoutDesigner: LayoutDesignerService
+    private layoutDesigner: LayoutDesignerService,
+    private alignmentService: AlignmentService,
+    private clipboardService: ClipboardService,
+    private viewportService: ViewportService
   ) {
     this.rootElement$ = this.elementService.elements$;
     this.selectedElement$ = this.elementService.selectedElement$;
+    this.viewport = this.viewportService.state;
   }
 
   ngOnInit() {
-    // Initialize the canvas
+    this.subscription.add(
+      this.viewportService.state$.subscribe(state => {
+        this.viewport = state;
+        this.rebuildRulers();
+      })
+    );
+
+    this.subscription.add(
+      this.elementService.elements$.subscribe(root => {
+        this.designWidth = root.properties.width || 800;
+        this.designHeight = root.properties.height || 600;
+        this.rebuildRulers();
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
+  }
+
+  get canvasTransform(): string {
+    const { panX, panY, zoom } = this.viewport;
+    return `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  }
+
+  /** Ruler ticks are spaced by the grid size, scaled by the current zoom. */
+  private rebuildRulers() {
+    if (!this.viewport.showRulers) {
+      this.horizontalTicks = [];
+      this.verticalTicks = [];
+      return;
+    }
+
+    const step = Math.max(this.viewport.gridSize * 5, 40);
+    const zoom = this.viewport.zoom;
+
+    this.horizontalTicks = this.buildTicks(this.designWidth, step, zoom, this.viewport.panX);
+    this.verticalTicks = this.buildTicks(this.designHeight, step, zoom, this.viewport.panY);
+  }
+
+  private buildTicks(size: number, step: number, zoom: number, pan: number) {
+    const ticks: { offset: number, label: number }[] = [];
+    for (let value = 0; value <= size; value += step) {
+      ticks.push({ offset: Math.round(value * zoom + pan), label: value });
+    }
+    return ticks;
+  }
+
+  /** Converts a client point into unscaled canvas coordinates. */
+  private toCanvasPoint(clientX: number, clientY: number): { x: number, y: number } {
+    const rect = this.canvas.nativeElement.getBoundingClientRect();
+    const zoom = this.viewport.zoom || 1;
+    return {
+      x: (clientX - rect.left) / zoom,
+      y: (clientY - rect.top) / zoom
+    };
+  }
+
+  // --- Pan & wheel zoom -------------------------------------------------------
+
+  onViewportMouseDown(event: MouseEvent) {
+    // Middle button or Space + drag pans the design surface
+    if (event.button !== 1 && !(event.button === 0 && this.spacePressed)) {
+      return;
+    }
+    event.preventDefault();
+    this.isPanning = true;
+    this.panOrigin = { x: event.clientX, y: event.clientY };
+  }
+
+  onViewportWheel(event: WheelEvent) {
+    if (!event.ctrlKey && !event.metaKey) {
+      return;
+    }
+    event.preventDefault();
+    const factor = event.deltaY < 0 ? 1.1 : 0.9;
+    this.viewportService.setZoom(this.viewport.zoom * factor);
   }
 
   onElementClick(element: MauiElement, event: MouseEvent) {
     event.stopPropagation();
+    // A marquee that started on the root layout still emits a click on it
+    if (this.suppressNextCanvasClick) {
+      this.suppressNextCanvasClick = false;
+      return;
+    }
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      this.elementService.toggleSelection(element);
+      return;
+    }
     this.elementService.selectElement(element);
   }
 
   onCanvasClick() {
+    if (this.suppressNextCanvasClick) {
+      this.suppressNextCanvasClick = false;
+      return;
+    }
     this.elementService.selectElement(null);
+  }
+
+  // --- Marquee (rubber band) selection ---------------------------------------
+
+  onCanvasMouseDown(event: MouseEvent) {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    const owner = target.closest('[data-element-id]') as HTMLElement | null;
+
+    // Only start a marquee on the empty canvas or on the root layout itself
+    if (owner && owner.getAttribute('data-element-id') !== 'root') {
+      return;
+    }
+
+    this.marqueeOrigin = this.toCanvasPoint(event.clientX, event.clientY);
+    this.marquee = { x: this.marqueeOrigin.x, y: this.marqueeOrigin.y, width: 0, height: 0 };
+    this.isMarqueeSelecting = true;
+    this.marqueeAdditive = event.shiftKey || event.ctrlKey || event.metaKey;
+  }
+
+  private updateMarquee(event: MouseEvent) {
+    const { x: currentX, y: currentY } = this.toCanvasPoint(event.clientX, event.clientY);
+
+    this.marquee = {
+      x: Math.min(this.marqueeOrigin.x, currentX),
+      y: Math.min(this.marqueeOrigin.y, currentY),
+      width: Math.abs(currentX - this.marqueeOrigin.x),
+      height: Math.abs(currentY - this.marqueeOrigin.y)
+    };
+  }
+
+  private finishMarquee() {
+    const marquee = this.marquee;
+    this.isMarqueeSelecting = false;
+    this.marquee = null;
+
+    if (!marquee || (marquee.width < 4 && marquee.height < 4)) {
+      return;
+    }
+
+    // A marquee drag must not also clear the selection through the click handler
+    this.suppressNextCanvasClick = true;
+
+    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
+    const zoom = this.viewport.zoom || 1;
+    const hits: MauiElement[] = [];
+
+    this.canvas.nativeElement.querySelectorAll('[data-element-id]').forEach(node => {
+      const id = node.getAttribute('data-element-id');
+      if (!id || id === 'root') {
+        return;
+      }
+
+      const rect = (node as HTMLElement).getBoundingClientRect();
+      const left = (rect.left - canvasRect.left) / zoom;
+      const top = (rect.top - canvasRect.top) / zoom;
+      const width = rect.width / zoom;
+      const height = rect.height / zoom;
+      const intersects =
+        left < marquee.x + marquee.width &&
+        left + width > marquee.x &&
+        top < marquee.y + marquee.height &&
+        top + height > marquee.y;
+
+      if (!intersects) {
+        return;
+      }
+
+      const element = this.elementService.findElementById(id);
+      // Selecting a container implicitly covers its children, so skip nested hits
+      if (element && !hits.some(hit => this.isDescendantOf(element, hit))) {
+        hits.push(element);
+      }
+    });
+
+    const selection = this.marqueeAdditive
+      ? [...this.elementService.getSelectedElements(), ...hits]
+      : hits;
+    this.elementService.setSelection(selection);
+  }
+
+  private isDescendantOf(candidate: MauiElement, ancestor: MauiElement): boolean {
+    let current = candidate.parent;
+    while (current) {
+      if (current === ancestor) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
   }
 
   // --- Native drag from the toolbox -----------------------------------------
@@ -95,11 +304,10 @@ export class DesignerCanvasComponent implements OnInit {
     }
     event.preventDefault();
 
-    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
-    const x = event.clientX - canvasRect.left;
-    const y = event.clientY - canvasRect.top;
+    const { x, y } = this.toCanvasPoint(event.clientX, event.clientY);
+    const snapped = this.applyGridSnap(x, y);
 
-    this.dragDropService.createElementAtPosition(type, x, y, this.canvas.nativeElement);
+    this.dragDropService.createElementAtPosition(type, snapped.x, snapped.y, this.canvas.nativeElement);
     this.dragDropService.endDrag();
   }
 
@@ -112,6 +320,34 @@ export class DesignerCanvasComponent implements OnInit {
     }
 
     const ctrl = event.ctrlKey || event.metaKey;
+
+    if (event.code === 'Space') {
+      this.spacePressed = true;
+    }
+
+    if (ctrl && event.key.toLowerCase() === 'c') {
+      event.preventDefault();
+      this.clipboardService.copy(this.elementService.getSelectedElements());
+      return;
+    }
+
+    if (ctrl && event.key.toLowerCase() === 'x') {
+      event.preventDefault();
+      this.clipboardService.cut(this.elementService.getSelectedElements());
+      return;
+    }
+
+    if (ctrl && event.key.toLowerCase() === 'v') {
+      event.preventDefault();
+      this.clipboardService.paste();
+      return;
+    }
+
+    if (ctrl && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      this.selectAll();
+      return;
+    }
 
     if (ctrl && event.key.toLowerCase() === 'z' && !event.shiftKey) {
       event.preventDefault();
@@ -138,7 +374,7 @@ export class DesignerCanvasComponent implements OnInit {
 
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault();
-      this.elementService.removeElement(selected);
+      this.elementService.removeSelectedElements();
       return;
     }
 
@@ -156,13 +392,56 @@ export class DesignerCanvasComponent implements OnInit {
     };
 
     const nudge = nudges[event.key];
-    if (nudge && selected.parent?.type === ElementType.AbsoluteLayout) {
+    if (nudge) {
       event.preventDefault();
-      this.elementService.updateElementProperties(selected, {
-        x: (selected.properties.x || 0) + nudge.x,
-        y: (selected.properties.y || 0) + nudge.y
-      });
+      this.elementService.nudgeSelection(nudge.x, nudge.y);
     }
+  }
+
+  /** Applies grid snapping when it is enabled. */
+  private applyGridSnap(x: number, y: number): { x: number, y: number } {
+    if (!this.viewport.snapToGrid) {
+      return { x: Math.round(x), y: Math.round(y) };
+    }
+    return {
+      x: this.alignmentService.snapToGrid(x, this.viewport.gridSize),
+      y: this.alignmentService.snapToGrid(y, this.viewport.gridSize)
+    };
+  }
+
+  /**
+   * Turns a raw cdkDrag position into the final canvas position, applying
+   * smart guides first and the grid afterwards.
+   */
+  private resolveDragPosition(element: MauiElement, rawX: number, rawY: number): { x: number, y: number } {
+    const zoom = this.viewport.zoom || 1;
+    let x = rawX / zoom;
+    let y = rawY / zoom;
+
+    if (element.parent?.type === ElementType.AbsoluteLayout) {
+      if (this.viewport.showGuides) {
+        const snapped = this.alignmentService.computeGuides(element, x, y);
+        x = snapped.x;
+        y = snapped.y;
+      }
+      const grid = this.applyGridSnap(x, y);
+      x = grid.x;
+      y = grid.y;
+    }
+
+    return { x, y };
+  }
+
+  @HostListener('document:keyup', ['$event'])
+  onKeyUp(event: KeyboardEvent) {
+    if (event.code === 'Space') {
+      this.spacePressed = false;
+    }
+  }
+
+  /** Selects every direct child of the root layout. */
+  selectAll() {
+    this.elementService.setSelection([...this.elementService.getRootElement().children]);
   }
 
   private isEditingText(target: EventTarget | null): boolean {
@@ -221,13 +500,46 @@ export class DesignerCanvasComponent implements OnInit {
       ElementType.AbsoluteLayout,
       ElementType.VerticalStackLayout,
       ElementType.Frame,
+      ElementType.Border,
+      ElementType.CollectionView,
       ElementType.ScrollView
     ].includes(element.type);
   }
 
+  // --- Control previews -------------------------------------------------------
+
+  sliderPercent(element: MauiElement): number {
+    const props = element.properties;
+    const min = props.minimum ?? 0;
+    const max = props.maximum ?? 100;
+    const value = props.value ?? min;
+    if (max === min) {
+      return 0;
+    }
+    return Math.min(100, Math.max(0, ((value - min) / (max - min)) * 100));
+  }
+
+  progressPercent(element: MauiElement): number {
+    return Math.min(100, Math.max(0, (element.properties.progress ?? 0) * 100));
+  }
+
+  collectionPreviewItems(element: MauiElement): number[] {
+    const count = Math.min(20, Math.max(1, element.properties.itemCount ?? 3));
+    return Array.from({ length: count }, (_, index) => index);
+  }
+
+  collectionItemLabel(element: MauiElement): string {
+    return element.properties.itemTemplateText || 'Item';
+  }
+
   isSelected(element: MauiElement): boolean {
-    const selected = this.elementService.getSelectedElement();
-    return selected === element;
+    return this.elementService.isElementSelected(element);
+  }
+
+  /** Handles (and dragging) are only offered for a single selected element. */
+  isPrimarySelection(element: MauiElement): boolean {
+    return this.elementService.getSelectedElement() === element
+      && this.elementService.getSelectedElements().length === 1;
   }
 
   // Select element on pointerdown so cdkDrag will be enabled when drag starts.
@@ -240,12 +552,13 @@ export class DesignerCanvasComponent implements OnInit {
   }
 
   onDragEnded(element: MauiElement, event: CdkDragEnd) {
-    console.log("Drag released for element:", element, event);
     document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    this.alignmentGuides = [];
 
-    var dropPoint = event.source.getFreeDragPosition();
+    const dropPoint = event.source.getFreeDragPosition();
+    const target = this.resolveDragPosition(element, dropPoint.x, dropPoint.y);
 
-    this.dragDropService.handleCanvasDrop(element,dropPoint.x,  dropPoint.y, this.canvas.nativeElement);
+    this.dragDropService.handleCanvasDrop(element, target.x, target.y, this.canvas.nativeElement);
 
     //this.elementService.moveElement(element, element.parent!,  element.properties.x! + event.distance.x,  element.properties.y! + event.distance.y)
 
@@ -254,6 +567,16 @@ export class DesignerCanvasComponent implements OnInit {
 
   onDragMoved(element: MauiElement, event: CdkDragMove) {
     document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+
+    // Smart guides follow the element while it is dragged
+    if (this.viewport.showGuides && element.parent?.type === ElementType.AbsoluteLayout) {
+      const zoom = this.viewport.zoom || 1;
+      const proposedX = (element.properties.x || 0) + event.distance.x / zoom;
+      const proposedY = (element.properties.y || 0) + event.distance.y / zoom;
+      this.alignmentGuides = this.alignmentService.computeGuides(element, proposedX, proposedY).guides;
+    } else {
+      this.alignmentGuides = [];
+    }
     // Get layout element over which we are passing currently
     var layoutOver = this.dragDropService.findLayoutAtPosition(element.properties.x! + event.distance.x, element.properties.y! + event.distance.y, this.canvas.nativeElement)!;
 
@@ -328,6 +651,17 @@ export class DesignerCanvasComponent implements OnInit {
 
   @HostListener('document:mousemove', ['$event'])
   onMouseMove(event: MouseEvent) {
+    if (this.isPanning) {
+      this.viewportService.panBy(event.clientX - this.panOrigin.x, event.clientY - this.panOrigin.y);
+      this.panOrigin = { x: event.clientX, y: event.clientY };
+      return;
+    }
+
+    if (this.isMarqueeSelecting) {
+      this.updateMarquee(event);
+      return;
+    }
+
     if (!this.isResizing || !this.resizeDirection || !this.resizeElement) return;
 
     const deltaX = event.clientX - this.startMouseX;
@@ -437,6 +771,16 @@ export class DesignerCanvasComponent implements OnInit {
 
   @HostListener('document:mouseup', ['$event'])
   onMouseUp(event: MouseEvent) {
+    if (this.isPanning) {
+      this.isPanning = false;
+      return;
+    }
+
+    if (this.isMarqueeSelecting) {
+      this.finishMarquee();
+      return;
+    }
+
     if (this.isResizing) {
       this.isResizing = false;
       this.elementService.endBatch();

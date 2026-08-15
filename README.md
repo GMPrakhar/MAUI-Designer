@@ -19,6 +19,32 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **Keyboard Shortcuts**: `Delete` to remove, `Ctrl+D` to duplicate, arrow keys to nudge, `Esc` to deselect
 - **Local Persistence**: Save and restore your design in the browser
 
+### Multi-Selection
+- **Shift/Ctrl+Click**: Add or remove elements from the selection
+- **Marquee Selection**: Rubber-band across the canvas to grab everything it touches
+- **Select All**: `Ctrl+A` selects every child of the current layout
+- **Bulk Editing**: Shared width, height, background colour and visibility in the properties panel
+- **Bulk Actions**: Delete, duplicate, nudge and align a whole selection in one undo step
+
+### Alignment & Layout Tools
+- **Align**: Left, centre, right, top, middle and bottom for any multi-selection
+- **Distribute**: Even horizontal or vertical spacing for three or more elements
+- **Snap to Grid**: Configurable grid size with snapping while dragging
+- **Smart Guides**: Live guides when a dragged element lines up with a sibling or the page edges/centre
+- **Rulers**: Optional horizontal and vertical rulers around the design surface
+
+### Clipboard, Templates & Starter Pages
+- **Copy/Cut/Paste**: `Ctrl+C`, `Ctrl+X`, `Ctrl+V` (containers keep their children, names stay unique)
+- **Component Templates**: Save any selection as a reusable template, stored in the browser
+- **Starter Pages**: Login, list, profile and settings pages ready to drop onto the canvas
+
+### Live Preview
+- **Device Presets**: Phone, small phone, tablet, desktop or a custom surface size
+- **Zoom & Pan**: Toolbar buttons, `Ctrl` + mouse wheel, and `Space` + drag (or middle-drag) to pan
+- **Fit to Window**: One click to scale the design to the available space
+- **Dark Mode Preview**: Toggle a dark canvas to check contrast
+- **Persisted View**: Zoom, theme and grid settings survive a reload
+
 ### XAML Integration
 - **XAML Editor**: Full-featured code editor with syntax support
 - **Real-time Preview**: Instant visual updates when applying XAML changes
@@ -33,9 +59,20 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 #### Controls
 - **Label**: Text display with formatting options
 - **Button**: Interactive buttons with styling
-- **Entry**: Single-line text input fields
-- **Editor**: Multi-line text input areas
 - **Image**: Image display with positioning
+- **ProgressBar**: Determinate progress with a `Progress` value
+- **ActivityIndicator**: Busy indicator with an `IsRunning` flag
+- **CollectionView**: Repeating list with an editable `ItemTemplate`
+
+#### Inputs
+- **Entry**: Single-line text input with placeholder support
+- **Editor**: Multi-line text input areas
+- **SearchBar**: Search input with placeholder
+- **CheckBox**: Two-state check box
+- **Switch**: Toggle switch
+- **Slider**: Minimum/maximum/value slider
+- **Stepper**: Increment/decrement stepper
+- **DatePicker**: Date selection
 
 #### Layouts
 - **StackLayout**: Vertical/horizontal stacking of elements
@@ -44,6 +81,7 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 
 #### Views
 - **Frame**: Containers with borders and backgrounds
+- **Border**: Container with stroke, thickness and corner radius
 - **ScrollView**: Scrollable content areas
 
 ## 🛠️ Prerequisites
@@ -164,6 +202,8 @@ The Properties panel allows you to modify:
 - **Visual Properties**: Background color, text color, font family, font size
 - **Content Properties**: Text content, images, and other element-specific properties
 - **Grid Properties**: Row/column position and spanning for Grid layouts
+- **Control Properties**: Placeholder, checked/toggled state, slider range, progress, corner radius, and more
+- **Data Bindings**: Bind any supported property to a view-model path; the generated XAML emits `{Binding Path}` instead of the literal value
 
 ### 4. XAML Editor
 
@@ -235,6 +275,9 @@ The application follows Angular's standalone components architecture with a serv
 - **XamlGeneratorService**: Converts visual designs to XAML code
 - **XamlParserService**: Parses XAML code into visual elements
 - **DragDropService**: Manages drag-and-drop interactions
+- **AlignmentService**: Aligns, distributes, snaps and computes smart guides
+- **ViewportService**: Zoom, pan, device preset, theme and grid settings (persisted)
+- **ClipboardService**: Copy/cut/paste, component templates and starter pages
 
 ### Adding New MAUI Elements
 

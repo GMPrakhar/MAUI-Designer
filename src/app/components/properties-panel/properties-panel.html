@@ -1,4 +1,65 @@
 <div class="properties-panel">
+  <!-- Multi selection editor -->
+  <div class="properties-content" *ngIf="isMultiSelection" data-testid="multi-selection-panel">
+    <div class="property-section">
+      <h3 class="section-title" data-testid="multi-selection-title">{{ selectionCount }} elements selected</h3>
+      <div class="element-actions">
+        <button class="action-button" data-testid="multi-duplicate" (click)="duplicateSelection()">
+          <span class="material-icons">content_copy</span> Duplicate
+        </button>
+        <button class="action-button danger" data-testid="multi-delete" (click)="removeSelection()">
+          <span class="material-icons">delete</span> Delete all
+        </button>
+      </div>
+    </div>
+
+    <div class="property-section">
+      <h4 class="section-header">Shared Properties</h4>
+
+      <div class="property-row">
+        <div class="property-group">
+          <label class="property-label">Width</label>
+          <input type="number" class="property-input small" data-testid="multi-width"
+                 [value]="sharedValue('width')"
+                 (input)="updateSelection('width', +$any($event.target).value)">
+        </div>
+        <div class="property-group">
+          <label class="property-label">Height</label>
+          <input type="number" class="property-input small" data-testid="multi-height"
+                 [value]="sharedValue('height')"
+                 (input)="updateSelection('height', +$any($event.target).value)">
+        </div>
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Background</label>
+        <input type="color" class="property-input" data-testid="multi-backgroundColor"
+               [value]="sharedValue('backgroundColor') || '#ffffff'"
+               (input)="updateSelection('backgroundColor', $any($event.target).value)">
+      </div>
+
+      <div class="property-group checkbox-group">
+        <input type="checkbox" data-testid="multi-isVisible"
+               [checked]="sharedValue('isVisible') !== false"
+               (change)="updateSelection('isVisible', $any($event.target).checked)">
+        <label class="property-label">Is Visible</label>
+      </div>
+    </div>
+
+    <div class="property-section" data-testid="multi-align-section">
+      <h4 class="section-header">Align</h4>
+      <div class="align-buttons">
+        <button class="action-button" data-testid="panel-align-left" (click)="align('left')">Left</button>
+        <button class="action-button" data-testid="panel-align-center" (click)="align('center')">Centre</button>
+        <button class="action-button" data-testid="panel-align-right" (click)="align('right')">Right</button>
+        <button class="action-button" data-testid="panel-align-top" (click)="align('top')">Top</button>
+        <button class="action-button" data-testid="panel-align-middle" (click)="align('middle')">Middle</button>
+        <button class="action-button" data-testid="panel-align-bottom" (click)="align('bottom')">Bottom</button>
+      </div>
+    </div>
+  </div>
+
+  <ng-container *ngIf="!isMultiSelection">
   <div class="properties-content" *ngIf="selectedElement$ | async as element; else noSelection">
     <div class="property-section">
       <h3 class="section-title" data-testid="selected-element-name">Element: {{ element.name }}</h3>
@@ -184,6 +245,143 @@
           (change)="updateProperty(element, 'fontAttributes', $any($event.target).value)">
           <option *ngFor="let attribute of fontAttributes" [value]="attribute">{{ attribute }}</option>
         </select>
+      </div>
+    </div>
+
+    <!-- Control specific properties -->
+    <div class="property-section" *ngIf="hasControlProperties(element)" data-testid="control-properties-section">
+      <h4 class="section-header">{{ element.type }}</h4>
+
+      <div class="property-group" *ngIf="supportsPlaceholder(element)">
+        <label class="property-label">Placeholder</label>
+        <input
+          type="text"
+          class="property-input"
+          data-testid="prop-placeholder"
+          [value]="element.properties.placeholder || ''"
+          (input)="updateProperty(element, 'placeholder', $any($event.target).value)">
+      </div>
+
+      <div class="property-group checkbox-group" *ngIf="element.type === 'CheckBox'">
+        <input type="checkbox" data-testid="prop-isChecked"
+               [checked]="element.properties.isChecked === true"
+               (change)="updateProperty(element, 'isChecked', $any($event.target).checked)">
+        <label class="property-label">Is Checked</label>
+      </div>
+
+      <div class="property-group checkbox-group" *ngIf="element.type === 'Switch'">
+        <input type="checkbox" data-testid="prop-isToggled"
+               [checked]="element.properties.isToggled === true"
+               (change)="updateProperty(element, 'isToggled', $any($event.target).checked)">
+        <label class="property-label">Is Toggled</label>
+      </div>
+
+      <ng-container *ngIf="supportsRange(element)">
+        <div class="property-row">
+          <div class="property-group">
+            <label class="property-label">Minimum</label>
+            <input type="number" class="property-input small" data-testid="prop-minimum"
+                   [value]="element.properties.minimum ?? 0"
+                   (input)="updateProperty(element, 'minimum', +$any($event.target).value)">
+          </div>
+          <div class="property-group">
+            <label class="property-label">Maximum</label>
+            <input type="number" class="property-input small" data-testid="prop-maximum"
+                   [value]="element.properties.maximum ?? 100"
+                   (input)="updateProperty(element, 'maximum', +$any($event.target).value)">
+          </div>
+        </div>
+
+        <div class="property-row">
+          <div class="property-group">
+            <label class="property-label">Value</label>
+            <input type="number" class="property-input small" data-testid="prop-value"
+                   [value]="element.properties.value ?? 0"
+                   (input)="updateProperty(element, 'value', +$any($event.target).value)">
+          </div>
+          <div class="property-group" *ngIf="element.type === 'Stepper'">
+            <label class="property-label">Increment</label>
+            <input type="number" class="property-input small" data-testid="prop-increment"
+                   [value]="element.properties.increment ?? 1"
+                   (input)="updateProperty(element, 'increment', +$any($event.target).value)">
+          </div>
+        </div>
+      </ng-container>
+
+      <div class="property-group" *ngIf="element.type === 'ProgressBar'">
+        <label class="property-label">Progress (0-1)</label>
+        <input type="number" step="0.05" min="0" max="1" class="property-input" data-testid="prop-progress"
+               [value]="element.properties.progress ?? 0"
+               (input)="updateProperty(element, 'progress', +$any($event.target).value)">
+      </div>
+
+      <div class="property-group checkbox-group" *ngIf="element.type === 'ActivityIndicator'">
+        <input type="checkbox" data-testid="prop-isRunning"
+               [checked]="element.properties.isRunning !== false"
+               (change)="updateProperty(element, 'isRunning', $any($event.target).checked)">
+        <label class="property-label">Is Running</label>
+      </div>
+
+      <div class="property-group" *ngIf="element.type === 'DatePicker'">
+        <label class="property-label">Date</label>
+        <input type="date" class="property-input" data-testid="prop-date"
+               [value]="element.properties.date || ''"
+               (input)="updateProperty(element, 'date', $any($event.target).value)">
+      </div>
+
+      <ng-container *ngIf="supportsCornerRadius(element)">
+        <div class="property-group">
+          <label class="property-label">Corner Radius</label>
+          <input type="number" class="property-input" data-testid="prop-cornerRadius"
+                 [value]="element.properties.cornerRadius ?? 0"
+                 (input)="updateProperty(element, 'cornerRadius', +$any($event.target).value)">
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="element.type === 'Border'">
+        <div class="property-group">
+          <label class="property-label">Border Color</label>
+          <input type="color" class="property-input" data-testid="prop-borderColor"
+                 [value]="element.properties.borderColor || '#cccccc'"
+                 (input)="updateProperty(element, 'borderColor', $any($event.target).value)">
+        </div>
+        <div class="property-group">
+          <label class="property-label">Border Width</label>
+          <input type="number" class="property-input" data-testid="prop-borderWidth"
+                 [value]="element.properties.borderWidth ?? 1"
+                 (input)="updateProperty(element, 'borderWidth', +$any($event.target).value)">
+        </div>
+      </ng-container>
+
+      <ng-container *ngIf="element.type === 'CollectionView'">
+        <div class="property-group">
+          <label class="property-label">Preview Items</label>
+          <input type="number" min="1" max="20" class="property-input" data-testid="prop-itemCount"
+                 [value]="element.properties.itemCount ?? 3"
+                 (input)="updateProperty(element, 'itemCount', +$any($event.target).value)">
+        </div>
+        <div class="property-group">
+          <label class="property-label">Item Label</label>
+          <input type="text" class="property-input" data-testid="prop-itemTemplateText"
+                 [value]="element.properties.itemTemplateText || 'Item'"
+                 (input)="updateProperty(element, 'itemTemplateText', $any($event.target).value)">
+        </div>
+      </ng-container>
+    </div>
+
+    <!-- Data bindings -->
+    <div class="property-section" data-testid="bindings-section">
+      <h4 class="section-header">Data Bindings</h4>
+
+      <div class="property-group" *ngFor="let property of bindableProperties(element)">
+        <label class="property-label">{{ property }}</label>
+        <input
+          type="text"
+          class="property-input"
+          [attr.data-testid]="'binding-' + property"
+          placeholder="ViewModel path"
+          [value]="bindingValue(element, property)"
+          (input)="updateBinding(element, property, $any($event.target).value)">
       </div>
     </div>
 
@@ -415,6 +613,8 @@
       </div>
     </div>
   </div>
+
+  </ng-container>
 
   <ng-template #noSelection>
     <div class="no-selection">

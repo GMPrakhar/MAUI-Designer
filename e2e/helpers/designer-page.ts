@@ -36,6 +36,36 @@ export class DesignerPage {
   async goto() {
     await this.page.goto('/');
     await expect(this.canvas).toBeVisible();
+    // Every spec starts from a clean, predictable viewport
+    await this.page.evaluate(() => localStorage.removeItem('maui-designer.viewport'));
+  }
+
+  /** Ctrl-clicks an element to add or remove it from the selection. */
+  async toggleSelect(type: string, index = 0) {
+    await this.canvasElements(type).nth(index).click({ modifiers: ['Shift'] });
+  }
+
+  /** Drags a rubber band rectangle over the canvas in canvas coordinates. */
+  async marquee(from: { x: number; y: number }, to: { x: number; y: number }) {
+    const box = (await this.canvas.boundingBox())!;
+    await this.page.mouse.move(box.x + from.x, box.y + from.y);
+    await this.page.mouse.down();
+    await this.page.mouse.move(box.x + to.x, box.y + to.y, { steps: 12 });
+    await this.page.mouse.up();
+  }
+
+  /** Drags an already selected element by an offset. */
+  async dragElementBy(type: string, delta: { x: number; y: number }, index = 0) {
+    const element = this.canvasElements(type).nth(index);
+    const box = (await element.boundingBox())!;
+    await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await this.page.mouse.down();
+    await this.page.mouse.move(box.x + box.width / 2 + delta.x, box.y + box.height / 2 + delta.y, { steps: 12 });
+    await this.page.mouse.up();
+  }
+
+  selectionCount(): Locator {
+    return this.page.getByTestId('selection-count');
   }
 
   async openToolbox() {
@@ -136,6 +166,16 @@ export class DesignerPage {
     await expect
       .poll(() => this.propertyValue(name).then(raw => assertion(Number(raw))), { timeout: 10_000 })
       .toBe(true);
+  }
+
+  /** Reads a numeric property input once it has settled. */
+  async getPropertyNumber(name: string): Promise<number> {
+    await expect(this.page.getByTestId(`prop-${name}`)).toBeVisible();
+    return Number(await this.propertyValue(name));
+  }
+
+  alignButton(direction: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'): Locator {
+    return this.page.getByTestId(`align-${direction}`);
   }
 }
 

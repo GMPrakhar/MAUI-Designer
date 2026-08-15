@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ElementService } from '../../services/element';
@@ -9,9 +9,12 @@ import {
   GridLength,
   GridLengthType,
   Orientation,
-  FontAttributes
+  FontAttributes,
+  BINDABLE_PROPERTIES,
+  COMMON_BINDABLE_PROPERTIES
 } from '../../models/maui-element';
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
+import { AlignmentService, AlignMode } from '../../services/alignment';
 
 @Component({
   selector: 'app-properties-panel',
@@ -20,19 +23,68 @@ import { Observable } from 'rxjs';
   templateUrl: './properties-panel.html',
   styleUrl: './properties-panel.scss'
 })
-export class PropertiesPanelComponent implements OnInit {
+export class PropertiesPanelComponent implements OnInit, OnDestroy {
   selectedElement$: Observable<MauiElement | null>;
+  selection: MauiElement[] = [];
+  private subscription = new Subscription();
 
   readonly orientations = Object.values(Orientation);
   readonly fontAttributes = Object.values(FontAttributes);
   readonly gridLengthTypes = Object.values(GridLengthType);
 
-  constructor(private elementService: ElementService) {
+  constructor(
+    private elementService: ElementService,
+    private alignmentService: AlignmentService
+  ) {
     this.selectedElement$ = this.elementService.selectedElement$;
   }
 
   ngOnInit() {
-    // Initialize properties panel
+    this.subscription.add(
+      this.elementService.selectedElements$.subscribe(selection => (this.selection = selection))
+    );
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
+  }
+
+  // --- Multi selection --------------------------------------------------------
+
+  get isMultiSelection(): boolean {
+    return this.selection.length > 1;
+  }
+
+  get selectionCount(): number {
+    return this.selection.length;
+  }
+
+  /** Returns the value shared by every selected element, or '' when they differ. */
+  sharedValue(property: keyof ElementProperties): any {
+    if (this.selection.length === 0) {
+      return '';
+    }
+    const first = this.selection[0].properties[property];
+    return this.selection.every(element => element.properties[property] === first) ? first ?? '' : '';
+  }
+
+  updateSelection(property: keyof ElementProperties, value: any) {
+    this.elementService.updateSelectionProperties({ [property]: value });
+  }
+
+  removeSelection() {
+    this.elementService.removeSelectedElements();
+  }
+
+  duplicateSelection() {
+    const targets = [...this.selection];
+    this.elementService.runAsSingleChange(() => {
+      targets.forEach(element => this.elementService.duplicateElement(element));
+    });
+  }
+
+  align(mode: AlignMode) {
+    this.alignmentService.align(this.selection, mode);
   }
 
   updateProperty(element: MauiElement, property: keyof ElementProperties, value: any) {
@@ -56,6 +108,62 @@ export class PropertiesPanelComponent implements OnInit {
   }
 
   // --- Capability helpers -----------------------------------------------------
+
+  private static readonly PLACEHOLDER_TYPES = [ElementType.Entry, ElementType.Editor, ElementType.SearchBar];
+  private static readonly RANGE_TYPES = [ElementType.Slider, ElementType.Stepper];
+  private static readonly CONTROL_PROPERTY_TYPES = [
+    ElementType.Entry,
+    ElementType.Editor,
+    ElementType.SearchBar,
+    ElementType.CheckBox,
+    ElementType.Switch,
+    ElementType.Slider,
+    ElementType.Stepper,
+    ElementType.ProgressBar,
+    ElementType.ActivityIndicator,
+    ElementType.DatePicker,
+    ElementType.Border,
+    ElementType.Frame,
+    ElementType.CollectionView
+  ];
+
+  hasControlProperties(element: MauiElement): boolean {
+    return PropertiesPanelComponent.CONTROL_PROPERTY_TYPES.includes(element.type);
+  }
+
+  supportsPlaceholder(element: MauiElement): boolean {
+    return PropertiesPanelComponent.PLACEHOLDER_TYPES.includes(element.type);
+  }
+
+  supportsRange(element: MauiElement): boolean {
+    return PropertiesPanelComponent.RANGE_TYPES.includes(element.type);
+  }
+
+  supportsCornerRadius(element: MauiElement): boolean {
+    return element.type === ElementType.Border || element.type === ElementType.Frame;
+  }
+
+  // --- Data bindings ----------------------------------------------------------
+
+  bindableProperties(element: MauiElement): string[] {
+    const specific = BINDABLE_PROPERTIES[element.type] || [];
+    return [...new Set([...specific, ...COMMON_BINDABLE_PROPERTIES])];
+  }
+
+  bindingValue(element: MauiElement, property: string): string {
+    return element.properties.bindings?.[property] || '';
+  }
+
+  updateBinding(element: MauiElement, property: string, path: string) {
+    const bindings = { ...(element.properties.bindings || {}) };
+    const trimmed = path.trim();
+    if (trimmed) {
+      bindings[property] = trimmed;
+    } else {
+      delete bindings[property];
+    }
+    this.elementService.updateElementProperties(element, { bindings });
+  }
 
   isStackLayout(element: MauiElement): boolean {
     return element.type === ElementType.StackLayout || element.type === ElementType.VerticalStackLayout;

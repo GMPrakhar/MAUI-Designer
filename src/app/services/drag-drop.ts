@@ -243,7 +243,9 @@ export class DragDropService {
       case ElementType.Grid:
       case ElementType.AbsoluteLayout:
       case ElementType.Frame:
+      case ElementType.Border:
       case ElementType.ScrollView:
+      case ElementType.CollectionView:
         return true;
       default:
         return false;
