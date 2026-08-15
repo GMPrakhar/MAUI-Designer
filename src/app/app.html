@@ -1,7 +1,58 @@
 <div class="maui-designer">
   <div class="header">
     <h1>{{ title() }}</h1>
+
+    <div class="header-actions">
+      <button
+        class="header-button"
+        data-testid="undo-button"
+        [disabled]="!canUndo"
+        title="Undo (Ctrl+Z)"
+        (click)="undo()">
+        <span class="material-icons">undo</span>
+        Undo
+      </button>
+
+      <button
+        class="header-button"
+        data-testid="redo-button"
+        [disabled]="!canRedo"
+        title="Redo (Ctrl+Y)"
+        (click)="redo()">
+        <span class="material-icons">redo</span>
+        Redo
+      </button>
+
+      <button
+        class="header-button"
+        data-testid="save-button"
+        title="Save design in this browser"
+        (click)="saveDesign()">
+        <span class="material-icons">save</span>
+        Save
+      </button>
+
+      <button
+        class="header-button"
+        data-testid="load-button"
+        title="Load the saved design"
+        (click)="loadDesign()">
+        <span class="material-icons">folder_open</span>
+        Load
+      </button>
+
+      <button
+        class="header-button"
+        data-testid="clear-button"
+        title="Remove every element from the canvas"
+        (click)="clearDesign()">
+        <span class="material-icons">delete_sweep</span>
+        Clear
+      </button>
+    </div>
   </div>
+
+  <div class="toast" data-testid="app-toast" *ngIf="toastMessage">{{ toastMessage }}</div>
   
   <div class="designer-container">
     <!-- Left Panel -->
@@ -10,12 +61,14 @@
         <button 
           class="tab-button" 
           [class.active]="selectedTab === 'toolbox'"
+          data-testid="tab-toolbox"
           (click)="selectTab('toolbox')">
           Toolbox
         </button>
         <button 
           class="tab-button" 
           [class.active]="selectedTab === 'hierarchy'"
+          data-testid="tab-hierarchy"
           (click)="selectTab('hierarchy')">
           Hierarchy
         </button>

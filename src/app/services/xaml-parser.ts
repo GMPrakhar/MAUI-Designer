@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, ElementProperties, Thickness, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
 
 @Injectable({
   providedIn: 'root'
@@ -88,13 +88,13 @@ export class XamlParserService {
     // Parse child elements
     for (let i = 0; i < xmlElement.children.length; i++) {
       const childXmlElement = xmlElement.children[i];
-      
-      // Skip grid definition elements
-      if (childXmlElement.tagName.includes('.RowDefinitions') || 
+
+      // Grid definitions are property elements, not children
+      if (childXmlElement.tagName.includes('.RowDefinitions') ||
           childXmlElement.tagName.includes('.ColumnDefinitions')) {
         continue;
       }
-      
+
       const childElementType = this.getElementTypeFromTag(childXmlElement.tagName);
       if (childElementType) {
         const childElement = this.parseElement(childXmlElement, element);
@@ -102,7 +102,59 @@ export class XamlParserService {
       }
     }
 
+    if (elementType === ElementType.Grid) {
+      element.properties.gridDefinition = this.parseGridDefinition(xmlElement);
+    }
+
     return element;
+  }
+
+  private parseGridDefinition(gridXmlElement: Element): GridDefinition {
+    const rows: GridRowDefinition[] = [];
+    const columns: GridColumnDefinition[] = [];
+
+    for (let i = 0; i < gridXmlElement.children.length; i++) {
+      const child = gridXmlElement.children[i];
+      if (child.tagName.includes('.RowDefinitions')) {
+        for (let j = 0; j < child.children.length; j++) {
+          rows.push({ height: this.parseGridLength(child.children[j].getAttribute('Height')) });
+        }
+      } else if (child.tagName.includes('.ColumnDefinitions')) {
+        for (let j = 0; j < child.children.length; j++) {
+          columns.push({ width: this.parseGridLength(child.children[j].getAttribute('Width')) });
+        }
+      }
+    }
+
+    const defaultLength = (): GridLength => ({ value: 1, type: GridLengthType.Star });
+
+    return {
+      rows: rows.length ? rows : [{ height: defaultLength() }, { height: defaultLength() }],
+      columns: columns.length ? columns : [{ width: defaultLength() }, { width: defaultLength() }]
+    };
+  }
+
+  private parseGridLength(value: string | null): GridLength {
+    if (!value) {
+      return { value: 1, type: GridLengthType.Star };
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.toLowerCase() === 'auto') {
+      return { value: 1, type: GridLengthType.Auto };
+    }
+    if (trimmed === '*') {
+      return { value: 1, type: GridLengthType.Star };
+    }
+    if (trimmed.endsWith('*')) {
+      const starValue = parseFloat(trimmed.slice(0, -1));
+      return { value: Number.isNaN(starValue) ? 1 : starValue, type: GridLengthType.Star };
+    }
+
+    const absolute = parseFloat(trimmed);
+    return Number.isNaN(absolute)
+      ? { value: 1, type: GridLengthType.Star }
+      : { value: absolute, type: GridLengthType.Absolute };
   }
 
   private idCounter = 0;
@@ -340,12 +392,22 @@ export class XamlParserService {
       const spacing = xmlElement.getAttribute('Spacing');
       if (spacing) properties.spacing = parseFloat(spacing);
 
-      // Determine orientation from tag name
-      if (xmlElement.tagName.toLowerCase() === 'horizontalstacklayout') {
-        properties.orientation = 'Horizontal' as any;
+      // An explicit Orientation attribute wins over the tag name
+      const orientation = xmlElement.getAttribute('Orientation');
+      if (orientation) {
+        properties.orientation = orientation.toLowerCase() === 'horizontal'
+          ? Orientation.Horizontal
+          : Orientation.Vertical;
+      } else if (xmlElement.tagName.toLowerCase() === 'horizontalstacklayout') {
+        properties.orientation = Orientation.Horizontal;
       } else {
-        properties.orientation = 'Vertical' as any;
+        properties.orientation = Orientation.Vertical;
       }
+    }
+
+    if (elementType === ElementType.VerticalStackLayout) {
+      const spacing = xmlElement.getAttribute('Spacing');
+      if (spacing) properties.spacing = parseFloat(spacing);
     }
 
     // Set default values if not specified

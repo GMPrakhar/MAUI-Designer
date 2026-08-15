@@ -1,11 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ElementService } from '../../services/element';
 import { XamlGeneratorService } from '../../services/xaml-generator';
 import { XamlParserService } from '../../services/xaml-parser';
-import { MauiElement } from '../../models/maui-element';
-import { Observable, map } from 'rxjs';
+import { Observable, Subscription, map } from 'rxjs';
 
 @Component({
   selector: 'app-xaml-editor',
@@ -14,13 +13,14 @@ import { Observable, map } from 'rxjs';
   templateUrl: './xaml-editor.html',
   styleUrl: './xaml-editor.scss'
 })
-export class XamlEditorComponent implements OnInit {
+export class XamlEditorComponent implements OnInit, OnDestroy {
   xamlContent$: Observable<string>;
   editableXamlContent: string = '';
   statusMessage: string = '';
   statusType: 'success' | 'error' | 'info' = 'info';
   private statusTimeout: any;
-  
+  private subscription = new Subscription();
+
   constructor(
     private elementService: ElementService,
     private xamlGenerator: XamlGeneratorService,
@@ -32,10 +32,19 @@ export class XamlEditorComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Initialize with current XAML content
-    this.xamlContent$.subscribe(xaml => {
-      this.editableXamlContent = xaml;
-    });
+    // Keep the editor in sync with the current design
+    this.subscription.add(
+      this.xamlContent$.subscribe(xaml => {
+        this.editableXamlContent = xaml;
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
+    if (this.statusTimeout) {
+      clearTimeout(this.statusTimeout);
+    }
   }
 
   applyXaml() {
@@ -69,12 +78,11 @@ export class XamlEditorComponent implements OnInit {
   private showStatus(message: string, type: 'success' | 'error' | 'info') {
     this.statusMessage = message;
     this.statusType = type;
-    
-    // Clear any existing timeout
+
     if (this.statusTimeout) {
       clearTimeout(this.statusTimeout);
     }
-    
+
     // Auto-clear status after 3 seconds
     this.statusTimeout = setTimeout(() => {
       this.statusMessage = '';
@@ -82,9 +90,13 @@ export class XamlEditorComponent implements OnInit {
   }
 
   copyToClipboard() {
-    navigator.clipboard.writeText(this.editableXamlContent).then(() => {
-      this.showStatus('XAML copied to clipboard', 'success');
-    });
+    if (!navigator.clipboard) {
+      this.showStatus('Clipboard is not available in this browser', 'error');
+      return;
+    }
+    navigator.clipboard.writeText(this.editableXamlContent)
+      .then(() => this.showStatus('XAML copied to clipboard', 'success'))
+      .catch(() => this.showStatus('Failed to copy XAML to clipboard', 'error'));
   }
 
   downloadXaml() {
@@ -98,10 +110,29 @@ export class XamlEditorComponent implements OnInit {
     this.showStatus('XAML file downloaded', 'success');
   }
 
+  /** Loads a .xaml/.svg file from disk into the editor and applies it. */
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.editableXamlContent = String(reader.result || '');
+      this.applyXaml();
+      input.value = '';
+    };
+    reader.onerror = () => {
+      this.showStatus('Failed to read the selected file', 'error');
+      input.value = '';
+    };
+    reader.readAsText(file);
+  }
+
   resetXaml() {
-    this.xamlContent$.subscribe(xaml => {
-      this.editableXamlContent = xaml;
-      this.showStatus('XAML reset to current design', 'info');
-    });
+    this.editableXamlContent = this.xamlGenerator.generateXaml(this.elementService.getRootElement());
+    this.showStatus('XAML reset to current design', 'info');
   }
 }

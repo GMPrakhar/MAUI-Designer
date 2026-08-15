@@ -11,6 +11,9 @@ export interface DragData {
   isFromToolbox: boolean;
 }
 
+/** MIME type used when dragging a control out of the toolbox onto the canvas. */
+export const TOOLBOX_DRAG_MIME = 'application/x-maui-element-type';
+
 @Injectable({
   providedIn: 'root'
 })
@@ -49,7 +52,53 @@ export class DragDropService {
     }
   }
 
+  /**
+   * Creates a new element of the given type inside the layout under the drop point.
+   * Used by the native drag from the toolbox onto the canvas.
+   */
+  createElementAtPosition(elementType: ElementType, dropX: number, dropY: number, canvasElement: HTMLElement): MauiElement {
+    const targetLayout = this.findLayoutAtPosition(dropX, dropY, canvasElement) || this.elementService.getRootElement();
+
+    const newElement = this.elementService.createElement(elementType);
+    this.elementService.addElement(newElement, targetLayout);
+
+    const position = this.layoutDesigner.getChildLayoutProperties(
+      targetLayout,
+      newElement,
+      this.resolveLocalPosition(targetLayout, dropX, dropY, canvasElement)
+    );
+    this.elementService.updateElementProperties(newElement, position, { recordHistory: false });
+    this.elementService.selectElement(newElement);
+    return newElement;
+  }
+
+  private resolveLocalPosition(targetLayout: MauiElement, dropX: number, dropY: number, canvasElement: HTMLElement): { x: number, y: number } {
+    const layoutInfo = this.layoutDesigner.getLayoutInfo(targetLayout.type);
+    const dom = targetLayout.domElement;
+
+    if (!dom || targetLayout.id === 'root') {
+      return { x: dropX, y: dropY };
+    }
+
+    const rect = dom.getBoundingClientRect();
+    const canvasRect = canvasElement.getBoundingClientRect();
+    const localX = dropX - (rect.left - canvasRect.left);
+    const localY = dropY - (rect.top - canvasRect.top);
+
+    if (layoutInfo.supportsGridPositioning) {
+      const cell = this.layoutDesigner.getGridCellAtPosition(targetLayout, localX, localY, dom);
+      return cell ? { x: cell.column, y: cell.row } : { x: 0, y: 0 };
+    }
+
+    return { x: localX, y: localY };
+  }
+
   handleElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement): void {
+    // A move is a single undo step even though it touches several properties
+    this.elementService.runAsSingleChange(() => this.applyElementMove(element, x, y, targetParent));
+  }
+
+  private applyElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement): void {
     // Get layout info for the target parent
     const layoutInfo = this.layoutDesigner.getLayoutInfo(targetParent.type);
     
@@ -166,7 +215,12 @@ export class DragDropService {
     // element references or use a more sophisticated mapping
     const elementId = domElement.getAttribute('data-element-id');
     if (elementId) {
-      return this.elementService.findElementById(elementId);
+      const found = this.elementService.findElementById(elementId);
+      if (found) {
+        // Keep the DOM reference fresh so position maths stay accurate
+        found.domElement = domElement as HTMLElement;
+      }
+      return found;
     }
     return null;
   }
@@ -182,7 +236,7 @@ export class DragDropService {
     return false;
   }
 
-  private canHaveChildren(elementType: ElementType): boolean {
+  canHaveChildren(elementType: ElementType): boolean {
     switch (elementType) {
       case ElementType.StackLayout:
       case ElementType.VerticalStackLayout:

@@ -1,4 +1,4 @@
-<p><div class="xaml-editor">
+<div class="xaml-editor">
   <div class="editor-toolbar">
     <div class="toolbar-title">XAML Editor</div>
     
@@ -6,6 +6,7 @@
       <button 
         class="action-button apply-button"
         (click)="applyXaml()"
+        data-testid="xaml-apply"
         title="Apply XAML to design">
         <span class="material-icons">play_arrow</span>
         Apply
@@ -14,6 +15,7 @@
       <button 
         class="action-button"
         (click)="resetXaml()"
+        data-testid="xaml-reset"
         title="Reset to current design">
         <span class="material-icons">refresh</span>
         Reset
@@ -22,6 +24,7 @@
       <button 
         class="action-button"
         (click)="copyToClipboard()"
+        data-testid="xaml-copy"
         title="Copy to clipboard">
         <span class="material-icons">content_copy</span>
         Copy
@@ -30,15 +33,34 @@
       <button 
         class="action-button"
         (click)="downloadXaml()"
+        data-testid="xaml-download"
         title="Download XAML file">
         <span class="material-icons">download</span>
         Download
       </button>
+
+      <button
+        class="action-button"
+        (click)="xamlFileInput.click()"
+        data-testid="xaml-import"
+        title="Import a .xaml or .svg file">
+        <span class="material-icons">upload_file</span>
+        Import
+      </button>
+
+      <input
+        #xamlFileInput
+        type="file"
+        class="file-input"
+        data-testid="xaml-file-input"
+        accept=".xaml,.xml,.svg"
+        (change)="onFileSelected($event)"
+        hidden>
     </div>
   </div>
   
   <!-- Status Message -->
-  <div class="status-bar" *ngIf="statusMessage" [ngClass]="'status-' + statusType">
+  <div class="status-bar" data-testid="xaml-status" *ngIf="statusMessage" [ngClass]="'status-' + statusType">
     <span class="material-icons">
       {{ statusType === 'success' ? 'check_circle' : statusType === 'error' ? 'error' : 'info' }}
     </span>
@@ -48,6 +70,7 @@
   <div class="editor-content">
     <textarea 
       class="xaml-editor-textarea"
+      data-testid="xaml-textarea"
       [(ngModel)]="editableXamlContent"
       placeholder="Enter your XAML code here..."
       spellcheck="false">

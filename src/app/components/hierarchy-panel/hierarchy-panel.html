@@ -1,4 +1,4 @@
-<p><div class="hierarchy-panel">
+<div class="hierarchy-panel" data-testid="hierarchy-panel">
   <div class="hierarchy-tree" *ngIf="rootElement$ | async as rootElement">
     <ng-container *ngTemplateOutlet="hierarchyNode; context: { $implicit: rootElement, level: 0 }"></ng-container>
   </div>
@@ -16,6 +16,9 @@
     <div 
       class="node-content"
       [class.selected]="isSelected(element)"
+      [attr.data-testid]="'hierarchy-node-' + element.id"
+      [attr.data-element-type]="element.type"
+      [attr.data-selected]="isSelected(element)"
       (click)="onElementSelect(element)">
       
       <div class="node-icon">
@@ -33,6 +36,7 @@
       <div class="node-actions" *ngIf="element.id !== 'root'">
         <button 
           class="action-button delete-button"
+          [attr.data-testid]="'hierarchy-delete-' + element.id"
           (click)="onElementDelete(element, $event)"
           title="Delete element">
           <span class="material-icons">delete</span>

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, ElementProperties, Thickness } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridLength, GridLengthType, Orientation } from '../models/maui-element';
 
 @Injectable({
   providedIn: 'root'
@@ -21,37 +21,39 @@ ${xamlContent}
 
   private generateElementXaml(element: MauiElement, indentLevel: number): string {
     const indent = '    '.repeat(indentLevel + 1);
-    const childIndent = '    '.repeat(indentLevel + 2);
-    
-    const elementName = this.getXamlElementName(element.type);
+
+    const elementName = this.getXamlElementName(element);
     const attributes = this.generateAttributes(element);
     const hasChildren = element.children && element.children.length > 0;
-    
-    if (!hasChildren) {
+    const isGrid = element.type === ElementType.Grid;
+
+    if (!hasChildren && !isGrid) {
       return `${indent}<${elementName}${attributes} />`;
     }
-    
+
     let xaml = `${indent}<${elementName}${attributes}>`;
-    
+
     // Add special content for certain layouts
-    if (element.type === ElementType.Grid) {
+    if (isGrid) {
       xaml += this.generateGridDefinitions(element, indentLevel + 1);
     }
-    
+
     // Add children
     for (const child of element.children) {
       xaml += '\n' + this.generateElementXaml(child, indentLevel + 1);
     }
-    
+
     xaml += `\n${indent}</${elementName}>`;
-    
+
     return xaml;
   }
 
-  private getXamlElementName(type: ElementType): string {
-    switch (type) {
+  private getXamlElementName(element: MauiElement): string {
+    switch (element.type) {
       case ElementType.StackLayout:
-        return 'VerticalStackLayout'; // or HorizontalStackLayout based on orientation
+        return element.properties.orientation === Orientation.Horizontal
+          ? 'HorizontalStackLayout'
+          : 'VerticalStackLayout';
       case ElementType.VerticalStackLayout:
         return 'VerticalStackLayout';
       case ElementType.AbsoluteLayout:
@@ -75,7 +77,7 @@ ${xamlContent}
       case ElementType.Path:
         return 'Path';
       default:
-        return type;
+        return element.type;
     }
   }
 
@@ -207,20 +209,46 @@ ${xamlContent}
   private generateGridDefinitions(element: MauiElement, indentLevel: number): string {
     const indent = '    '.repeat(indentLevel + 1);
     const childIndent = '    '.repeat(indentLevel + 2);
-    
-    // For now, generate simple grid definitions
-    // This could be enhanced to read from element properties
+
+    const definition: GridDefinition = element.properties.gridDefinition || {
+      rows: [
+        { height: { value: 1, type: GridLengthType.Star } },
+        { height: { value: 1, type: GridLengthType.Star } }
+      ],
+      columns: [
+        { width: { value: 1, type: GridLengthType.Star } },
+        { width: { value: 1, type: GridLengthType.Star } }
+      ]
+    };
+
     let xaml = `\n${indent}<Grid.RowDefinitions>`;
-    xaml += `\n${childIndent}<RowDefinition Height="*" />`;
-    xaml += `\n${childIndent}<RowDefinition Height="*" />`;
+    for (const row of definition.rows) {
+      xaml += `\n${childIndent}<RowDefinition Height="${this.gridLengthToString(row.height)}" />`;
+    }
     xaml += `\n${indent}</Grid.RowDefinitions>`;
-    
+
     xaml += `\n${indent}<Grid.ColumnDefinitions>`;
-    xaml += `\n${childIndent}<ColumnDefinition Width="*" />`;
-    xaml += `\n${childIndent}<ColumnDefinition Width="*" />`;
+    for (const column of definition.columns) {
+      xaml += `\n${childIndent}<ColumnDefinition Width="${this.gridLengthToString(column.width)}" />`;
+    }
     xaml += `\n${indent}</Grid.ColumnDefinitions>`;
-    
+
     return xaml;
+  }
+
+  private gridLengthToString(length: GridLength): string {
+    if (!length) {
+      return '*';
+    }
+    switch (length.type) {
+      case GridLengthType.Auto:
+        return 'Auto';
+      case GridLengthType.Absolute:
+        return `${length.value}`;
+      case GridLengthType.Star:
+      default:
+        return length.value === 1 ? '*' : `${length.value}*`;
+    }
   }
 
   private thicknessToString(thickness: Thickness): string {

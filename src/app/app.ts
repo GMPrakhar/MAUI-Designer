@@ -1,7 +1,9 @@
-import { Component, signal, HostListener } from '@angular/core';
+import { Component, signal, HostListener, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DragDropModule } from '@angular/cdk/drag-drop';
+import { Subscription } from 'rxjs';
 
+import { ElementService } from './services/element';
 import { ToolboxComponent } from './components/toolbox/toolbox';
 import { DesignerCanvasComponent } from './components/designer-canvas/designer-canvas';
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel';
@@ -23,15 +25,21 @@ import { XamlEditorComponent } from './components/xaml-editor/xaml-editor';
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
-export class App {
+export class App implements OnInit, OnDestroy {
   protected readonly title = signal('MAUI Designer - Angular');
-  
+
   leftPanelWidth = 250;
   rightPanelWidth = 350;
   bottomPanelHeight = 200;
-  
+
   selectedTab = 'hierarchy';
   selectedBottomTab = 'xaml';
+
+  canUndo = false;
+  canRedo = false;
+  toastMessage = '';
+  private toastTimeout: any;
+  private subscription = new Subscription();
 
   // Resize state
   private isResizing = false;
@@ -44,6 +52,61 @@ export class App {
   // Constants for panel constraints
   private readonly MIN_PANEL_SIZE = 50;
   private readonly MAX_PANEL_RATIO = 0.8;
+
+  constructor(private elementService: ElementService) {}
+
+  ngOnInit() {
+    this.subscription.add(
+      this.elementService.history$.subscribe(state => {
+        this.canUndo = state.canUndo;
+        this.canRedo = state.canRedo;
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+    }
+  }
+
+  undo() {
+    this.elementService.undo();
+  }
+
+  redo() {
+    this.elementService.redo();
+  }
+
+  saveDesign() {
+    this.showToast(
+      this.elementService.saveToStorage()
+        ? 'Design saved to this browser'
+        : 'Unable to save the design (storage unavailable)'
+    );
+  }
+
+  loadDesign() {
+    this.showToast(
+      this.elementService.loadFromStorage()
+        ? 'Design loaded'
+        : 'No saved design found'
+    );
+  }
+
+  clearDesign() {
+    this.elementService.clearDesign();
+    this.showToast('Canvas cleared');
+  }
+
+  private showToast(message: string) {
+    this.toastMessage = message;
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+    }
+    this.toastTimeout = setTimeout(() => (this.toastMessage = ''), 3000);
+  }
 
   selectTab(tab: string) {
     this.selectedTab = tab;

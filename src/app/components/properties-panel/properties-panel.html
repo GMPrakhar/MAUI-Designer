@@ -1,8 +1,27 @@
-<p><div class="properties-panel">
+<div class="properties-panel">
   <div class="properties-content" *ngIf="selectedElement$ | async as element; else noSelection">
     <div class="property-section">
-      <h3 class="section-title">Element: {{ element.name }}</h3>
-      <div class="section-subtitle">{{ element.type }}</div>
+      <h3 class="section-title" data-testid="selected-element-name">Element: {{ element.name }}</h3>
+      <div class="section-subtitle" data-testid="selected-element-type">{{ element.type }}</div>
+
+      <div class="property-group">
+        <label class="property-label">Name</label>
+        <input
+          type="text"
+          class="property-input"
+          data-testid="prop-name"
+          [value]="element.name"
+          (change)="updateName(element, $any($event.target).value)">
+      </div>
+
+      <div class="element-actions" *ngIf="!isRoot(element)">
+        <button class="action-button" data-testid="prop-duplicate" (click)="duplicate(element)">
+          <span class="material-icons">content_copy</span> Duplicate
+        </button>
+        <button class="action-button danger" data-testid="prop-delete" (click)="remove(element)">
+          <span class="material-icons">delete</span> Delete
+        </button>
+      </div>
     </div>
 
     <!-- General Properties -->
@@ -14,6 +33,7 @@
         <input 
           type="number" 
           class="property-input"
+          data-testid="prop-width"
           [value]="element.properties.width || 0"
           (input)="updateProperty(element, 'width', +$any($event.target).value)">
       </div>
@@ -23,6 +43,7 @@
         <input 
           type="number" 
           class="property-input"
+          data-testid="prop-height"
           [value]="element.properties.height || 0"
           (input)="updateProperty(element, 'height', +$any($event.target).value)">
       </div>
@@ -32,6 +53,7 @@
         <input 
           type="number" 
           class="property-input"
+          data-testid="prop-x"
           [value]="element.properties.x || 0"
           (input)="updateProperty(element, 'x', +$any($event.target).value)">
       </div>
@@ -41,6 +63,7 @@
         <input 
           type="number" 
           class="property-input"
+          data-testid="prop-y"
           [value]="element.properties.y || 0"
           (input)="updateProperty(element, 'y', +$any($event.target).value)">
       </div>
@@ -55,6 +78,7 @@
         <input 
           type="color" 
           class="property-input color-input"
+          data-testid="prop-backgroundColor"
           [value]="element.properties.backgroundColor || '#ffffff'"
           (input)="updateProperty(element, 'backgroundColor', $any($event.target).value)">
       </div>
@@ -64,6 +88,7 @@
         <input 
           type="color" 
           class="property-input color-input"
+          data-testid="prop-textColor"
           [value]="element.properties.textColor || '#000000'"
           (input)="updateProperty(element, 'textColor', $any($event.target).value)">
       </div>
@@ -78,6 +103,7 @@
         <input 
           type="text" 
           class="property-input"
+          data-testid="prop-text"
           [value]="element.properties.text || ''"
           (input)="updateProperty(element, 'text', $any($event.target).value)">
       </div>
@@ -87,6 +113,7 @@
         <input 
           type="number" 
           class="property-input"
+          data-testid="prop-fontSize"
           [value]="element.properties.fontSize || 14"
           (input)="updateProperty(element, 'fontSize', +$any($event.target).value)">
       </div>
@@ -144,6 +171,162 @@
           [value]="element.properties.strokeThickness ?? 0"
           (input)="updateProperty(element, 'strokeThickness', +$any($event.target).value)">
       </div>
+    </div>
+
+    <!-- Font attributes -->
+    <div class="property-section" *ngIf="element.properties.text !== undefined">
+      <div class="property-group">
+        <label class="property-label">Font Attributes</label>
+        <select
+          class="property-input"
+          data-testid="prop-fontAttributes"
+          [value]="element.properties.fontAttributes || 'None'"
+          (change)="updateProperty(element, 'fontAttributes', $any($event.target).value)">
+          <option *ngFor="let attribute of fontAttributes" [value]="attribute">{{ attribute }}</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Stack layout properties -->
+    <div class="property-section" *ngIf="isStackLayout(element)">
+      <h4 class="section-header">Layout</h4>
+
+      <div class="property-group" *ngIf="supportsOrientation(element)">
+        <label class="property-label">Orientation</label>
+        <select
+          class="property-input"
+          data-testid="prop-orientation"
+          [value]="element.properties.orientation || 'Vertical'"
+          (change)="updateProperty(element, 'orientation', $any($event.target).value)">
+          <option *ngFor="let orientation of orientations" [value]="orientation">{{ orientation }}</option>
+        </select>
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Spacing</label>
+        <input
+          type="number"
+          class="property-input"
+          data-testid="prop-spacing"
+          [value]="element.properties.spacing || 0"
+          (input)="updateProperty(element, 'spacing', +$any($event.target).value)">
+      </div>
+    </div>
+
+    <!-- Grid definitions -->
+    <div class="property-section" *ngIf="isGrid(element)" data-testid="grid-definition-section">
+      <h4 class="section-header">Grid Definition</h4>
+
+      <div class="grid-def-header">
+        <span data-testid="grid-row-count">Rows: {{ gridRowCount(element) }}</span>
+        <button class="action-button" data-testid="grid-add-row" (click)="addRow(element)">Add row</button>
+      </div>
+
+      <div class="grid-def-row" *ngFor="let row of gridRows(element); let i = index" [attr.data-testid]="'grid-row-' + i">
+        <span class="grid-def-index">R{{ i }}</span>
+        <select
+          class="property-input small"
+          [attr.data-testid]="'grid-row-type-' + i"
+          [value]="row.height.type"
+          (change)="updateRowType(element, i, $any($event.target).value)">
+          <option *ngFor="let type of gridLengthTypes" [value]="type">{{ type }}</option>
+        </select>
+        <input
+          type="number"
+          class="property-input small"
+          [attr.data-testid]="'grid-row-value-' + i"
+          [disabled]="row.height.type === 'Auto'"
+          [value]="row.height.value"
+          (input)="updateRowValue(element, i, +$any($event.target).value)">
+        <button
+          class="action-button danger"
+          [attr.data-testid]="'grid-remove-row-' + i"
+          [disabled]="gridRowCount(element) <= 1"
+          (click)="removeRow(element, i)">
+          <span class="material-icons">remove</span>
+        </button>
+      </div>
+
+      <div class="grid-def-header">
+        <span data-testid="grid-column-count">Columns: {{ gridColumnCount(element) }}</span>
+        <button class="action-button" data-testid="grid-add-column" (click)="addColumn(element)">Add column</button>
+      </div>
+
+      <div class="grid-def-row" *ngFor="let column of gridColumns(element); let i = index" [attr.data-testid]="'grid-column-' + i">
+        <span class="grid-def-index">C{{ i }}</span>
+        <select
+          class="property-input small"
+          [attr.data-testid]="'grid-column-type-' + i"
+          [value]="column.width.type"
+          (change)="updateColumnType(element, i, $any($event.target).value)">
+          <option *ngFor="let type of gridLengthTypes" [value]="type">{{ type }}</option>
+        </select>
+        <input
+          type="number"
+          class="property-input small"
+          [attr.data-testid]="'grid-column-value-' + i"
+          [disabled]="column.width.type === 'Auto'"
+          [value]="column.width.value"
+          (input)="updateColumnValue(element, i, +$any($event.target).value)">
+        <button
+          class="action-button danger"
+          [attr.data-testid]="'grid-remove-column-' + i"
+          [disabled]="gridColumnCount(element) <= 1"
+          (click)="removeColumn(element, i)">
+          <span class="material-icons">remove</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Grid child placement -->
+    <div class="property-section" *ngIf="isGridChild(element)" data-testid="grid-placement-section">
+      <h4 class="section-header">Grid Placement</h4>
+
+      <div class="spacing-grid">
+        <div class="spacing-item">
+          <label class="property-label">Row</label>
+          <input type="number" class="property-input small" data-testid="prop-row"
+                 [value]="element.properties.row || 0"
+                 (input)="updateProperty(element, 'row', +$any($event.target).value)">
+        </div>
+        <div class="spacing-item">
+          <label class="property-label">Column</label>
+          <input type="number" class="property-input small" data-testid="prop-column"
+                 [value]="element.properties.column || 0"
+                 (input)="updateProperty(element, 'column', +$any($event.target).value)">
+        </div>
+        <div class="spacing-item">
+          <label class="property-label">Row Span</label>
+          <input type="number" class="property-input small" data-testid="prop-rowSpan"
+                 [value]="element.properties.rowSpan || 1"
+                 (input)="updateProperty(element, 'rowSpan', +$any($event.target).value)">
+        </div>
+        <div class="spacing-item">
+          <label class="property-label">Column Span</label>
+          <input type="number" class="property-input small" data-testid="prop-columnSpan"
+                 [value]="element.properties.columnSpan || 1"
+                 (input)="updateProperty(element, 'columnSpan', +$any($event.target).value)">
+        </div>
+      </div>
+    </div>
+
+    <!-- State -->
+    <div class="property-section">
+      <h4 class="section-header">State</h4>
+
+      <label class="checkbox-group">
+        <input type="checkbox" data-testid="prop-isVisible"
+               [checked]="element.properties.isVisible !== false"
+               (change)="updateProperty(element, 'isVisible', $any($event.target).checked)">
+        Visible
+      </label>
+
+      <label class="checkbox-group">
+        <input type="checkbox" data-testid="prop-isEnabled"
+               [checked]="element.properties.isEnabled !== false"
+               (change)="updateProperty(element, 'isEnabled', $any($event.target).checked)">
+        Enabled
+      </label>
     </div>
 
     <!-- Margin Properties -->
