@@ -8,6 +8,7 @@ export interface ToolboxItem {
 
 export enum ToolboxCategory {
   Controls = 'Controls',
+  Inputs = 'Inputs',
   Layouts = 'Layouts',
   Views = 'Views'
 }
@@ -33,13 +34,69 @@ export const MAUI_CONTROLS: ToolboxItem[] = [
     displayName: 'Entry',
     icon: 'input',
     description: 'Single line text input',
-    category: ToolboxCategory.Controls
+    category: ToolboxCategory.Inputs
   },
   {
     type: 'Editor',
     displayName: 'Editor',
     icon: 'edit_note',
     description: 'Multi-line text input',
+    category: ToolboxCategory.Inputs
+  },
+  {
+    type: 'SearchBar',
+    displayName: 'SearchBar',
+    icon: 'search',
+    description: 'Search input with a search button',
+    category: ToolboxCategory.Inputs
+  },
+  {
+    type: 'CheckBox',
+    displayName: 'CheckBox',
+    icon: 'check_box',
+    description: 'Boolean check box',
+    category: ToolboxCategory.Inputs
+  },
+  {
+    type: 'Switch',
+    displayName: 'Switch',
+    icon: 'toggle_on',
+    description: 'On/off toggle',
+    category: ToolboxCategory.Inputs
+  },
+  {
+    type: 'Slider',
+    displayName: 'Slider',
+    icon: 'tune',
+    description: 'Selects a value from a range',
+    category: ToolboxCategory.Inputs
+  },
+  {
+    type: 'Stepper',
+    displayName: 'Stepper',
+    icon: 'exposure',
+    description: 'Increments and decrements a value',
+    category: ToolboxCategory.Inputs
+  },
+  {
+    type: 'DatePicker',
+    displayName: 'DatePicker',
+    icon: 'event',
+    description: 'Selects a date',
+    category: ToolboxCategory.Inputs
+  },
+  {
+    type: 'ProgressBar',
+    displayName: 'ProgressBar',
+    icon: 'linear_scale',
+    description: 'Shows progress of a task',
+    category: ToolboxCategory.Controls
+  },
+  {
+    type: 'ActivityIndicator',
+    displayName: 'ActivityIndicator',
+    icon: 'refresh',
+    description: 'Shows that work is in progress',
     category: ToolboxCategory.Controls
   },
   {
@@ -96,10 +153,24 @@ export const MAUI_CONTROLS: ToolboxItem[] = [
     category: ToolboxCategory.Views
   },
   {
+    type: 'Border',
+    displayName: 'Border',
+    icon: 'rounded_corner',
+    description: 'Container with a stroke and corner radius',
+    category: ToolboxCategory.Views
+  },
+  {
     type: 'ScrollView',
     displayName: 'ScrollView',
     icon: 'unfold_more',
     description: 'Scrollable container',
+    category: ToolboxCategory.Views
+  },
+  {
+    type: 'CollectionView',
+    displayName: 'CollectionView',
+    icon: 'view_list',
+    description: 'Repeats an item template over a bound collection',
     category: ToolboxCategory.Views
   }
 ];

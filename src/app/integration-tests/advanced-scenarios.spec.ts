@@ -31,7 +31,7 @@ describe('Advanced Integration Scenarios', () => {
       
       const inputEntry = elementService.createElement(ElementType.Entry, {
         x: 10, y: 60, width: 250, height: 35,
-        text: 'Enter your name',
+        placeholder: 'Enter your name',
         backgroundColor: '#ffffff'
       });
       
@@ -70,7 +70,7 @@ describe('Advanced Integration Scenarios', () => {
       expect(parsedLayout.children.length).toBe(3);
       expect(parsedLayout.children[0].properties.text).toBe('Updated Application Title');
       expect(parsedLayout.children[0].properties.fontSize).toBe(28);
-      expect(parsedLayout.children[1].properties.text).toBe('Enter your name'); // Placeholder becomes text
+      expect(parsedLayout.children[1].properties.placeholder).toBe('Enter your name');
       expect(parsedLayout.children[2].properties.text).toBe('Submit');
       
       // Step 5: Set the parsed layout and verify service state

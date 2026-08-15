@@ -9,6 +9,7 @@ import { DesignerCanvasComponent } from './components/designer-canvas/designer-c
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel';
 import { HierarchyPanelComponent } from './components/hierarchy-panel/hierarchy-panel';
 import { XamlEditorComponent } from './components/xaml-editor/xaml-editor';
+import { CanvasToolbarComponent } from './components/canvas-toolbar/canvas-toolbar';
 
 @Component({
   selector: 'app-root',
@@ -20,7 +21,8 @@ import { XamlEditorComponent } from './components/xaml-editor/xaml-editor';
     DesignerCanvasComponent,
     PropertiesPanelComponent,
     HierarchyPanelComponent,
-    XamlEditorComponent
+    XamlEditorComponent,
+    CanvasToolbarComponent
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss'

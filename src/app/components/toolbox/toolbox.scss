@@ -130,3 +130,50 @@
   color: #888;
   font-size: 13px;
 }
+
+.toolbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.toolbox-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  color: #334155;
+
+  &:hover {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+  }
+
+  .material-icons {
+    font-size: 16px;
+    color: #64748b;
+  }
+
+  .item-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .icon-button {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #94a3b8;
+    padding: 0;
+
+    &:hover { color: #ef4444; }
+  }
+}

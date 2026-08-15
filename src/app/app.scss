@@ -39,11 +39,24 @@
 
 .center-panel {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   background-color: #f7fafc;
   border: 1px solid #e2e8f0;
   margin: 5px;
   border-radius: 4px;
   overflow: hidden;
+
+  app-canvas-toolbar {
+    flex: 0 0 auto;
+  }
+
+  app-designer-canvas {
+    flex: 1;
+    min-height: 0;
+    display: block;
+  }
 }
 
 .bottom-panel {

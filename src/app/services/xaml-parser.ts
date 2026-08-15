@@ -67,6 +67,8 @@ export class XamlParserService {
            type === ElementType.StackLayout ||
            type === ElementType.VerticalStackLayout ||
            type === ElementType.Frame ||
+           type === ElementType.Border ||
+           type === ElementType.CollectionView ||
            type === ElementType.ScrollView;
   }
 
@@ -86,15 +88,7 @@ export class XamlParserService {
     };
 
     // Parse child elements
-    for (let i = 0; i < xmlElement.children.length; i++) {
-      const childXmlElement = xmlElement.children[i];
-
-      // Grid definitions are property elements, not children
-      if (childXmlElement.tagName.includes('.RowDefinitions') ||
-          childXmlElement.tagName.includes('.ColumnDefinitions')) {
-        continue;
-      }
-
+    for (const childXmlElement of this.getChildElements(xmlElement)) {
       const childElementType = this.getElementTypeFromTag(childXmlElement.tagName);
       if (childElementType) {
         const childElement = this.parseElement(childXmlElement, element);
@@ -107,6 +101,37 @@ export class XamlParserService {
     }
 
     return element;
+  }
+
+  /**
+   * Returns the real child views, skipping property elements such as
+   * Grid.RowDefinitions and unwrapping CollectionView.ItemTemplate/DataTemplate.
+   */
+  private getChildElements(xmlElement: Element): Element[] {
+    const children: Element[] = [];
+
+    for (let i = 0; i < xmlElement.children.length; i++) {
+      const child = xmlElement.children[i];
+      const tag = child.tagName;
+
+      if (tag.includes('.RowDefinitions') || tag.includes('.ColumnDefinitions')) {
+        continue;
+      }
+
+      if (tag.includes('.ItemTemplate') || tag.toLowerCase() === 'datatemplate') {
+        children.push(...this.getChildElements(child));
+        continue;
+      }
+
+      // Any other property element (Border.StrokeShape, Grid.Resources, ...)
+      if (tag.includes('.')) {
+        continue;
+      }
+
+      children.push(child);
+    }
+
+    return children;
   }
 
   private parseGridDefinition(gridXmlElement: Element): GridDefinition {
@@ -186,6 +211,26 @@ export class XamlParserService {
         return ElementType.Entry;
       case 'editor':
         return ElementType.Editor;
+      case 'searchbar':
+        return ElementType.SearchBar;
+      case 'checkbox':
+        return ElementType.CheckBox;
+      case 'switch':
+        return ElementType.Switch;
+      case 'slider':
+        return ElementType.Slider;
+      case 'stepper':
+        return ElementType.Stepper;
+      case 'progressbar':
+        return ElementType.ProgressBar;
+      case 'activityindicator':
+        return ElementType.ActivityIndicator;
+      case 'datepicker':
+        return ElementType.DatePicker;
+      case 'border':
+        return ElementType.Border;
+      case 'collectionview':
+        return ElementType.CollectionView;
       case 'image':
         return ElementType.Image;
       case 'path':
@@ -308,12 +353,66 @@ export class XamlParserService {
       isEnabled: true
     };
 
+    // Bindings are captured separately so they survive a round trip
+    const bindings = this.parseBindings(xmlElement);
+    if (Object.keys(bindings).length > 0) {
+      properties.bindings = bindings;
+    }
+
+    const literal = (name: string): string | null => {
+      const value = xmlElement.getAttribute(name);
+      return value === null || this.isBindingExpression(value) ? null : value;
+    };
+
     // Parse basic properties
-    const text = xmlElement.getAttribute('Text');
+    const text = literal('Text');
     if (text) properties.text = text;
 
-    const placeholder = xmlElement.getAttribute('Placeholder');
-    if (placeholder) properties.text = placeholder; // Entry placeholder becomes text property
+    const placeholder = literal('Placeholder');
+    if (placeholder) properties.placeholder = placeholder;
+
+    const isChecked = literal('IsChecked');
+    if (isChecked) properties.isChecked = isChecked.toLowerCase() === 'true';
+
+    const isToggled = literal('IsToggled');
+    if (isToggled) properties.isToggled = isToggled.toLowerCase() === 'true';
+
+    const minimum = literal('Minimum');
+    if (minimum) properties.minimum = parseFloat(minimum);
+
+    const maximum = literal('Maximum');
+    if (maximum) properties.maximum = parseFloat(maximum);
+
+    const increment = literal('Increment');
+    if (increment) properties.increment = parseFloat(increment);
+
+    const value = literal('Value');
+    if (value) properties.value = parseFloat(value);
+
+    const progress = literal('Progress');
+    if (progress) properties.progress = parseFloat(progress);
+
+    const isRunning = literal('IsRunning');
+    if (isRunning) properties.isRunning = isRunning.toLowerCase() === 'true';
+
+    const date = literal('Date');
+    if (date) properties.date = date;
+
+    const cornerRadius = literal('CornerRadius');
+    if (cornerRadius) properties.cornerRadius = parseFloat(cornerRadius);
+
+    const strokeShape = literal('StrokeShape');
+    if (strokeShape) {
+      const radius = parseFloat(strokeShape.replace(/[^0-9.]/g, ''));
+      if (!Number.isNaN(radius)) properties.cornerRadius = radius;
+    }
+
+    if (elementType === ElementType.Border) {
+      const borderColor = literal('Stroke');
+      if (borderColor) properties.borderColor = borderColor;
+      const borderWidth = literal('StrokeThickness');
+      if (borderWidth) properties.borderWidth = parseFloat(borderWidth);
+    }
 
     const pathData = xmlElement.getAttribute('Data');
     if (pathData) properties.pathData = pathData;
@@ -416,6 +515,25 @@ export class XamlParserService {
     return properties;
   }
 
+  private isBindingExpression(value: string): boolean {
+    return /^\s*\{\s*Binding\b/i.test(value);
+  }
+
+  /** Collects every attribute written as `{Binding Path}` into a map. */
+  private parseBindings(xmlElement: Element): Record<string, string> {
+    const bindings: Record<string, string> = {};
+    for (let i = 0; i < xmlElement.attributes.length; i++) {
+      const attribute = xmlElement.attributes[i];
+      if (!this.isBindingExpression(attribute.value)) {
+        continue;
+      }
+      const match = /\{\s*Binding\s+([^},]*)/i.exec(attribute.value);
+      const path = (match?.[1] || '').trim();
+      bindings[attribute.name] = path.replace(/^Path\s*=\s*/i, '');
+    }
+    return bindings;
+  }
+
   private parseThickness(value: string): Thickness {
     const values = value.split(',').map(v => parseFloat(v.trim()));
     if (values.length === 1) {
@@ -448,10 +566,54 @@ export class XamlParserService {
         if (properties.fontSize === undefined) properties.fontSize = 14;
         break;
       case ElementType.Entry:
-        if (properties.width === undefined) properties.width = 100;
-        if (properties.height === undefined) properties.height = 30;
+      case ElementType.SearchBar:
+        if (properties.width === undefined) properties.width = 200;
+        if (properties.height === undefined) properties.height = 40;
         if (properties.backgroundColor === undefined) properties.backgroundColor = '#ffffff';
         if (properties.textColor === undefined) properties.textColor = '#000000';
+        break;
+      case ElementType.CheckBox:
+        if (properties.width === undefined) properties.width = 40;
+        if (properties.height === undefined) properties.height = 40;
+        if (properties.isChecked === undefined) properties.isChecked = false;
+        break;
+      case ElementType.Switch:
+        if (properties.width === undefined) properties.width = 60;
+        if (properties.height === undefined) properties.height = 32;
+        if (properties.isToggled === undefined) properties.isToggled = false;
+        break;
+      case ElementType.Slider:
+      case ElementType.Stepper:
+        if (properties.width === undefined) properties.width = 200;
+        if (properties.height === undefined) properties.height = 32;
+        if (properties.minimum === undefined) properties.minimum = 0;
+        if (properties.maximum === undefined) properties.maximum = 100;
+        if (properties.value === undefined) properties.value = 0;
+        break;
+      case ElementType.ProgressBar:
+        if (properties.width === undefined) properties.width = 200;
+        if (properties.height === undefined) properties.height = 12;
+        if (properties.progress === undefined) properties.progress = 0;
+        break;
+      case ElementType.ActivityIndicator:
+        if (properties.width === undefined) properties.width = 40;
+        if (properties.height === undefined) properties.height = 40;
+        if (properties.isRunning === undefined) properties.isRunning = true;
+        break;
+      case ElementType.DatePicker:
+        if (properties.width === undefined) properties.width = 180;
+        if (properties.height === undefined) properties.height = 40;
+        break;
+      case ElementType.Border:
+        if (properties.width === undefined) properties.width = 150;
+        if (properties.height === undefined) properties.height = 100;
+        if (properties.borderColor === undefined) properties.borderColor = '#cccccc';
+        if (properties.borderWidth === undefined) properties.borderWidth = 1;
+        break;
+      case ElementType.CollectionView:
+        if (properties.width === undefined) properties.width = 240;
+        if (properties.height === undefined) properties.height = 200;
+        if (properties.itemCount === undefined) properties.itemCount = 3;
         break;
       case ElementType.Editor:
         if (properties.width === undefined) properties.width = 100;

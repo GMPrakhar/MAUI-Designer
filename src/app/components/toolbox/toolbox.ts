@@ -5,6 +5,8 @@ import { MAUI_CONTROLS, ToolboxItem, ToolboxCategory } from '../../models/toolbo
 import { ElementType, MauiElement } from '../../models/maui-element';
 import { ElementService } from '../../services/element';
 import { DragDropService, TOOLBOX_DRAG_MIME } from '../../services/drag-drop';
+import { ClipboardService, ComponentTemplate, StarterPage } from '../../services/clipboard';
+import { Observable } from 'rxjs';
 
 @Component({
   selector: 'app-toolbox',
@@ -18,10 +20,37 @@ export class ToolboxComponent {
   categories = Object.values(ToolboxCategory);
   searchTerm = '';
 
+  templates$: Observable<ComponentTemplate[]>;
+  starterPages: StarterPage[];
+
   constructor(
     private elementService: ElementService,
-    private dragDropService: DragDropService
-  ) {}
+    private dragDropService: DragDropService,
+    private clipboardService: ClipboardService
+  ) {
+    this.templates$ = this.clipboardService.templates$;
+    this.starterPages = this.clipboardService.starterPages;
+  }
+
+  // --- Templates & starter pages ---------------------------------------------
+
+  matchesSearch(text: string): boolean {
+    const term = this.searchTerm.trim().toLowerCase();
+    return !term || text.toLowerCase().includes(term);
+  }
+
+  insertTemplate(template: ComponentTemplate) {
+    this.clipboardService.insertTemplate(template.id, this.resolveTargetParent());
+  }
+
+  deleteTemplate(event: Event, template: ComponentTemplate) {
+    event.stopPropagation();
+    this.clipboardService.deleteTemplate(template.id);
+  }
+
+  applyStarterPage(page: StarterPage) {
+    this.clipboardService.applyStarterPage(page.id);
+  }
 
   getItemsByCategory(category: ToolboxCategory): ToolboxItem[] {
     const term = this.searchTerm.trim().toLowerCase();
@@ -78,7 +107,7 @@ export class ToolboxComponent {
    * New controls are added to the selected layout when one is selected,
    * so nesting does not require a drag operation.
    */
-  private resolveTargetParent(): MauiElement {
+  resolveTargetParent(): MauiElement {
     const selected = this.elementService.getSelectedElement();
     if (selected && this.dragDropService.canHaveChildren(selected.type)) {
       return selected;

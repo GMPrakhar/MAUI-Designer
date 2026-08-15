@@ -1,0 +1,120 @@
+<div class="canvas-toolbar" data-testid="canvas-toolbar">
+  <div class="toolbar-group">
+    <label class="toolbar-label" for="device-select">Device</label>
+    <select
+      id="device-select"
+      class="toolbar-select"
+      data-testid="device-select"
+      [value]="viewport.deviceId"
+      (change)="selectDevice($any($event.target).value)">
+      <option *ngFor="let device of devices" [value]="device.id">{{ device.name }}</option>
+    </select>
+  </div>
+
+  <div class="toolbar-group">
+    <button class="toolbar-button" data-testid="zoom-out" title="Zoom out" (click)="zoomOut()">
+      <span class="material-icons">remove</span>
+    </button>
+    <span class="zoom-value" data-testid="zoom-value">{{ zoomPercent }}%</span>
+    <button class="toolbar-button" data-testid="zoom-in" title="Zoom in" (click)="zoomIn()">
+      <span class="material-icons">add</span>
+    </button>
+    <button class="toolbar-button" data-testid="zoom-fit" title="Fit to window" (click)="zoomToFit()">
+      <span class="material-icons">fit_screen</span>
+    </button>
+    <button class="toolbar-button" data-testid="zoom-reset" title="Reset zoom and pan" (click)="resetView()">
+      <span class="material-icons">restart_alt</span>
+    </button>
+  </div>
+
+  <div class="toolbar-group">
+    <button
+      class="toolbar-button"
+      data-testid="toggle-theme"
+      [attr.data-active]="viewport.theme === 'dark'"
+      [title]="viewport.theme === 'dark' ? 'Switch to light preview' : 'Switch to dark preview'"
+      (click)="toggleTheme()">
+      <span class="material-icons">{{ viewport.theme === 'dark' ? 'dark_mode' : 'light_mode' }}</span>
+    </button>
+
+    <button
+      class="toolbar-button"
+      data-testid="toggle-snap"
+      [attr.data-active]="viewport.snapToGrid"
+      title="Snap to grid"
+      (click)="toggleSnap()">
+      <span class="material-icons">grid_goldenratio</span>
+    </button>
+
+    <button
+      class="toolbar-button"
+      data-testid="toggle-grid"
+      [attr.data-active]="viewport.showGrid"
+      title="Show grid"
+      (click)="toggleGrid()">
+      <span class="material-icons">grid_on</span>
+    </button>
+
+    <button
+      class="toolbar-button"
+      data-testid="toggle-rulers"
+      [attr.data-active]="viewport.showRulers"
+      title="Show rulers"
+      (click)="toggleRulers()">
+      <span class="material-icons">straighten</span>
+    </button>
+
+    <input
+      type="number"
+      class="toolbar-number"
+      data-testid="grid-size"
+      min="2"
+      max="200"
+      title="Grid size in pixels"
+      [value]="viewport.gridSize"
+      (input)="setGridSize(+$any($event.target).value)">
+  </div>
+
+  <div class="toolbar-group" data-testid="align-group">
+    <button class="toolbar-button" data-testid="align-left" title="Align left" [disabled]="!canAlign" (click)="align('left')">
+      <span class="material-icons">align_horizontal_left</span>
+    </button>
+    <button class="toolbar-button" data-testid="align-center" title="Align centre" [disabled]="!canAlign" (click)="align('center')">
+      <span class="material-icons">align_horizontal_center</span>
+    </button>
+    <button class="toolbar-button" data-testid="align-right" title="Align right" [disabled]="!canAlign" (click)="align('right')">
+      <span class="material-icons">align_horizontal_right</span>
+    </button>
+    <button class="toolbar-button" data-testid="align-top" title="Align top" [disabled]="!canAlign" (click)="align('top')">
+      <span class="material-icons">align_vertical_top</span>
+    </button>
+    <button class="toolbar-button" data-testid="align-middle" title="Align middle" [disabled]="!canAlign" (click)="align('middle')">
+      <span class="material-icons">align_vertical_center</span>
+    </button>
+    <button class="toolbar-button" data-testid="align-bottom" title="Align bottom" [disabled]="!canAlign" (click)="align('bottom')">
+      <span class="material-icons">align_vertical_bottom</span>
+    </button>
+    <button class="toolbar-button" data-testid="distribute-horizontal" title="Distribute horizontally" [disabled]="!canDistribute" (click)="distribute('horizontal')">
+      <span class="material-icons">horizontal_distribute</span>
+    </button>
+    <button class="toolbar-button" data-testid="distribute-vertical" title="Distribute vertically" [disabled]="!canDistribute" (click)="distribute('vertical')">
+      <span class="material-icons">vertical_distribute</span>
+    </button>
+  </div>
+
+  <div class="toolbar-group">
+    <button class="toolbar-button" data-testid="toolbar-copy" title="Copy (Ctrl+C)" [disabled]="!hasSelection" (click)="copy()">
+      <span class="material-icons">content_copy</span>
+    </button>
+    <button class="toolbar-button" data-testid="toolbar-paste" title="Paste (Ctrl+V)" (click)="paste()">
+      <span class="material-icons">content_paste</span>
+    </button>
+    <button class="toolbar-button" data-testid="save-template" title="Save selection as a template" [disabled]="!hasSelection" (click)="saveAsTemplate()">
+      <span class="material-icons">bookmark_add</span>
+    </button>
+  </div>
+
+  <div class="toolbar-group selection-count" data-testid="selection-count">
+    {{ selection.length }} selected
+  </div>
+</div>

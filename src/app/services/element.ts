@@ -7,12 +7,15 @@ import { BehaviorSubject, Observable } from 'rxjs';import { MauiElement, Element
 export class ElementService {
   private rootElement: MauiElement;
   private selectedElement: MauiElement | null = null;
+  private selectedElements: MauiElement[] = [];
   private elementCounter = 0;
 
   private selectedElementSubject = new BehaviorSubject<MauiElement | null>(null);
+  private selectedElementsSubject = new BehaviorSubject<MauiElement[]>([]);
   private elementsSubject: BehaviorSubject<MauiElement>;
 
   selectedElement$ = this.selectedElementSubject.asObservable();
+  selectedElements$ = this.selectedElementsSubject.asObservable();
   elements$: Observable<MauiElement>;
 
   // Undo / redo history of serialized snapshots
@@ -90,15 +93,84 @@ export class ElementService {
       case ElementType.Entry:
         return {
           ...common,
+          width: 200,
           text: '',
+          placeholder: 'Enter text',
           backgroundColor: '#ffffff',
           textColor: '#000000'
         };
       case ElementType.Editor:
         return {
           ...common,
+          width: 200,
           height: 100,
           text: '',
+          placeholder: 'Enter text',
+          backgroundColor: '#ffffff',
+          textColor: '#000000'
+        };
+      case ElementType.SearchBar:
+        return {
+          ...common,
+          width: 220,
+          height: 40,
+          placeholder: 'Search',
+          backgroundColor: '#ffffff',
+          textColor: '#000000'
+        };
+      case ElementType.CheckBox:
+        return {
+          ...common,
+          width: 40,
+          height: 40,
+          isChecked: false
+        };
+      case ElementType.Switch:
+        return {
+          ...common,
+          width: 60,
+          height: 32,
+          isToggled: false
+        };
+      case ElementType.Slider:
+        return {
+          ...common,
+          width: 200,
+          height: 32,
+          minimum: 0,
+          maximum: 100,
+          value: 50
+        };
+      case ElementType.Stepper:
+        return {
+          ...common,
+          width: 120,
+          height: 40,
+          minimum: 0,
+          maximum: 100,
+          increment: 1,
+          value: 0
+        };
+      case ElementType.ProgressBar:
+        return {
+          ...common,
+          width: 200,
+          height: 12,
+          progress: 0.5
+        };
+      case ElementType.ActivityIndicator:
+        return {
+          ...common,
+          width: 40,
+          height: 40,
+          isRunning: true
+        };
+      case ElementType.DatePicker:
+        return {
+          ...common,
+          width: 180,
+          height: 40,
+          date: new Date().toISOString().slice(0, 10),
           backgroundColor: '#ffffff',
           textColor: '#000000'
         };
@@ -152,6 +224,24 @@ export class ElementService {
           backgroundColor: '#f0f0f0',
           width: 150,
           height: 100
+        };
+      case ElementType.Border:
+        return {
+          ...common,
+          width: 150,
+          height: 100,
+          backgroundColor: '#ffffff',
+          borderColor: '#cccccc',
+          borderWidth: 1,
+          cornerRadius: 8
+        };
+      case ElementType.CollectionView:
+        return {
+          ...common,
+          width: 240,
+          height: 200,
+          itemCount: 3,
+          itemTemplateText: 'Item'
         };
       case ElementType.ScrollView:
         return {
@@ -243,9 +333,129 @@ export class ElementService {
     return clone;
   }
 
+  /** Serializes a set of elements (used by copy/paste and templates). */
+  serializeElements(elements: MauiElement[]): string {
+    return JSON.stringify(elements.map(element => ElementService.toPlainObject(element)));
+  }
+
+  /**
+   * Inserts previously serialized elements into a parent with fresh ids and
+   * names, as a single undo step. Returns the inserted elements.
+   */
+  insertSerializedElements(json: string, parent?: MauiElement, offset = 0): MauiElement[] {
+    let plain: any[];
+    try {
+      plain = JSON.parse(json);
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(plain) || plain.length === 0) {
+      return [];
+    }
+
+    const target = parent || this.rootElement;
+    const inserted: MauiElement[] = [];
+
+    this.runAsSingleChange(() => {
+      for (const item of plain) {
+        const element = ElementService.fromPlainObject(item, target);
+        this.assignFreshIds(element);
+        if (offset && target.type === ElementType.AbsoluteLayout) {
+          element.properties.x = (element.properties.x || 0) + offset;
+          element.properties.y = (element.properties.y || 0) + offset;
+        }
+        target.children.push(element);
+        inserted.push(element);
+      }
+    });
+
+    this.elementsSubject.next(this.rootElement);
+    this.setSelection(inserted);
+    return inserted;
+  }
+
+  private assignFreshIds(element: MauiElement): void {
+    this.elementCounter++;
+    const previousName = element.name;
+    element.id = `element_${this.elementCounter}`;
+    element.name = previousName && !/^element_\d+$/.test(previousName)
+      ? `${previousName}Copy${this.elementCounter}`
+      : `${element.type}${this.elementCounter}`;
+    element.domElement = undefined;
+    element.children.forEach(child => this.assignFreshIds(child));
+  }
+
   selectElement(element: MauiElement | null): void {
     this.selectedElement = element;
+    this.selectedElements = element ? [element] : [];
     this.selectedElementSubject.next(element);
+    this.selectedElementsSubject.next(this.selectedElements);
+  }
+
+  /** Replaces the whole selection. The last entry becomes the primary selection. */
+  setSelection(elements: MauiElement[]): void {
+    const unique = elements.filter((element, index) => elements.indexOf(element) === index);
+    this.selectedElements = unique;
+    this.selectedElement = unique.length ? unique[unique.length - 1] : null;
+    this.selectedElementSubject.next(this.selectedElement);
+    this.selectedElementsSubject.next(this.selectedElements);
+  }
+
+  /** Adds or removes an element from the selection (Ctrl/Shift click). */
+  toggleSelection(element: MauiElement): void {
+    const next = this.selectedElements.includes(element)
+      ? this.selectedElements.filter(candidate => candidate !== element)
+      : [...this.selectedElements, element];
+    this.setSelection(next);
+  }
+
+  isElementSelected(element: MauiElement): boolean {
+    return this.selectedElements.includes(element);
+  }
+
+  getSelectedElements(): MauiElement[] {
+    return [...this.selectedElements];
+  }
+
+  /** Deletes every selected element as a single undo step. */
+  removeSelectedElements(): void {
+    const targets = this.selectedElements.filter(element => element !== this.rootElement && element.parent);
+    if (targets.length === 0) {
+      return;
+    }
+    this.runAsSingleChange(() => {
+      targets.forEach(element => this.removeElement(element));
+    });
+    this.selectElement(null);
+  }
+
+  /** Applies the same property patch to several elements in one undo step. */
+  updateSelectionProperties(properties: Partial<ElementProperties>): void {
+    const targets = this.selectedElements;
+    if (targets.length === 0) {
+      return;
+    }
+    this.runAsSingleChange(() => {
+      targets.forEach(element =>
+        this.updateElementProperties(element, properties, { recordHistory: false })
+      );
+    });
+  }
+
+  /** Moves every selected element that lives in an AbsoluteLayout. */
+  nudgeSelection(deltaX: number, deltaY: number): void {
+    const targets = this.selectedElements.filter(element => element.parent?.type === ElementType.AbsoluteLayout);
+    if (targets.length === 0) {
+      return;
+    }
+    this.runAsSingleChange(() => {
+      targets.forEach(element =>
+        this.updateElementProperties(element, {
+          x: (element.properties.x || 0) + deltaX,
+          y: (element.properties.y || 0) + deltaY
+        }, { recordHistory: false })
+      );
+    });
   }
 
   updateElementProperties(element: MauiElement, properties: Partial<ElementProperties>, options: { recordHistory?: boolean } = {}): void {
