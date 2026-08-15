@@ -383,6 +383,13 @@ We welcome contributions! Please follow these steps:
 - Some advanced XAML features are not yet supported
 - Complex nested layouts may require manual XAML adjustments
 
+## 🧩 IDE Integration
+
+Curious whether this designer can live inside Visual Studio? See
+[docs/visual-studio-extension.md](docs/visual-studio-extension.md) for a feasibility assessment of a
+VS 2022 VSIX (WebView2 + custom `.xaml` editor + NuGet-derived control manifests) and a VS Code
+webview extension.
+
 ## 📚 Resources
 
 - [MAUI Documentation](https://docs.microsoft.com/en-us/dotnet/maui/)
