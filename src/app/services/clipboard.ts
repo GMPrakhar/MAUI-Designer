@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { ElementService } from './element';
 import { XamlParserService } from './xaml-parser';
+import { CustomControlRegistryService } from './custom-control-registry';
 import { MauiElement, ElementType } from '../models/maui-element';
 
 export interface ComponentTemplate {
@@ -111,7 +112,8 @@ export class ClipboardService {
 
   constructor(
     private elementService: ElementService,
-    private xamlParser: XamlParserService
+    private xamlParser: XamlParserService,
+    private registry: CustomControlRegistryService
   ) {
     this.buffer = this.readClipboard();
   }
@@ -209,7 +211,7 @@ export class ClipboardService {
 
   private resolveTargetParent(): MauiElement {
     const selected = this.elementService.getSelectedElement();
-    if (selected && this.canHaveChildren(selected.type)) {
+    if (selected && this.canHaveChildren(selected.type, selected)) {
       return selected;
     }
     if (selected?.parent) {
@@ -218,7 +220,10 @@ export class ClipboardService {
     return this.elementService.getRootElement();
   }
 
-  private canHaveChildren(type: ElementType): boolean {
+  private canHaveChildren(type: ElementType, element?: MauiElement): boolean {
+    if (type === ElementType.Custom && element) {
+      return this.registry.findForElement(element)?.definition.canHaveChildren ?? false;
+    }
     return [
       ElementType.StackLayout,
       ElementType.VerticalStackLayout,

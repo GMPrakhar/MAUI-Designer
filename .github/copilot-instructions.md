@@ -94,9 +94,24 @@ Always reference these instructions first and fallback to search or bash command
   - **alignment.ts**: Align, distribute, snap-to-grid and smart guides
   - **viewport.ts**: Zoom, pan, device preset, theme and grid state (persisted in localStorage)
   - **clipboard.ts**: Copy/cut/paste, component templates and starter pages
+  - **custom-control-registry.ts**: Third-party (NuGet) control manifests — import/export, persistence, lookup, learning from XAML, preview interpolation
 - **src/app/models/**: Data models and interfaces
   - **maui-element.ts**: MAUI element definitions
   - **toolbox.ts**: Toolbox item definitions
+  - **custom-control.ts**: Custom control manifest schema plus the bundled CommunityToolkit.Maui pack
+
+### Custom Controls
+Third-party controls are **data, not code**. A JSON manifest (see `src/app/models/custom-control.ts`)
+drives the toolbox entry, the properties panel editors, the canvas preview and XAML generation.
+- Element identity is `prefix:Tag`; the namespace URI is stored on the element (`customNamespace`)
+  so generated XAML stays valid even if the manifest is removed.
+- `xaml-parser.ts` never throws on an unknown tag: it falls back to `ElementType.Custom`, learns the
+  control into the registry, splits attributes into manifest-declared `customValues` and
+  `rawAttributes`, and preserves property elements verbatim in `rawContentXml`.
+- `xaml-generator.ts` emits only the namespaces actually used and de-duplicates attributes
+  (first writer wins) so custom values are never emitted twice.
+- When adding a bundled pack, extend `BUNDLED_MANIFESTS`; bundled manifests are always re-merged
+  when the registry is restored from localStorage.
 
 ### Common Commands Reference
 ```

@@ -6,6 +6,8 @@ import { ElementType, MauiElement } from '../../models/maui-element';
 import { ElementService } from '../../services/element';
 import { DragDropService, TOOLBOX_DRAG_MIME } from '../../services/drag-drop';
 import { ClipboardService, ComponentTemplate, StarterPage } from '../../services/clipboard';
+import { CustomControlRegistryService } from '../../services/custom-control-registry';
+import { CustomControlDefinition, CustomControlManifest } from '../../models/custom-control';
 import { Observable } from 'rxjs';
 
 @Component({
@@ -22,14 +24,89 @@ export class ToolboxComponent {
 
   templates$: Observable<ComponentTemplate[]>;
   starterPages: StarterPage[];
+  manifests$: Observable<CustomControlManifest[]>;
+  manifestError = '';
 
   constructor(
     private elementService: ElementService,
     private dragDropService: DragDropService,
-    private clipboardService: ClipboardService
+    private clipboardService: ClipboardService,
+    private registry: CustomControlRegistryService
   ) {
     this.templates$ = this.clipboardService.templates$;
     this.starterPages = this.clipboardService.starterPages;
+    this.manifests$ = this.registry.manifests$;
+  }
+
+  // --- Custom controls --------------------------------------------------------
+
+  /** Controls of a manifest that survive the current search filter. */
+  visibleControls(manifest: CustomControlManifest): CustomControlDefinition[] {
+    const term = this.searchTerm.trim().toLowerCase();
+    return manifest.controls.filter(control =>
+      !term ||
+      control.tag.toLowerCase().includes(term) ||
+      (control.displayName || '').toLowerCase().includes(term) ||
+      manifest.package.toLowerCase().includes(term)
+    );
+  }
+
+  onCustomItemClick(manifest: CustomControlManifest, control: CustomControlDefinition) {
+    const parent = this.resolveTargetParent();
+    const element = this.elementService.createElement(
+      ElementType.Custom,
+      this.registry.defaultProperties({ manifest, definition: control })
+    );
+    this.elementService.addElement(element, parent);
+    this.elementService.selectElement(element);
+  }
+
+  onCustomItemKeydown(event: KeyboardEvent, manifest: CustomControlManifest, control: CustomControlDefinition) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      this.onCustomItemClick(manifest, control);
+    }
+  }
+
+  onCustomDragStart(event: DragEvent, manifest: CustomControlManifest, control: CustomControlDefinition) {
+    const payload = `Custom:${manifest.xmlns.prefix}:${control.tag}`;
+    this.dragDropService.startDrag({ elementType: ElementType.Custom, isFromToolbox: true });
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'copy';
+      event.dataTransfer.setData(TOOLBOX_DRAG_MIME, payload);
+      event.dataTransfer.setData('text/plain', control.tag);
+    }
+  }
+
+  removeManifest(manifest: CustomControlManifest) {
+    this.registry.remove(manifest.id);
+  }
+
+  async importManifest(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    try {
+      this.registry.import(await file.text());
+      this.manifestError = '';
+    } catch (error: any) {
+      this.manifestError = error?.message || 'Could not import that manifest.';
+    } finally {
+      input.value = '';
+    }
+  }
+
+  exportManifests() {
+    const blob = new Blob([this.registry.export()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'maui-designer-controls.json';
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   // --- Templates & starter pages ---------------------------------------------
@@ -69,7 +146,10 @@ export class ToolboxComponent {
   }
 
   get hasAnyResult(): boolean {
-    return this.categories.some(category => this.hasItems(category));
+    return (
+      this.categories.some(category => this.hasItems(category)) ||
+      this.registry.manifests.some(manifest => this.visibleControls(manifest).length > 0)
+    );
   }
 
   clearSearch() {
@@ -109,10 +189,10 @@ export class ToolboxComponent {
    */
   resolveTargetParent(): MauiElement {
     const selected = this.elementService.getSelectedElement();
-    if (selected && this.dragDropService.canHaveChildren(selected.type)) {
+    if (selected && this.dragDropService.canElementHaveChildren(selected)) {
       return selected;
     }
-    if (selected?.parent && this.dragDropService.canHaveChildren(selected.parent.type)) {
+    if (selected?.parent && this.dragDropService.canElementHaveChildren(selected.parent)) {
       return selected.parent;
     }
     return this.elementService.getRootElement();

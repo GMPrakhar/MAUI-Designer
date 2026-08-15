@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { CdkDragDrop, CdkDragEnd, CdkDragStart, transferArrayItem } from '@angular/cdk/drag-drop';
 import { ElementService } from './element';
+import { CustomControlRegistryService } from './custom-control-registry';
 import { LayoutDesignerService } from './layout-designer';
-import { MauiElement, ElementType } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties } from '../models/maui-element';
 import { BehaviorSubject, min } from 'rxjs';
 
 export interface DragData {
@@ -25,7 +26,8 @@ export class DragDropService {
 
   constructor(
     private elementService: ElementService,
-    private layoutDesigner: LayoutDesignerService
+    private layoutDesigner: LayoutDesignerService,
+    private registry: CustomControlRegistryService
   ) { }
 
   startDrag(data: DragData): void {
@@ -56,10 +58,16 @@ export class DragDropService {
    * Creates a new element of the given type inside the layout under the drop point.
    * Used by the native drag from the toolbox onto the canvas.
    */
-  createElementAtPosition(elementType: ElementType, dropX: number, dropY: number, canvasElement: HTMLElement): MauiElement {
+  createElementAtPosition(
+    elementType: ElementType,
+    dropX: number,
+    dropY: number,
+    canvasElement: HTMLElement,
+    properties?: Partial<ElementProperties>
+  ): MauiElement {
     const targetLayout = this.findLayoutAtPosition(dropX, dropY, canvasElement) || this.elementService.getRootElement();
 
-    const newElement = this.elementService.createElement(elementType);
+    const newElement = this.elementService.createElement(elementType, properties);
     this.elementService.addElement(newElement, targetLayout);
 
     const position = this.layoutDesigner.getChildLayoutProperties(
@@ -148,7 +156,7 @@ export class DragDropService {
     }
     
     // Check if target can accept children
-    return this.canHaveChildren(target.type);
+    return this.canElementHaveChildren(target);
   }
 
   /**
@@ -234,6 +242,14 @@ export class DragDropService {
       current = current.parent;
     }
     return false;
+  }
+
+  /** Custom controls declare in their manifest whether they accept children. */
+  canElementHaveChildren(element: MauiElement): boolean {
+    if (element.type === ElementType.Custom) {
+      return this.registry.findForElement(element)?.definition.canHaveChildren ?? false;
+    }
+    return this.canHaveChildren(element.type);
   }
 
   canHaveChildren(elementType: ElementType): boolean {
