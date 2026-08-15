@@ -154,7 +154,7 @@ export class XamlParserService {
         y: 0,
         width: size.width,
         height: size.height,
-        backgroundColor: '#ffffff',
+        backgroundColor: 'Transparent',
         isVisible: true,
         isEnabled: true
       },
