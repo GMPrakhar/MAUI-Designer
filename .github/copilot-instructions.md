@@ -31,7 +31,8 @@ Always reference these instructions first and fallback to search or bash command
 - The application will launch in a web browser with the XAML designer interface
 
 ## Validation
-- **Manual Testing Required**: After making changes, always test these core scenarios:
+- **Automated coverage first**: run `npm run test:headless` and `npm run e2e` after changes.
+- **Manual Testing Required**: After making changes, also sanity check these core scenarios:
   1. **XAML Editor**: Write XAML in the text editor and click "Apply" to see the preview
   2. **Drag and Drop**: Select elements from the toolbox and drag them to the design canvas
   3. **Element Scaling**: Select an element and use handles to resize it  
@@ -44,9 +45,10 @@ Always reference these instructions first and fallback to search or bash command
 - **Designer Workflow Test**: Create a simple layout with Label, Button, and Entry controls to verify basic functionality
 
 ### Running Tests
-- **Unit Tests**: `npm test` or `ng test` -- runs Jasmine/Karma tests in watch mode
+- **Unit Tests**: `npm test` (watch) or `npm run test:headless` (single headless run, uses the `ChromeHeadlessCI` launcher)
 - **Build Tests**: `ng build` -- verifies TypeScript compilation and bundling
-- **E2E Tests**: Currently no E2E test infrastructure configured
+- **E2E Tests**: `npm run e2e` -- headless Playwright suite in `e2e/`; it boots `ng serve` on port 4300 automatically. Run `npx playwright install chromium` once first. Use `E2E_BASE_URL` to target an existing server.
+- **Test hooks**: components expose `data-testid` attributes consumed by `e2e/helpers/designer-page.ts`. Preserve them when editing templates.
 - **Linting**: Use `ng lint` if ESLint is configured, or standard TypeScript compiler checks
 
 ### Browser Compatibility
@@ -111,7 +113,7 @@ typescript (5.5.4)
 - **Focus on XAML designer workflow**: Test element creation, property editing, and layout generation
 - **Angular CLI**: Use `ng generate` commands for creating new components and services
 - **Hot reloading**: Development server auto-reloads on file changes
-- **No CI/CD**: Repository has no GitHub Actions or automated build pipeline
+- **CI/CD**: `.github/workflows/ci.yml` builds and runs unit + e2e tests; `.github/workflows/deploy-pages.yml` publishes the static build to GitHub Pages on pushes to `main`
 
 ## Troubleshooting
 - **Build fails with module not found**: Run `npm install` to ensure all dependencies are installed

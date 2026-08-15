@@ -1,6 +1,5 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { MauiElement, ElementType, ElementProperties, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
+import { BehaviorSubject, Observable } from 'rxjs';import { MauiElement, ElementType, ElementProperties, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
 
 @Injectable({
   providedIn: 'root'
@@ -11,14 +10,28 @@ export class ElementService {
   private elementCounter = 0;
 
   private selectedElementSubject = new BehaviorSubject<MauiElement | null>(null);
-  private elementsSubject = new BehaviorSubject<MauiElement>(this.createRootElement());
+  private elementsSubject: BehaviorSubject<MauiElement>;
 
   selectedElement$ = this.selectedElementSubject.asObservable();
-  elements$ = this.elementsSubject.asObservable();
+  elements$: Observable<MauiElement>;
+
+  // Undo / redo history of serialized snapshots
+  private undoStack: string[] = [];
+  private redoStack: string[] = [];
+  private historySubject = new BehaviorSubject<{ canUndo: boolean; canRedo: boolean }>({ canUndo: false, canRedo: false });
+  history$ = this.historySubject.asObservable();
+  private readonly MAX_HISTORY = 50;
+  private suppressHistory = false;
+  private lastEditKey: string | null = null;
+  private lastEditTime = 0;
+  private readonly COALESCE_WINDOW_MS = 700;
+
+  private static readonly STORAGE_KEY = 'maui-designer.design';
 
   constructor() {
     this.rootElement = this.createRootElement();
-    this.elementsSubject.next(this.rootElement);
+    this.elementsSubject = new BehaviorSubject<MauiElement>(this.rootElement);
+    this.elements$ = this.elementsSubject.asObservable();
   }
 
   private createRootElement(): MauiElement {
@@ -110,7 +123,7 @@ export class ElementService {
           ...common,
           width: 200,
           height: 200,
-          orientation: 'Vertical' as any,
+          orientation: Orientation.Vertical,
           spacing: 5
         };
       case ElementType.VerticalStackLayout:
@@ -124,7 +137,8 @@ export class ElementService {
         return {
           ...common,
           width: 200,
-          height: 200
+          height: 200,
+          gridDefinition: ElementService.createDefaultGridDefinition()
         };
       case ElementType.AbsoluteLayout:
         return {
@@ -151,6 +165,7 @@ export class ElementService {
   }
 
   addElement(element: MauiElement, parent?: MauiElement): void {
+    this.pushHistory();
     const targetParent = parent || this.rootElement;
     element.parent = targetParent;
     targetParent.children.push(element);
@@ -158,18 +173,74 @@ export class ElementService {
   }
 
   removeElement(element: MauiElement): void {
+    if (element === this.rootElement) {
+      return;
+    }
+
+    this.pushHistory();
+
     if (element.parent) {
       const index = element.parent.children.indexOf(element);
       if (index > -1) {
         element.parent.children.splice(index, 1);
       }
     }
-    
-    if (this.selectedElement === element) {
+
+    // Clear the selection when the removed element (or one of its descendants)
+    // was selected, otherwise the properties panel keeps editing a detached node.
+    if (this.selectedElement && this.isSelfOrDescendant(this.selectedElement, element)) {
       this.selectElement(null);
     }
-    
+
     this.elementsSubject.next(this.rootElement);
+  }
+
+  private isSelfOrDescendant(candidate: MauiElement, ancestor: MauiElement): boolean {
+    let current: MauiElement | undefined = candidate;
+    while (current) {
+      if (current === ancestor) {
+        return true;
+      }
+      current = current.parent;
+    }
+    return false;
+  }
+
+  /** Creates a deep copy of an element (new ids/names) and inserts it next to the original. */
+  duplicateElement(element: MauiElement): MauiElement | null {
+    if (element === this.rootElement || !element.parent) {
+      return null;
+    }
+
+    const parent = element.parent;
+    this.pushHistory();
+
+    const clone = this.cloneElement(element, parent);
+    const index = parent.children.indexOf(element);
+    parent.children.splice(index + 1, 0, clone);
+
+    if (parent.type === ElementType.AbsoluteLayout) {
+      clone.properties.x = (clone.properties.x || 0) + 10;
+      clone.properties.y = (clone.properties.y || 0) + 10;
+    }
+
+    this.elementsSubject.next(this.rootElement);
+    this.selectElement(clone);
+    return clone;
+  }
+
+  private cloneElement(element: MauiElement, parent?: MauiElement): MauiElement {
+    this.elementCounter++;
+    const clone: MauiElement = {
+      id: `element_${this.elementCounter}`,
+      type: element.type,
+      name: `${element.type}${this.elementCounter}`,
+      properties: JSON.parse(JSON.stringify(element.properties)),
+      children: [],
+      parent
+    };
+    clone.children = element.children.map(child => this.cloneElement(child, clone));
+    return clone;
   }
 
   selectElement(element: MauiElement | null): void {
@@ -177,8 +248,34 @@ export class ElementService {
     this.selectedElementSubject.next(element);
   }
 
-  updateElementProperties(element: MauiElement, properties: Partial<ElementProperties>): void {
+  updateElementProperties(element: MauiElement, properties: Partial<ElementProperties>, options: { recordHistory?: boolean } = {}): void {
+    if (options.recordHistory !== false) {
+      this.recordCoalescedHistory(element, properties);
+    }
     element.properties = { ...element.properties, ...properties };
+    this.elementsSubject.next(this.rootElement);
+  }
+
+  /**
+   * Property edits are undoable, but continuous edits (typing in a field,
+   * dragging a slider) collapse into a single history entry.
+   */
+  private recordCoalescedHistory(element: MauiElement, properties: Partial<ElementProperties>): void {
+    const key = `${element.id}:${Object.keys(properties).sort().join(',')}`;
+    const now = Date.now();
+    if (this.lastEditKey !== key || now - this.lastEditTime > this.COALESCE_WINDOW_MS) {
+      this.pushHistory();
+    }
+    this.lastEditKey = key;
+    this.lastEditTime = now;
+  }
+
+  renameElement(element: MauiElement, name: string): void {
+    const trimmed = (name || '').trim();
+    if (!trimmed) {
+      return;
+    }
+    element.name = trimmed;
     this.elementsSubject.next(this.rootElement);
   }
 
@@ -212,6 +309,8 @@ export class ElementService {
   }
 
   moveElement(element: MauiElement, newParent: MauiElement, x: number, y: number, insertionIndex?: number): void {
+
+    this.pushHistory();
 
     if(element.parent != newParent)
     {
@@ -254,38 +353,285 @@ export class ElementService {
   }
 
   setRootElement(element: MauiElement): void {
+    this.pushHistory();
+    this.applyRootElement(element);
+  }
+
+  private applyRootElement(element: MauiElement): void {
     this.rootElement = element;
+    this.reindexCounter(element);
     this.elementsSubject.next(this.rootElement);
     // Clear selection when setting new root
     this.selectElement(null);
   }
 
-  // Grid specific methods
-  addGridRow(gridElement: MauiElement): void {
-    if (gridElement.type === ElementType.Grid) {
-      // Implementation for adding grid row
-      this.elementsSubject.next(this.rootElement);
+  /** Keeps the id counter ahead of any ids present in an imported tree. */
+  private reindexCounter(element: MauiElement): void {
+    const match = /^element_(\d+)$/.exec(element.id);
+    if (match) {
+      this.elementCounter = Math.max(this.elementCounter, parseInt(match[1], 10));
     }
+    element.children.forEach(child => this.reindexCounter(child));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Grid definitions
+  // ---------------------------------------------------------------------------
+
+  static createDefaultGridDefinition(): GridDefinition {
+    return {
+      rows: [
+        { height: { value: 1, type: GridLengthType.Star } },
+        { height: { value: 1, type: GridLengthType.Star } }
+      ],
+      columns: [
+        { width: { value: 1, type: GridLengthType.Star } },
+        { width: { value: 1, type: GridLengthType.Star } }
+      ]
+    };
+  }
+
+  getGridDefinition(gridElement: MauiElement): GridDefinition {
+    if (!gridElement.properties.gridDefinition) {
+      gridElement.properties.gridDefinition = ElementService.createDefaultGridDefinition();
+    }
+    return gridElement.properties.gridDefinition;
+  }
+
+  addGridRow(gridElement: MauiElement): void {
+    if (gridElement.type !== ElementType.Grid) {
+      return;
+    }
+    this.pushHistory();
+    const definition = this.getGridDefinition(gridElement);
+    definition.rows.push({ height: { value: 1, type: GridLengthType.Star } });
+    this.elementsSubject.next(this.rootElement);
   }
 
   addGridColumn(gridElement: MauiElement): void {
-    if (gridElement.type === ElementType.Grid) {
-      // Implementation for adding grid column
-      this.elementsSubject.next(this.rootElement);
+    if (gridElement.type !== ElementType.Grid) {
+      return;
     }
+    this.pushHistory();
+    const definition = this.getGridDefinition(gridElement);
+    definition.columns.push({ width: { value: 1, type: GridLengthType.Star } });
+    this.elementsSubject.next(this.rootElement);
   }
 
   removeGridRow(gridElement: MauiElement, rowIndex: number): void {
-    if (gridElement.type === ElementType.Grid) {
-      // Implementation for removing grid row
-      this.elementsSubject.next(this.rootElement);
+    if (gridElement.type !== ElementType.Grid) {
+      return;
     }
+    const definition = this.getGridDefinition(gridElement);
+    if (definition.rows.length <= 1 || rowIndex < 0 || rowIndex >= definition.rows.length) {
+      return;
+    }
+    this.pushHistory();
+    definition.rows.splice(rowIndex, 1);
+    this.clampChildrenToGrid(gridElement, definition);
+    this.elementsSubject.next(this.rootElement);
   }
 
   removeGridColumn(gridElement: MauiElement, columnIndex: number): void {
-    if (gridElement.type === ElementType.Grid) {
-      // Implementation for removing grid column
-      this.elementsSubject.next(this.rootElement);
+    if (gridElement.type !== ElementType.Grid) {
+      return;
     }
+    const definition = this.getGridDefinition(gridElement);
+    if (definition.columns.length <= 1 || columnIndex < 0 || columnIndex >= definition.columns.length) {
+      return;
+    }
+    this.pushHistory();
+    definition.columns.splice(columnIndex, 1);
+    this.clampChildrenToGrid(gridElement, definition);
+    this.elementsSubject.next(this.rootElement);
+  }
+
+  updateGridRow(gridElement: MauiElement, rowIndex: number, length: GridLength): void {
+    const definition = this.getGridDefinition(gridElement);
+    if (rowIndex < 0 || rowIndex >= definition.rows.length) {
+      return;
+    }
+    this.pushHistory();
+    definition.rows[rowIndex] = { height: length };
+    this.elementsSubject.next(this.rootElement);
+  }
+
+  updateGridColumn(gridElement: MauiElement, columnIndex: number, length: GridLength): void {
+    const definition = this.getGridDefinition(gridElement);
+    if (columnIndex < 0 || columnIndex >= definition.columns.length) {
+      return;
+    }
+    this.pushHistory();
+    definition.columns[columnIndex] = { width: length };
+    this.elementsSubject.next(this.rootElement);
+  }
+
+  private clampChildrenToGrid(gridElement: MauiElement, definition: GridDefinition): void {
+    for (const child of gridElement.children) {
+      child.properties.row = Math.min(child.properties.row || 0, definition.rows.length - 1);
+      child.properties.column = Math.min(child.properties.column || 0, definition.columns.length - 1);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Undo / redo
+  // ---------------------------------------------------------------------------
+
+  /** Captures the current tree so the next mutation can be reverted. */
+  pushHistory(): void {
+    if (this.suppressHistory) {
+      return;
+    }
+    this.lastEditKey = null;
+    this.undoStack.push(this.serialize());
+    if (this.undoStack.length > this.MAX_HISTORY) {
+      this.undoStack.shift();
+    }
+    this.redoStack = [];
+    this.emitHistoryState();
+  }
+
+  /**
+   * Starts a batch: one history entry is recorded now and further mutations
+   * are folded into it until endBatch() is called (used while resizing/dragging).
+   */
+  beginBatch(): void {
+    this.pushHistory();
+    this.suppressHistory = true;
+  }
+
+  endBatch(): void {
+    this.suppressHistory = false;
+    this.lastEditKey = null;
+  }
+
+  /** Runs a multi-step mutation that should be undone as a single step. */
+  runAsSingleChange<T>(action: () => T): T {
+    this.beginBatch();
+    try {
+      return action();
+    } finally {
+      this.endBatch();
+    }
+  }
+
+  canUndo(): boolean {
+    return this.undoStack.length > 0;
+  }
+
+  canRedo(): boolean {
+    return this.redoStack.length > 0;
+  }
+
+  undo(): void {
+    const snapshot = this.undoStack.pop();
+    if (!snapshot) {
+      return;
+    }
+    this.redoStack.push(this.serialize());
+    this.lastEditKey = null;
+    this.applyRootElement(ElementService.deserialize(snapshot));
+    this.emitHistoryState();
+  }
+
+  redo(): void {
+    const snapshot = this.redoStack.pop();
+    if (!snapshot) {
+      return;
+    }
+    this.undoStack.push(this.serialize());
+    this.lastEditKey = null;
+    this.applyRootElement(ElementService.deserialize(snapshot));
+    this.emitHistoryState();
+  }
+
+  private emitHistoryState(): void {
+    this.historySubject.next({ canUndo: this.canUndo(), canRedo: this.canRedo() });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Serialization / persistence
+  // ---------------------------------------------------------------------------
+
+  /** JSON representation of the tree, stripped of circular parent/DOM references. */
+  serialize(root?: MauiElement): string {
+    return JSON.stringify(ElementService.toPlainObject(root || this.rootElement));
+  }
+
+  private static toPlainObject(element: MauiElement): any {
+    return {
+      id: element.id,
+      type: element.type,
+      name: element.name,
+      properties: element.properties,
+      children: element.children.map(child => ElementService.toPlainObject(child))
+    };
+  }
+
+  static deserialize(json: string): MauiElement {
+    const plain = JSON.parse(json);
+    return ElementService.fromPlainObject(plain, undefined);
+  }
+
+  private static fromPlainObject(plain: any, parent?: MauiElement): MauiElement {
+    const element: MauiElement = {
+      id: plain.id,
+      type: plain.type,
+      name: plain.name,
+      properties: plain.properties || {},
+      children: [],
+      parent
+    };
+    element.children = (plain.children || []).map((child: any) => ElementService.fromPlainObject(child, element));
+    return element;
+  }
+
+  /** Persists the current design in localStorage. Returns false when storage is unavailable. */
+  saveToStorage(): boolean {
+    try {
+      localStorage.setItem(ElementService.STORAGE_KEY, this.serialize());
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Restores a previously saved design. Returns false when nothing valid is stored. */
+  loadFromStorage(): boolean {
+    try {
+      const stored = localStorage.getItem(ElementService.STORAGE_KEY);
+      if (!stored) {
+        return false;
+      }
+      const restored = ElementService.deserialize(stored);
+      this.setRootElement(restored);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  hasStoredDesign(): boolean {
+    try {
+      return !!localStorage.getItem(ElementService.STORAGE_KEY);
+    } catch {
+      return false;
+    }
+  }
+
+  clearStorage(): void {
+    try {
+      localStorage.removeItem(ElementService.STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+  }
+
+  /** Removes every child of the root layout. */
+  clearDesign(): void {
+    this.pushHistory();
+    this.rootElement.children = [];
+    this.selectElement(null);
+    this.elementsSubject.next(this.rootElement);
   }
 }

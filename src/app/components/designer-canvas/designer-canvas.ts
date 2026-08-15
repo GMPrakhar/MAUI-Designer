@@ -2,7 +2,7 @@ import { Component, OnInit, ElementRef, ViewChild, HostListener } from '@angular
 import { CommonModule } from '@angular/common';
 import { DragDropModule, CdkDropList, CdkDragDrop, CdkDragEnd, CdkDragMove } from '@angular/cdk/drag-drop';
 import { ElementService } from '../../services/element';
-import { DragDropService } from '../../services/drag-drop';
+import { DragDropService, TOOLBOX_DRAG_MIME } from '../../services/drag-drop';
 import { LayoutDesignerService } from '../../services/layout-designer';
 import { MauiElement, ElementType } from '../../models/maui-element';
 import { Observable } from 'rxjs';
@@ -45,6 +45,9 @@ export class DesignerCanvasComponent implements OnInit {
   // Drop zone preview state
   dropZonePreview: { element: MauiElement, visible: boolean } | null = null;
 
+  // True while a toolbox control is dragged over the canvas
+  isDragOver = false;
+
   // Constants
   private readonly MIN_SIZE = 20;
 
@@ -68,6 +71,107 @@ export class DesignerCanvasComponent implements OnInit {
 
   onCanvasClick() {
     this.elementService.selectElement(null);
+  }
+
+  // --- Native drag from the toolbox -----------------------------------------
+
+  onCanvasDragOver(event: DragEvent) {
+    if (event.dataTransfer?.types?.includes(TOOLBOX_DRAG_MIME)) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      this.isDragOver = true;
+    }
+  }
+
+  onCanvasDragLeave() {
+    this.isDragOver = false;
+  }
+
+  onCanvasDrop(event: DragEvent) {
+    this.isDragOver = false;
+    const type = event.dataTransfer?.getData(TOOLBOX_DRAG_MIME) as ElementType;
+    if (!type) {
+      return;
+    }
+    event.preventDefault();
+
+    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
+    const x = event.clientX - canvasRect.left;
+    const y = event.clientY - canvasRect.top;
+
+    this.dragDropService.createElementAtPosition(type, x, y, this.canvas.nativeElement);
+    this.dragDropService.endDrag();
+  }
+
+  // --- Keyboard shortcuts ----------------------------------------------------
+
+  @HostListener('document:keydown', ['$event'])
+  onKeyDown(event: KeyboardEvent) {
+    if (this.isEditingText(event.target)) {
+      return;
+    }
+
+    const ctrl = event.ctrlKey || event.metaKey;
+
+    if (ctrl && event.key.toLowerCase() === 'z' && !event.shiftKey) {
+      event.preventDefault();
+      this.elementService.undo();
+      return;
+    }
+
+    if (ctrl && (event.key.toLowerCase() === 'y' || (event.shiftKey && event.key.toLowerCase() === 'z'))) {
+      event.preventDefault();
+      this.elementService.redo();
+      return;
+    }
+
+    const selected = this.elementService.getSelectedElement();
+    if (!selected) {
+      return;
+    }
+
+    if (ctrl && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      this.elementService.duplicateElement(selected);
+      return;
+    }
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      this.elementService.removeElement(selected);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      this.elementService.selectElement(null);
+      return;
+    }
+
+    const step = event.shiftKey ? 10 : 1;
+    const nudges: Record<string, { x: number, y: number }> = {
+      ArrowUp: { x: 0, y: -step },
+      ArrowDown: { x: 0, y: step },
+      ArrowLeft: { x: -step, y: 0 },
+      ArrowRight: { x: step, y: 0 }
+    };
+
+    const nudge = nudges[event.key];
+    if (nudge && selected.parent?.type === ElementType.AbsoluteLayout) {
+      event.preventDefault();
+      this.elementService.updateElementProperties(selected, {
+        x: (selected.properties.x || 0) + nudge.x,
+        y: (selected.properties.y || 0) + nudge.y
+      });
+    }
+  }
+
+  private isEditingText(target: EventTarget | null): boolean {
+    const element = target as HTMLElement | null;
+    if (!element) {
+      return false;
+    }
+    const tag = element.tagName?.toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || element.isContentEditable === true;
   }
 
   // Set DOM element reference for position calculations
@@ -201,6 +305,7 @@ export class DesignerCanvasComponent implements OnInit {
     event.stopPropagation();
     
     this.isResizing = true;
+    this.elementService.beginBatch();
     this.resizeDirection = direction;
     this.resizeElement = element;
     this.startMouseX = event.clientX;
@@ -318,13 +423,13 @@ export class DesignerCanvasComponent implements OnInit {
       }
     }
 
-    // Update element properties
+    // Update element properties (folded into a single history entry)
     this.elementService.updateElementProperties(this.resizeElement, {
       x: newX,
       y: newY,
       width: newWidth,
       height: newHeight
-    });
+    }, { recordHistory: false });
 
     // Update size display
     this.updateSizeDisplay(event);
@@ -334,6 +439,7 @@ export class DesignerCanvasComponent implements OnInit {
   onMouseUp(event: MouseEvent) {
     if (this.isResizing) {
       this.isResizing = false;
+      this.elementService.endBatch();
       this.resizeDirection = null;
       this.resizeElement = null;
       this.showSizeDisplay = false;

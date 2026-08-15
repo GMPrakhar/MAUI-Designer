@@ -104,3 +104,68 @@
     }
   }
 }
+.element-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  background: #fafafa;
+  font-size: 12px;
+  cursor: pointer;
+
+  .material-icons {
+    font-size: 14px;
+  }
+
+  &:hover:not(:disabled) {
+    background: #eee;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  &.danger {
+    color: #b3261e;
+    border-color: #f0c4c1;
+  }
+}
+
+.grid-def-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.grid-def-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+
+  .grid-def-index {
+    width: 24px;
+    font-size: 11px;
+    color: #666;
+  }
+}
+
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 6px;
+}

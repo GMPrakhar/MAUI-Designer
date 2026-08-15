@@ -2,6 +2,8 @@
 
 A powerful web-based visual designer for creating MAUI (Microsoft App UI) layouts with drag-and-drop functionality. This Angular application provides an intuitive interface for designing XAML-based user interfaces with real-time preview capabilities.
 
+**Live demo:** https://gmprakhar.github.io/MAUI-Designer/ (deployed to GitHub Pages from `main`)
+
 ![MAUI Designer](https://img.shields.io/badge/Angular-18.2.0-red) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5.4-blue) ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## 🚀 Features
@@ -12,6 +14,10 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **Properties Panel**: Real-time property editing with immediate visual feedback
 - **Hierarchy Panel**: Tree view of element structure for easy navigation
 - **Resizable Panels**: Customizable workspace with adjustable panel sizes
+- **Toolbox Search**: Filter the control list as you type
+- **Undo/Redo**: Full history for every design change (`Ctrl+Z` / `Ctrl+Y`)
+- **Keyboard Shortcuts**: `Delete` to remove, `Ctrl+D` to duplicate, arrow keys to nudge, `Esc` to deselect
+- **Local Persistence**: Save and restore your design in the browser
 
 ### XAML Integration
 - **XAML Editor**: Full-featured code editor with syntax support
@@ -19,6 +25,8 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **XAML Generation**: Export designed layouts as clean XAML code
 - **XAML Parsing**: Import existing XAML files to recreate visual designs
 - **Copy & Download**: Easy sharing and saving of generated XAML
+- **File Import**: Load a `.xaml` file, or convert an `.svg` icon into MAUI `Path` elements
+- **Grid Definitions**: Row/column definitions (`Auto`, `*`, absolute) round-trip through XAML
 
 ### Supported MAUI Elements
 
@@ -92,12 +100,43 @@ The build artifacts will be stored in the `dist/` directory.
 
 ### Running Tests
 
-Execute the unit tests:
+Unit tests (Karma + Jasmine):
 
 ```bash
-npm test
-# or
-ng test
+npm test                # watch mode
+npm run test:headless   # single headless run (CI friendly)
+```
+
+End-to-end tests (Playwright, headless Chromium). The Angular dev server is started
+automatically on port 4300:
+
+```bash
+npx playwright install chromium   # once
+npm run e2e                       # run the suite
+npm run e2e:report                # open the last HTML report
+```
+
+To run the suite against an already running instance (for example a production build):
+
+```bash
+E2E_BASE_URL=http://localhost:4400 npm run e2e
+```
+
+The specs live in `e2e/` and cover the shell, toolbox, canvas, hierarchy, properties
+panel, grid editing, undo/redo, persistence and the XAML editor.
+
+### Deploying to GitHub Pages
+
+The app is fully client side, so it can be hosted as a static site. Pushing to `main`
+runs `.github/workflows/deploy-pages.yml`, which builds with the correct base href,
+adds an SPA `404.html` fallback and publishes to GitHub Pages.
+
+Enable it once via **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+Build the same bundle locally with:
+
+```bash
+npm run build:pages
 ```
 
 ## 🎯 Usage Guide
@@ -162,7 +201,21 @@ src/
 │   └── app.ts              # Main app component
 ├── styles.scss             # Global styles
 └── index.html             # Main HTML file
+
+e2e/                        # Playwright end-to-end tests
+├── helpers/designer-page.ts # Page object with data-testid locators
+├── app-shell.spec.ts
+├── toolbox.spec.ts
+├── canvas.spec.ts
+├── hierarchy-panel.spec.ts
+├── properties-panel.spec.ts
+├── undo-redo.spec.ts
+├── persistence.spec.ts
+└── xaml-editor.spec.ts
 ```
+
+> UI elements expose `data-testid` attributes for the e2e suite. Keep them stable when
+> refactoring templates.
 
 ## 🔧 Development
 

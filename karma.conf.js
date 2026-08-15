@@ -34,6 +34,13 @@ module.exports = function (config) {
     },
     reporters: ['progress', 'kjhtml'],
     browsers: ['Chrome'],
+    // Sandboxless headless Chrome for CI / containers: ng test --browsers=ChromeHeadlessCI
+    customLaunchers: {
+      ChromeHeadlessCI: {
+        base: 'ChromeHeadless',
+        flags: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage']
+      }
+    },
     restartOnFileChange: true
   });
 };

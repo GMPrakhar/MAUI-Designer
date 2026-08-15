@@ -1,22 +1,55 @@
-<p><div class="toolbox">
+<div class="toolbox" data-testid="toolbox">
+  <div class="toolbox-search">
+    <span class="material-icons">search</span>
+    <input
+      type="text"
+      class="search-input"
+      data-testid="toolbox-search"
+      placeholder="Search controls..."
+      aria-label="Search controls"
+      [(ngModel)]="searchTerm">
+    <button
+      *ngIf="searchTerm"
+      class="clear-search"
+      type="button"
+      data-testid="toolbox-search-clear"
+      aria-label="Clear search"
+      (click)="clearSearch()">
+      <span class="material-icons">close</span>
+    </button>
+  </div>
+
   <div class="category-group" *ngFor="let category of categories">
-    <h3 class="category-title">{{ category }}</h3>
-    
-    <div class="toolbox-items">
-      <div 
-        class="toolbox-item"
-        *ngFor="let item of getItemsByCategory(category)"
-        (click)="onItemClick(item)"
-        [title]="item.description">
-        
-        <div class="item-icon">
-          <span class="material-icons">{{ item.icon }}</span>
-        </div>
-        
-        <div class="item-label">
-          {{ item.displayName }}
+    <ng-container *ngIf="hasItems(category)">
+      <h3 class="category-title">{{ category }}</h3>
+
+      <div class="toolbox-items">
+        <div
+          class="toolbox-item"
+          *ngFor="let item of getItemsByCategory(category)"
+          [attr.data-testid]="'toolbox-item-' + item.type"
+          role="button"
+          tabindex="0"
+          draggable="true"
+          (dragstart)="onDragStart($event, item)"
+          (dragend)="onDragEnd()"
+          (click)="onItemClick(item)"
+          (keydown)="onItemKeydown($event, item)"
+          [title]="item.description">
+
+          <div class="item-icon">
+            <span class="material-icons">{{ item.icon }}</span>
+          </div>
+
+          <div class="item-label">
+            {{ item.displayName }}
+          </div>
         </div>
       </div>
-    </div>
+    </ng-container>
+  </div>
+
+  <div class="empty-state" *ngIf="!hasAnyResult" data-testid="toolbox-empty">
+    <p>No controls match "{{ searchTerm }}"</p>
   </div>
 </div>

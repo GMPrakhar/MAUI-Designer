@@ -1,20 +1,20 @@
-<p><div class="designer-canvas-container">
+<div class="designer-canvas-container">
   <div 
     class="designer-canvas"
+    [class.drag-over-canvas]="isDragOver"
+    data-testid="designer-canvas"
     #canvas
     cdkDropList
     [cdkDropListData]="[]"
+    (dragover)="onCanvasDragOver($event)"
+    (dragleave)="onCanvasDragLeave()"
+    (drop)="onCanvasDrop($event)"
     (click)="onCanvasClick()">
     
-    <!-- Root element content -->
-    <div 
-      class="canvas-element root-element"
-      *ngIf="rootElement$ | async as rootElement"
-      [style]="getElementStyles(rootElement)">
-      
-      <!-- Recursive element rendering -->
+    <!-- Root element content (rendered through the recursive template) -->
+    <ng-container *ngIf="rootElement$ | async as rootElement">
       <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: rootElement }"></ng-container>
-    </div>
+    </ng-container>
     
     <!-- Grid overlay for visual feedback -->
     <div class="grid-overlay" [style.display]="'none'">
@@ -29,6 +29,7 @@
   
   <!-- Real-time size display during resize -->
   <div class="size-display" 
+       data-testid="size-display"
        *ngIf="showSizeDisplay"
        [style.left.px]="sizeDisplayX"
        [style.top.px]="sizeDisplayY">
@@ -43,10 +44,14 @@
     class="canvas-element"
     [class.selected]="isSelected(element)"
     [class.layout-element]="isLayoutElement(element)"
+    [class.root-element]="element.id === 'root'"
     [style]="getElementStyles(element)"
     [attr.data-element-id]="element.id"
+    [attr.data-element-type]="element.type"
+    [attr.data-element-name]="element.name"
+    [attr.data-selected]="isSelected(element)"
     cdkDrag
-    [cdkDragDisabled]="!isSelected(element)"
+    [cdkDragDisabled]="!isSelected(element) || element.id === 'root'"
     (cdkDragStarted)="onDragStarted(element); setElementRef(element, elementDiv)"
     (cdkDragMoved)="onDragMoved(element, $event)"
     (cdkDragEnded)="onDragEnded(element, $event)"
@@ -56,7 +61,7 @@
     [cdkDragData]="element">
 
     <!-- Drag handle: appears only when selected; covers element so dragging can only start when selected -->
-    <div *ngIf="isSelected(element)" class="drag-handle" cdkDragHandle (pointerdown)="$event.stopPropagation()"></div>
+    <div *ngIf="isSelected(element) && element.id !== 'root'" class="drag-handle" cdkDragHandle (pointerdown)="$event.stopPropagation()"></div>
 
     <!-- Element content based on type -->
     <div class="element-content" [ngSwitch]="element.type">
@@ -195,7 +200,7 @@
     </div>
     
     <!-- Selection handles -->
-    <div class="selection-handles" *ngIf="isSelected(element)">
+    <div class="selection-handles" *ngIf="isSelected(element) && element.id !== 'root'">
       <!-- Corner handles (blue) -->
       <div class="handle handle-corner handle-nw" 
            (mousedown)="onResizeStart($event, 'nw', element)"></div>
@@ -204,6 +209,7 @@
       <div class="handle handle-corner handle-sw" 
            (mousedown)="onResizeStart($event, 'sw', element)"></div>
       <div class="handle handle-corner handle-se" 
+           data-testid="resize-handle-se"
            (mousedown)="onResizeStart($event, 'se', element)"></div>
       
       <!-- Edge handles (green) -->
