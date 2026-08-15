@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { XamlGeneratorService } from '../services/xaml-generator';
 import { XamlParserService } from '../services/xaml-parser';
 import { ElementService } from '../services/element';
-import { ElementType } from '../models/maui-element';
+import { DEFAULT_ICON_PATH_DATA, ElementType } from '../models/maui-element';
 
 describe('XAML Services', () => {
   let elementService: ElementService;
@@ -47,7 +47,7 @@ describe('XAML Services', () => {
         y: 6,
         width: 24,
         height: 24,
-        pathData: 'M12 2L2 22h20L12 2Z',
+        pathData: DEFAULT_ICON_PATH_DATA,
         fillColor: '#111111',
         strokeColor: 'Transparent',
         strokeThickness: 0
@@ -57,7 +57,7 @@ describe('XAML Services', () => {
       const xaml = xamlGenerator.generateXaml(root);
 
       expect(xaml).toContain('<Path');
-      expect(xaml).toContain('Data="M12 2L2 22h20L12 2Z"');
+      expect(xaml).toContain(`Data="${DEFAULT_ICON_PATH_DATA}"`);
       expect(xaml).toContain('Fill="#111111"');
       expect(xaml).toContain('Stroke="Transparent"');
       expect(xaml).toContain('AbsoluteLayout.LayoutBounds="5,6,24,24"');
@@ -91,7 +91,7 @@ describe('XAML Services', () => {
     it('should parse XAML Path icon elements', () => {
       const iconXaml = `
         <AbsoluteLayout>
-          <Path Data="M12 2L2 22h20L12 2Z"
+          <Path Data="${DEFAULT_ICON_PATH_DATA}"
                 Fill="#111111"
                 Stroke="Transparent"
                 StrokeThickness="0"
@@ -102,7 +102,7 @@ describe('XAML Services', () => {
       const icon = parsed.children[0];
 
       expect(icon.type).toBe(ElementType.Path);
-      expect(icon.properties.pathData).toBe('M12 2L2 22h20L12 2Z');
+      expect(icon.properties.pathData).toBe(DEFAULT_ICON_PATH_DATA);
       expect(icon.properties.fillColor).toBe('#111111');
       expect(icon.properties.strokeColor).toBe('Transparent');
       expect(icon.properties.strokeThickness).toBe(0);
@@ -112,7 +112,7 @@ describe('XAML Services', () => {
 
     it('should convert pasted SVG paths into MAUI Path elements', () => {
       const heroIconSvg = `
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" color="#222222" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
         </svg>`;
 
@@ -123,7 +123,7 @@ describe('XAML Services', () => {
       expect(icon.type).toBe(ElementType.Path);
       expect(icon.properties.pathData).toBe('M4.5 12.75l6 6 9-13.5');
       expect(icon.properties.fillColor).toBe('Transparent');
-      expect(icon.properties.strokeColor).toBe('#000000');
+      expect(icon.properties.strokeColor).toBe('#222222');
       expect(icon.properties.strokeThickness).toBe(1.5);
     });
   });

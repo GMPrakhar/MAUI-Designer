@@ -23,6 +23,8 @@ export enum ElementType {
   ScrollView = 'ScrollView'
 }
 
+export const DEFAULT_ICON_PATH_DATA = 'M12 2L2 22h20L12 2Z';
+
 export interface ElementProperties {
   // Layout properties
   x?: number;

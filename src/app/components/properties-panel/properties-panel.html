@@ -141,7 +141,7 @@
         <input
           type="number"
           class="property-input"
-          [value]="element.properties.strokeThickness || 0"
+          [value]="element.properties.strokeThickness ?? 0"
           (input)="updateProperty(element, 'strokeThickness', +$any($event.target).value)">
       </div>
     </div>

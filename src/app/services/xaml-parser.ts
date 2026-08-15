@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, ElementProperties, Thickness } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, Thickness, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
 
 @Injectable({
   providedIn: 'root'
@@ -169,6 +169,7 @@ export class XamlParserService {
     }
 
     pathElements.forEach((pathElement, index) => {
+      const currentColor = this.getSvgCurrentColor(pathElement);
       const path: MauiElement = {
         id: this.generateId(),
         type: ElementType.Path,
@@ -179,8 +180,8 @@ export class XamlParserService {
           width: size.width,
           height: size.height,
           pathData: pathElement.getAttribute('d') || '',
-          fillColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'fill'), '#000000', '#000000'),
-          strokeColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'stroke'), 'Transparent', '#000000'),
+          fillColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'fill'), '#000000', currentColor),
+          strokeColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'stroke'), 'Transparent', currentColor),
           strokeThickness: this.parseNumber(this.getInheritedAttribute(pathElement, 'stroke-width'), 0),
           isVisible: true,
           isEnabled: true
@@ -234,6 +235,11 @@ export class XamlParserService {
       return 'Transparent';
     }
     return value;
+  }
+
+  private getSvgCurrentColor(element: Element): string {
+    const color = this.getInheritedAttribute(element, 'color');
+    return color && color !== 'currentColor' && color.toLowerCase() !== 'none' ? color : '#000000';
   }
 
   private parseNumber(value: string | null, fallback: number): number {
@@ -398,7 +404,7 @@ export class XamlParserService {
       case ElementType.Path:
         if (properties.width === undefined) properties.width = 24;
         if (properties.height === undefined) properties.height = 24;
-        if (properties.pathData === undefined) properties.pathData = 'M12 2L2 22h20L12 2Z';
+        if (properties.pathData === undefined) properties.pathData = DEFAULT_ICON_PATH_DATA;
         if (properties.fillColor === undefined) properties.fillColor = '#000000';
         if (properties.strokeColor === undefined) properties.strokeColor = 'Transparent';
         if (properties.strokeThickness === undefined) properties.strokeThickness = 0;
