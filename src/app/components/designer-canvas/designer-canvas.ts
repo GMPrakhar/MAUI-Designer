@@ -58,6 +58,7 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   private marqueeOrigin = { x: 0, y: 0 };
   private isMarqueeSelecting = false;
   private marqueeAdditive = false;
+  private dragOrigin: { x: number, y: number } | null = null;
   private suppressNextCanvasClick = false;
 
   // Constants
@@ -438,10 +439,10 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
    * Turns a raw cdkDrag position into the final canvas position, applying
    * smart guides first and the grid afterwards.
    */
+  /** Applies smart guides and grid snapping to a position expressed in the parent's own coordinates. */
   private resolveDragPosition(element: MauiElement, rawX: number, rawY: number): { x: number, y: number } {
-    const zoom = this.viewport.zoom || 1;
-    let x = rawX / zoom;
-    let y = rawY / zoom;
+    let x = rawX;
+    let y = rawY;
 
     if (element.parent?.type === ElementType.AbsoluteLayout) {
       if (this.viewport.showGuides) {
@@ -596,20 +597,62 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   }
   
   onDragStarted(element: MauiElement) {
+    // Remember where the element started so the drop position is origin + travelled distance
+    this.dragOrigin = { x: element.properties.x || 0, y: element.properties.y || 0 };
   }
 
   onDragEnded(element: MauiElement, event: CdkDragEnd) {
     document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     this.alignmentGuides = [];
 
-    const dropPoint = event.source.getFreeDragPosition();
-    const target = this.resolveDragPosition(element, dropPoint.x, dropPoint.y);
+    const zoom = this.viewport.zoom || 1;
+    const origin = this.dragOrigin ?? { x: element.properties.x || 0, y: element.properties.y || 0 };
+    this.dragOrigin = null;
 
-    this.dragDropService.handleCanvasDrop(element, target.x, target.y, this.canvas.nativeElement);
+    // The pointer position decides which layout receives the element
+    const pointer = this.toCanvasPoint(event.dropPoint.x, event.dropPoint.y);
 
-    //this.elementService.moveElement(element, element.parent!,  element.properties.x! + event.distance.x,  element.properties.y! + event.distance.y)
+    let target: { x: number, y: number };
+    if (this.parentUsesAbsolutePositioning(element)) {
+      // cdkDrag reports the travelled distance in client pixels; the model stores unscaled pixels
+      const local = this.resolveDragPosition(
+        element,
+        origin.x + event.distance.x / zoom,
+        origin.y + event.distance.y / zoom
+      );
+      target = this.toCanvasSpace(element.parent, local.x, local.y);
+    } else {
+      // Stack and grid children have no pixel position of their own, so follow the pointer
+      target = pointer;
+    }
 
+    // Drop the transform cdkDrag applied - the element is repositioned through its own styles,
+    // and a leftover translation would offset every following drag.
+    event.source.reset();
+
+    this.dragDropService.handleCanvasDrop(element, target.x, target.y, this.canvas.nativeElement, pointer);
     this.dragDropService.endDrag();
+  }
+
+  private parentUsesAbsolutePositioning(element: MauiElement): boolean {
+    const parent = element.parent;
+    return !!parent && this.layoutDesigner.getLayoutInfo(parent.type).supportsAbsolutePositioning;
+  }
+
+  /** Converts a point expressed in a layout's own coordinates into canvas space. */
+  private toCanvasSpace(parent: MauiElement | undefined, localX: number, localY: number): { x: number, y: number } {
+    const dom = parent?.domElement;
+    if (!parent || parent.id === 'root' || !dom) {
+      return { x: localX, y: localY };
+    }
+
+    const zoom = this.viewport.zoom || 1;
+    const rect = dom.getBoundingClientRect();
+    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
+    return {
+      x: localX + (rect.left - canvasRect.left) / zoom,
+      y: localY + (rect.top - canvasRect.top) / zoom
+    };
   }
 
   onDragMoved(element: MauiElement, event: CdkDragMove) {
@@ -624,15 +667,16 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     } else {
       this.alignmentGuides = [];
     }
-    // Get layout element over which we are passing currently
-    var layoutOver = this.dragDropService.findLayoutAtPosition(element.properties.x! + event.distance.x, element.properties.y! + event.distance.y, this.canvas.nativeElement)!;
+    // The layout under the pointer is the drop candidate
+    const pointer = this.toCanvasPoint(event.pointerPosition.x, event.pointerPosition.y);
+    const layoutOver = this.dragDropService.findLayoutAtPosition(pointer.x, pointer.y, this.canvas.nativeElement, element)!;
 
-    if(layoutOver.type === ElementType.Grid && this.layoutDesigner.getVisualHints(layoutOver).showGrid) {
-      const rect = (event.source.getRootElement() as HTMLElement).getBoundingClientRect();
+    if(layoutOver?.type === ElementType.Grid && this.layoutDesigner.getVisualHints(layoutOver).showGrid) {
+      const zoom = this.viewport.zoom || 1;
       const parentRect = layoutOver.domElement?.getBoundingClientRect();
 
-      const x = event.pointerPosition.x - (parentRect?.left || 0);
-      const y = event.pointerPosition.y - (parentRect?.top || 0);
+      const x = (event.pointerPosition.x - (parentRect?.left || 0)) / zoom;
+      const y = (event.pointerPosition.y - (parentRect?.top || 0)) / zoom;
       const gridCell = this.layoutDesigner.getGridCellAtPosition(layoutOver, x, y, layoutOver.domElement!);
       if(gridCell) {
         this.highlightedGridCell = { element: layoutOver, row: gridCell.row, column: gridCell.column };

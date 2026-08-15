@@ -94,12 +94,15 @@ export class LayoutDesignerService {
       columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
     };
     
+    // offsetWidth/Height are unscaled, so grid maths stay correct while the canvas is zoomed
     const rect = containerElement.getBoundingClientRect();
+    const width = containerElement.offsetWidth || rect.width;
+    const height = containerElement.offsetHeight || rect.height;
     const rows = gridDefinition.rows.length;
     const columns = gridDefinition.columns.length;
-    
-    const cellWidth = rect.width / columns;
-    const cellHeight = rect.height / rows;
+
+    const cellWidth = width / columns;
+    const cellHeight = height / rows;
     
     const column = Math.min(Math.floor(x / cellWidth), columns - 1);
     const row = Math.min(Math.floor(y / cellHeight), rows - 1);
