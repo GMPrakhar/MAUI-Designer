@@ -49,19 +49,19 @@ test.describe('XAML editor', () => {
 
   test('reset restores the XAML of the current design', async () => {
     await designer.addControl('Label');
-    const generated = await designer.getXaml();
+    const generated = await designer.xamlWhen(xaml => xaml.includes('<Label '));
 
     await designer.setXaml('<broken');
     await designer.resetXaml();
-    expect(await designer.getXaml()).toBe(generated);
+    await expect(designer.xamlTextarea).toHaveValue(generated);
   });
 
   test('round trips a design through apply and regenerate', async () => {
     await designer.applyXaml(SAMPLE_XAML);
-    const firstPass = await designer.getXaml();
+    const firstPass = await designer.xamlWhen(xaml => xaml.includes('Text="Hello MAUI"'));
 
     await designer.applyXaml(firstPass);
-    const secondPass = await designer.getXaml();
+    const secondPass = await designer.xamlWhen(xaml => xaml.includes('Text="Hello MAUI"'));
 
     expect(secondPass).toBe(firstPass);
     expect(secondPass).toContain('Text="Hello MAUI"');
@@ -84,7 +84,7 @@ test.describe('XAML editor', () => {
     </Grid>
 </ContentPage>`);
 
-    const xaml = await designer.getXaml();
+    const xaml = await designer.xamlWhen(value => value.includes('<RowDefinition '));
     expect(xaml).toContain('<RowDefinition Height="Auto" />');
     expect(xaml).toContain('<RowDefinition Height="2*" />');
     expect(xaml).toContain('<ColumnDefinition Width="80" />');
@@ -122,6 +122,6 @@ test.describe('XAML editor', () => {
 
     await expect(designer.xamlStatus).toContainText('applied successfully');
     await expect(designer.canvasElements('Path')).toHaveCount(1);
-    expect(await designer.getXaml()).toContain('Data="M4 4h24v24H4z"');
+    await designer.expectXamlToContain('Data="M4 4h24v24H4z"');
   });
 });

@@ -50,8 +50,8 @@ test.describe('Canvas interactions', () => {
     await expect(page.getByTestId('size-display')).toBeVisible();
     await page.mouse.up();
 
-    expect(Number(await designer.propertyValue('width'))).toBe(startWidth + 60);
-    expect(Number(await designer.propertyValue('height'))).toBe(startHeight + 40);
+    await designer.expectProperty('width', startWidth + 60);
+    await designer.expectProperty('height', startHeight + 40);
   });
 
   test('resizing never shrinks below the minimum size', async ({ page }) => {
@@ -66,8 +66,8 @@ test.describe('Canvas interactions', () => {
     await page.mouse.move(box.x - 400, box.y - 400, { steps: 10 });
     await page.mouse.up();
 
-    expect(Number(await designer.propertyValue('width'))).toBeGreaterThanOrEqual(20);
-    expect(Number(await designer.propertyValue('height'))).toBeGreaterThanOrEqual(20);
+    await designer.expectPropertyNumber('width', value => value >= 20);
+    await designer.expectPropertyNumber('height', value => value >= 20);
   });
 
   test('arrow keys nudge the selected element', async ({ page }) => {
@@ -79,11 +79,11 @@ test.describe('Canvas interactions', () => {
 
     await designer.canvas.press('ArrowRight');
     await designer.canvas.press('ArrowDown');
-    expect(Number(await designer.propertyValue('x'))).toBe(startX + 1);
-    expect(Number(await designer.propertyValue('y'))).toBe(startY + 1);
+    await designer.expectProperty('x', startX + 1);
+    await designer.expectProperty('y', startY + 1);
 
     await page.keyboard.press('Shift+ArrowRight');
-    expect(Number(await designer.propertyValue('x'))).toBe(startX + 11);
+    await designer.expectProperty('x', startX + 11);
   });
 
   test('Delete removes the selected element and Escape clears selection', async ({ page }) => {

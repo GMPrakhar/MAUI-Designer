@@ -100,6 +100,22 @@ export class DesignerPage {
     return this.xamlTextarea.inputValue();
   }
 
+  /**
+   * The XAML pane is regenerated from an observable, so a one-shot read can
+   * race with Angular's change detection on slower machines. Poll instead.
+   */
+  async expectXamlToContain(...fragments: string[]) {
+    for (const fragment of fragments) {
+      await expect.poll(() => this.getXaml(), { timeout: 10_000 }).toContain(fragment);
+    }
+  }
+
+  /** Resolves with the XAML once it satisfies the predicate. */
+  async xamlWhen(predicate: (xaml: string) => boolean): Promise<string> {
+    await expect.poll(() => this.getXaml().then(predicate), { timeout: 10_000 }).toBe(true);
+    return this.getXaml();
+  }
+
   /** Reads a property input from the properties panel. */
   async propertyValue(name: string): Promise<string> {
     return this.page.getByTestId(`prop-${name}`).inputValue();
@@ -109,6 +125,17 @@ export class DesignerPage {
     const input = this.page.getByTestId(`prop-${name}`);
     await input.fill(value);
     await input.dispatchEvent('input');
+  }
+
+  /** Waits for a property input to settle on a value. */
+  async expectProperty(name: string, value: string | number) {
+    await expect(this.page.getByTestId(`prop-${name}`)).toHaveValue(String(value));
+  }
+
+  async expectPropertyNumber(name: string, assertion: (value: number) => boolean) {
+    await expect
+      .poll(() => this.propertyValue(name).then(raw => assertion(Number(raw))), { timeout: 10_000 })
+      .toBe(true);
   }
 }
 

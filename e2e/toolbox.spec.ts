@@ -44,8 +44,8 @@ test.describe('Toolbox', () => {
     await expect(button).toHaveCount(1);
 
     // Element is selected after the drop, so the properties panel shows its position
-    expect(Number(await designer.propertyValue('x'))).toBeGreaterThan(100);
-    expect(Number(await designer.propertyValue('y'))).toBeGreaterThan(50);
+    await designer.expectPropertyNumber('x', value => value > 100);
+    await designer.expectPropertyNumber('y', value => value > 50);
   });
 
   test('adds a control into the selected layout', async () => {

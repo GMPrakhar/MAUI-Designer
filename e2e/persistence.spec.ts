@@ -40,7 +40,7 @@ test.describe('Design persistence', () => {
 
     await expect(designer.canvasElements('Label').first()).toContainText('Hello MAUI');
     await expect(designer.canvasElements('Button').first()).toContainText('Send');
-    expect(await designer.getXaml()).toContain('x:Name="Title"');
+    await designer.expectXamlToContain('x:Name="Title"');
   });
 
   test('loading a design is undoable', async ({ page }) => {

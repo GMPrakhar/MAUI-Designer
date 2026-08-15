@@ -63,8 +63,9 @@ test.describe('Properties panel', () => {
     await designer.selectFirst('Label');
 
     await page.getByTestId('prop-isVisible').uncheck();
+    await designer.expectXamlToContain('IsVisible="False"');
     await designer.applyXaml(await designer.getXaml());
-    expect(await designer.getXaml()).toContain('IsVisible="False"');
+    await designer.expectXamlToContain('IsVisible="False"');
   });
 
   test('exposes orientation and spacing for stack layouts', async ({ page }) => {
@@ -76,8 +77,7 @@ test.describe('Properties panel', () => {
     await page.getByTestId('prop-spacing').fill('12');
     await page.getByTestId('prop-spacing').dispatchEvent('input');
 
-    expect(await designer.getXaml()).toContain('HorizontalStackLayout');
-    expect(await designer.getXaml()).toContain('Spacing="12"');
+    await designer.expectXamlToContain('HorizontalStackLayout', 'Spacing="12"');
   });
 
   test('duplicate and delete buttons act on the selected element', async ({ page }) => {
@@ -129,7 +129,7 @@ test.describe('Grid editing', () => {
     await page.getByTestId('grid-column-value-1').fill('120');
     await page.getByTestId('grid-column-value-1').dispatchEvent('input');
 
-    const xaml = await designer.getXaml();
+    const xaml = await designer.xamlWhen(value => value.includes('<ColumnDefinition Width="120" />'));
     expect(xaml).toContain('<RowDefinition Height="Auto" />');
     expect(xaml).toContain('<ColumnDefinition Width="120" />');
     expect((xaml.match(/<RowDefinition /g) || []).length).toBe(3);
