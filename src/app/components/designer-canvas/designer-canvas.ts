@@ -7,6 +7,8 @@ import { LayoutDesignerService } from '../../services/layout-designer';
 import { MauiElement, ElementType } from '../../models/maui-element';
 import { AlignmentService, AlignmentGuide } from '../../services/alignment';
 import { ClipboardService } from '../../services/clipboard';
+import { CustomControlRegistryService } from '../../services/custom-control-registry';
+import { CustomPreview } from '../../models/custom-control';
 import { ViewportService, ViewportState } from '../../services/viewport';
 import { Observable, Subscription } from 'rxjs';
 
@@ -80,7 +82,8 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     private layoutDesigner: LayoutDesignerService,
     private alignmentService: AlignmentService,
     private clipboardService: ClipboardService,
-    private viewportService: ViewportService
+    private viewportService: ViewportService,
+    private registry: CustomControlRegistryService
   ) {
     this.rootElement$ = this.elementService.elements$;
     this.selectedElement$ = this.elementService.selectedElement$;
@@ -298,8 +301,8 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
 
   onCanvasDrop(event: DragEvent) {
     this.isDragOver = false;
-    const type = event.dataTransfer?.getData(TOOLBOX_DRAG_MIME) as ElementType;
-    if (!type) {
+    const payload = event.dataTransfer?.getData(TOOLBOX_DRAG_MIME);
+    if (!payload) {
       return;
     }
     event.preventDefault();
@@ -307,7 +310,29 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     const { x, y } = this.toCanvasPoint(event.clientX, event.clientY);
     const snapped = this.applyGridSnap(x, y);
 
-    this.dragDropService.createElementAtPosition(type, snapped.x, snapped.y, this.canvas.nativeElement);
+    // Custom controls are dragged as "Custom:<prefix>:<tag>"
+    if (payload.startsWith('Custom:')) {
+      const [, prefix, tag] = payload.split(':');
+      const lookup = this.registry.find(prefix, tag);
+      if (lookup) {
+        this.dragDropService.createElementAtPosition(
+          ElementType.Custom,
+          snapped.x,
+          snapped.y,
+          this.canvas.nativeElement,
+          this.registry.defaultProperties(lookup)
+        );
+      }
+      this.dragDropService.endDrag();
+      return;
+    }
+
+    this.dragDropService.createElementAtPosition(
+      payload as ElementType,
+      snapped.x,
+      snapped.y,
+      this.canvas.nativeElement
+    );
     this.dragDropService.endDrag();
   }
 
@@ -494,6 +519,9 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   }
 
   isLayoutElement(element: MauiElement): boolean {
+    if (element.type === ElementType.Custom) {
+      return this.registry.findForElement(element)?.definition.canHaveChildren ?? false;
+    }
     return [
       ElementType.StackLayout,
       ElementType.Grid,
@@ -504,6 +532,25 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
       ElementType.CollectionView,
       ElementType.ScrollView
     ].includes(element.type);
+  }
+
+  // --- Custom control previews ------------------------------------------------
+
+  /** Preview description of a custom control, with sensible fallbacks. */
+  customPreview(element: MauiElement): CustomPreview {
+    const definition = this.registry.findForElement(element)?.definition;
+    return definition?.preview || { kind: 'box', label: element.properties.customTag || 'Custom', icon: 'extension' };
+  }
+
+  customLabel(element: MauiElement): string {
+    const preview = this.customPreview(element);
+    const label = this.registry.interpolate(preview.label, element).trim();
+    return label || element.properties.customTag || 'Custom';
+  }
+
+  customCornerRadius(element: MauiElement): number | null {
+    const radius = Number(this.registry.interpolate(this.customPreview(element).cornerRadius, element));
+    return Number.isFinite(radius) && radius > 0 ? radius : null;
   }
 
   // --- Control previews -------------------------------------------------------

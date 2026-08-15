@@ -175,3 +175,10 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
 }
+
+/* Custom (third party) control section */
+.section-hint {
+  margin: -4px 0 8px;
+  color: #6b7280;
+  font-size: 11px;
+}

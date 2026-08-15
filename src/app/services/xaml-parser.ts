@@ -1,12 +1,35 @@
 import { Injectable } from '@angular/core';
 import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
+import { CustomControlRegistryService } from './custom-control-registry';
+
+/** Attributes the designer models itself, so they never end up in rawAttributes. */
+const RESERVED_ATTRIBUTES = new Set([
+  'x:name',
+  'x:class',
+  'absolutelayout.layoutbounds',
+  'absolutelayout.layoutflags',
+  'grid.row',
+  'grid.column',
+  'grid.rowspan',
+  'grid.columnspan',
+  'widthrequest',
+  'heightrequest',
+  'backgroundcolor',
+  'margin',
+  'padding',
+  'isvisible',
+  'isenabled'
+]);
 
 @Injectable({
   providedIn: 'root'
 })
 export class XamlParserService {
 
-  constructor() { }
+  /** xmlns prefixes declared on the document being parsed. */
+  private namespaces: Record<string, string> = {};
+
+  constructor(private registry: CustomControlRegistryService) { }
 
   parseXaml(xamlContent: string): MauiElement {
     try {
@@ -25,6 +48,8 @@ export class XamlParserService {
       if (!contentPage) {
         throw new Error('No root element found');
       }
+
+      this.namespaces = this.collectNamespaces(contentPage);
 
       if (contentPage.tagName.toLowerCase() === 'svg') {
         return this.parseSvgIcon(contentPage);
@@ -73,27 +98,33 @@ export class XamlParserService {
   }
 
   private parseElement(xmlElement: Element, parent: MauiElement | null): MauiElement {
-    const elementType = this.getElementTypeFromTag(xmlElement.tagName);
-    if (!elementType) {
-      throw new Error(`Unsupported element type: ${xmlElement.tagName}`);
-    }
+    const elementType = this.getElementTypeFromTag(xmlElement.tagName) ?? ElementType.Custom;
+    const properties = this.parseProperties(xmlElement, elementType, parent);
+    const fallbackName = elementType === ElementType.Custom
+      ? `${properties.customTag}${this.idCounter}`
+      : `${elementType}${this.idCounter}`;
 
     const element: MauiElement = {
       id: this.generateId(),
       type: elementType,
-      name: xmlElement.getAttribute('x:Name') || `${elementType}${this.idCounter}`,
-      properties: this.parseProperties(xmlElement, elementType, parent),
+      name: xmlElement.getAttribute('x:Name') || fallbackName,
+      properties,
       children: [],
       parent: parent || undefined
     };
 
-    // Parse child elements
-    for (const childXmlElement of this.getChildElements(xmlElement)) {
-      const childElementType = this.getElementTypeFromTag(childXmlElement.tagName);
-      if (childElementType) {
-        const childElement = this.parseElement(childXmlElement, element);
-        element.children.push(childElement);
+    // Property elements of a custom control cannot be modelled, so keep the XML
+    if (elementType === ElementType.Custom) {
+      const rawContent = this.collectRawPropertyElements(xmlElement);
+      if (rawContent.length) {
+        element.properties.rawContentXml = rawContent;
       }
+    }
+
+    // Parse child elements: unknown tags become custom elements, never dropped
+    for (const childXmlElement of this.getChildElements(xmlElement)) {
+      const childElement = this.parseElement(childXmlElement, element);
+      element.children.push(childElement);
     }
 
     if (elementType === ElementType.Grid) {
@@ -347,11 +378,91 @@ export class XamlParserService {
     return Number.isNaN(parsed) ? fallback : parsed;
   }
 
+  /** Serialises property elements such as `<toolkit:Expander.Header>` verbatim. */
+  private collectRawPropertyElements(xmlElement: Element): string[] {
+    const serializer = new XMLSerializer();
+    const raw: string[] = [];
+
+    for (let i = 0; i < xmlElement.children.length; i++) {
+      const child = xmlElement.children[i];
+      if (child.tagName.includes('.')) {
+        // The serializer repeats every namespace: they are declared on the page
+        raw.push(serializer.serializeToString(child).replace(/\s+xmlns(:[\w.-]+)?="[^"]*"/g, ''));
+      }
+    }
+
+    return raw;
+  }
+
+  /** Reads `xmlns:prefix="uri"` declarations from the document root. */
+  private collectNamespaces(root: Element): Record<string, string> {
+    const namespaces: Record<string, string> = {};
+    for (let i = 0; i < root.attributes.length; i++) {
+      const attribute = root.attributes[i];
+      if (attribute.name.startsWith('xmlns:')) {
+        namespaces[attribute.name.slice('xmlns:'.length)] = attribute.value;
+      }
+    }
+    return namespaces;
+  }
+
+  /**
+   * Keeps an unrecognised control usable: its tag, prefix, namespace and every
+   * attribute are preserved, and the control is registered so it can be edited.
+   */
+  private parseCustomControl(xmlElement: Element, properties: ElementProperties): void {
+    const [rawPrefix, rawTag] = xmlElement.tagName.includes(':')
+      ? xmlElement.tagName.split(':')
+      : ['', xmlElement.tagName];
+
+    const prefix = rawPrefix;
+    const tag = rawTag;
+    const uri = this.namespaces[prefix] || '';
+
+    const attributes: Record<string, string> = {};
+    for (let i = 0; i < xmlElement.attributes.length; i++) {
+      const attribute = xmlElement.attributes[i];
+      const name = attribute.name;
+      if (
+        name.startsWith('xmlns') ||
+        RESERVED_ATTRIBUTES.has(name.toLowerCase()) ||
+        this.isBindingExpression(attribute.value)
+      ) {
+        continue;
+      }
+      attributes[name] = attribute.value;
+    }
+
+    properties.customTag = tag;
+    properties.customPrefix = prefix || undefined;
+    properties.customNamespace = uri || undefined;
+
+    const lookup = this.registry.learn(prefix, uri, tag, attributes);
+    const declared = new Set((lookup.definition.properties || []).map(property => property.name));
+
+    const customValues: Record<string, string> = {};
+    const rawAttributes: Record<string, string> = {};
+    for (const [name, value] of Object.entries(attributes)) {
+      if (declared.has(name)) {
+        customValues[name] = value;
+      } else {
+        rawAttributes[name] = value;
+      }
+    }
+
+    properties.customValues = customValues;
+    properties.rawAttributes = rawAttributes;
+  }
+
   private parseProperties(xmlElement: Element, elementType: ElementType, parent: MauiElement | null): ElementProperties {
     const properties: ElementProperties = {
       isVisible: true,
       isEnabled: true
     };
+
+    if (elementType === ElementType.Custom) {
+      this.parseCustomControl(xmlElement, properties);
+    }
 
     // Bindings are captured separately so they survive a round trip
     const bindings = this.parseBindings(xmlElement);

@@ -10,13 +10,35 @@ export class XamlGeneratorService {
 
   generateXaml(rootElement: MauiElement): string {
     const xamlContent = this.generateElementXaml(rootElement, 0);
-    
+    const namespaces = this.collectNamespaceDeclarations(rootElement);
+
     return `<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"${namespaces}
              x:Class="YourApp.MainPage">
 ${xamlContent}
 </ContentPage>`;
+  }
+
+  /**
+   * Only the namespaces actually used by custom controls in the tree are
+   * declared, so the generated page stays clean.
+   */
+  private collectNamespaceDeclarations(rootElement: MauiElement): string {
+    const used = new Map<string, string>();
+
+    const walk = (element: MauiElement) => {
+      const { customPrefix, customNamespace } = element.properties;
+      if (element.type === ElementType.Custom && customPrefix && customNamespace) {
+        used.set(customPrefix, customNamespace);
+      }
+      element.children.forEach(walk);
+    };
+    walk(rootElement);
+
+    return [...used.entries()]
+      .map(([prefix, uri]) => `\n             xmlns:${prefix}="${uri}"`)
+      .join('');
   }
 
   private generateElementXaml(element: MauiElement, indentLevel: number): string {
@@ -26,8 +48,9 @@ ${xamlContent}
     const attributes = this.generateAttributes(element);
     const hasChildren = element.children && element.children.length > 0;
     const isGrid = element.type === ElementType.Grid;
+    const rawContent = element.properties.rawContentXml || [];
 
-    if (!hasChildren && !isGrid) {
+    if (!hasChildren && !isGrid && rawContent.length === 0) {
       return `${indent}<${elementName}${attributes} />`;
     }
 
@@ -36,6 +59,11 @@ ${xamlContent}
     // Add special content for certain layouts
     if (isGrid) {
       xaml += this.generateGridDefinitions(element, indentLevel + 1);
+    }
+
+    // Property elements of custom controls are re-emitted verbatim
+    for (const raw of rawContent) {
+      xaml += `\n${'    '.repeat(indentLevel + 2)}${raw}`;
     }
 
     // Add children (a CollectionView wraps them in a DataTemplate)
@@ -66,6 +94,11 @@ ${xamlContent}
   }
 
   private getXamlElementName(element: MauiElement): string {
+    if (element.type === ElementType.Custom) {
+      const tag = element.properties.customTag || 'ContentView';
+      return element.properties.customPrefix ? `${element.properties.customPrefix}:${tag}` : tag;
+    }
+
     switch (element.type) {
       case ElementType.StackLayout:
         return element.properties.orientation === Orientation.Horizontal
@@ -116,6 +149,16 @@ ${xamlContent}
     // Add name attribute
     if (element.name) {
       attributes.push(`x:Name="${element.name}"`);
+    }
+
+    // Manifest driven and preserved attributes win over the generic mapping
+    if (element.type === ElementType.Custom) {
+      for (const [name, value] of Object.entries(props.customValues || {})) {
+        push(name, this.escapeXml(String(value)));
+      }
+      for (const [name, value] of Object.entries(props.rawAttributes || {})) {
+        push(name, this.escapeXml(value));
+      }
     }
     
     // For children of AbsoluteLayout
@@ -271,7 +314,18 @@ ${xamlContent}
       }
     }
 
-    return attributes.length > 0 ? ' ' + attributes.join(' ') : '';
+    // An attribute may only appear once: the first writer wins
+    const seen = new Set<string>();
+    const unique = attributes.filter(attribute => {
+      const name = attribute.slice(0, attribute.indexOf('='));
+      if (seen.has(name)) {
+        return false;
+      }
+      seen.add(name);
+      return true;
+    });
+
+    return unique.length > 0 ? ' ' + unique.join(' ') : '';
   }
 
   private generateGridDefinitions(element: MauiElement, indentLevel: number): string {

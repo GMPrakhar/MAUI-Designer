@@ -95,6 +95,7 @@
     [attr.data-element-id]="element.id"
     [attr.data-element-type]="element.type"
     [attr.data-element-name]="element.name"
+    [attr.data-custom-tag]="element.properties.customTag"
     [attr.data-selected]="isSelected(element)"
     cdkDrag
     [cdkDragDisabled]="!isPrimarySelection(element) || element.id === 'root'"
@@ -326,6 +327,34 @@
       </div>
       
       <!-- Default case -->
+      <!-- Custom control from a NuGet package manifest -->
+      <div *ngSwitchCase="'Custom'"
+           class="element-custom"
+           [attr.data-custom-preview]="element.properties.customTag"
+           [attr.data-preview-kind]="customPreview(element).kind"
+           [class.custom-slot]="customPreview(element).kind === 'slot'"
+           [style.background]="customPreview(element).backgroundColor || null"
+           [style.color]="customPreview(element).textColor || null"
+           [style.border-color]="customPreview(element).borderColor || null"
+           [style.border-radius.px]="customCornerRadius(element)"
+           #layoutDiv
+           cdkDropList
+           [cdkDropListData]="element.children"
+           (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
+           (mouseenter)="setElementRef(element, layoutDiv)">
+
+        <ng-container *ngIf="element.children.length; else customPlaceholder">
+          <ng-container *ngFor="let child of element.children">
+            <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
+          </ng-container>
+        </ng-container>
+
+        <ng-template #customPlaceholder>
+          <span class="custom-icon material-icons" *ngIf="customPreview(element).icon">{{ customPreview(element).icon }}</span>
+          <span class="custom-label">{{ customLabel(element) }}</span>
+        </ng-template>
+      </div>
+
       <div *ngSwitchDefault class="element-default">
         {{ element.type }}
       </div>

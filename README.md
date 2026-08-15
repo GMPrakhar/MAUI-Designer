@@ -45,6 +45,14 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **Dark Mode Preview**: Toggle a dark canvas to check contrast
 - **Persisted View**: Zoom, theme and grid settings survive a reload
 
+### Custom Controls from NuGet Packages
+- **Manifest Registry**: Describe third-party controls (Syncfusion, Telerik, DevExpress, in-house libraries) in a small JSON manifest and they appear in the toolbox, properties panel and canvas
+- **Bundled CommunityToolkit.Maui Pack**: `AvatarView`, `Expander`, `DrawingView`, `MediaElement`, `Popup` and `SemanticOrderView` work out of the box
+- **Import & Export**: Load manifests from disk, export the whole registry as one JSON file, remove packs you no longer need
+- **Lossless Round-Trip**: Unknown vendor tags in imported XAML are preserved verbatim — namespaces, attributes, property elements and nested children all survive a parse/generate cycle
+- **Learning Parser**: Controls that are not in any manifest are inferred from the XAML (including property types) and added to the toolbox automatically
+- **Raw Attribute Editor**: Any attribute the manifest does not declare is still editable in the properties panel
+
 ### XAML Integration
 - **XAML Editor**: Full-featured code editor with syntax support
 - **Real-time Preview**: Instant visual updates when applying XAML changes
@@ -217,6 +225,57 @@ The Properties panel allows you to modify:
 - View the complete element structure
 - Select elements for editing
 - Navigate complex layouts easily
+
+### 6. Custom Controls from NuGet Packages
+
+The designer does not need to reference your NuGet package — it only needs a description of the
+controls. Drop a JSON manifest into **Toolbox → Custom controls → Import**:
+
+```json
+{
+  "id": "syncfusion-inputs",
+  "package": "Syncfusion.Maui.Inputs",
+  "xmlns": {
+    "prefix": "sf",
+    "uri": "clr-namespace:Syncfusion.Maui.Inputs;assembly=Syncfusion.Maui.Inputs"
+  },
+  "controls": [
+    {
+      "tag": "SfComboBox",
+      "displayName": "Combo box",
+      "icon": "arrow_drop_down_circle",
+      "defaultWidth": 200,
+      "defaultHeight": 40,
+      "isContainer": false,
+      "preview": { "kind": "box", "label": "{Placeholder}" },
+      "properties": [
+        { "name": "Placeholder", "type": "string", "defaultValue": "Select an item" },
+        { "name": "IsEditable", "type": "boolean", "defaultValue": false },
+        { "name": "MaxDropDownHeight", "type": "number", "defaultValue": 200 }
+      ]
+    }
+  ]
+}
+```
+
+Manifest reference:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | Stable identifier used for updates and removal |
+| `package` | NuGet package name, shown in the toolbox and properties panel |
+| `xmlns.prefix` / `xmlns.uri` | XML namespace emitted in the generated XAML |
+| `controls[].tag` | The XAML tag, e.g. `SfComboBox` |
+| `controls[].isContainer` | `true` if the control accepts child elements |
+| `controls[].preview` | Canvas rendering: `kind` of `box`, `text`, `image`, `list` or `slot`, plus `label`, `backgroundColor`, `textColor`, `borderColor`, `cornerRadius`, `icon` |
+| `controls[].properties[]` | Editable properties: `name`, `type` (`string`, `number`, `boolean`, `color`, `enum`), `defaultValue`, `options`, `bindable` |
+
+`{Property}` placeholders inside `preview.label` and the colour fields are interpolated from the
+element's current values, so the canvas preview updates as you edit.
+
+Registered manifests are stored in `localStorage` under `maui-designer.custom-controls`. The
+namespace URI is also stored on each element, so pasted XAML keeps working even if the manifest is
+removed later.
 
 ## 🏗️ Project Structure
 

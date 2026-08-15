@@ -37,7 +37,10 @@ export class DesignerPage {
     await this.page.goto('/');
     await expect(this.canvas).toBeVisible();
     // Every spec starts from a clean, predictable viewport
-    await this.page.evaluate(() => localStorage.removeItem('maui-designer.viewport'));
+    await this.page.evaluate(() => {
+      localStorage.removeItem('maui-designer.viewport');
+      localStorage.removeItem('maui-designer.custom-controls');
+    });
   }
 
   /** Ctrl-clicks an element to add or remove it from the selection. */
@@ -82,6 +85,12 @@ export class DesignerPage {
   async addControl(type: string) {
     await this.openToolbox();
     await this.page.getByTestId(`toolbox-item-${type}`).click();
+  }
+
+  /** Adds a custom (third party) control from the toolbox by prefix and tag. */
+  async addCustomControl(prefix: string, tag: string) {
+    await this.openToolbox();
+    await this.page.getByTestId(`custom-item-${prefix}-${tag}`).click();
   }
 
   /** Drags a control from the toolbox onto the canvas. */
