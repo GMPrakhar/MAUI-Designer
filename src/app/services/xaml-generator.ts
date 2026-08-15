@@ -142,7 +142,6 @@ ${xamlContent}
       if (props.strokeThickness !== undefined) {
         attributes.push(`StrokeThickness="${props.strokeThickness}"`);
       }
-      attributes.push(`Aspect="Uniform"`);
     }
     
     // Colors
