@@ -14,6 +14,7 @@ export enum ElementType {
   Entry = 'Entry',
   Editor = 'Editor',
   Image = 'Image',
+  Path = 'Path',
   StackLayout = 'StackLayout',
   VerticalStackLayout = 'VerticalStackLayout',
   Grid = 'Grid',
@@ -40,6 +41,11 @@ export interface ElementProperties {
   
   // Content properties
   text?: string;
+  pathData?: string;
+  viewBox?: string;
+  fillColor?: string;
+  strokeColor?: string;
+  strokeThickness?: number;
   
   // Grid-specific properties
   row?: number;

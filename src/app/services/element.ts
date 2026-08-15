@@ -95,6 +95,17 @@ export class ElementService {
           width: 100,
           height: 100
         };
+      case ElementType.Path:
+        return {
+          ...common,
+          width: 24,
+          height: 24,
+          pathData: 'M12 2L2 22h20L12 2Z',
+          viewBox: '0 0 24 24',
+          fillColor: '#000000',
+          strokeColor: 'Transparent',
+          strokeThickness: 0
+        };
       case ElementType.StackLayout:
         return {
           ...common,

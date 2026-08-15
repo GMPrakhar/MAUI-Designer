@@ -25,6 +25,10 @@ export class XamlParserService {
       if (!contentPage) {
         throw new Error('No root element found');
       }
+
+      if (contentPage.tagName.toLowerCase() === 'svg') {
+        return this.parseSvgIcon(contentPage);
+      }
       
       // Look for the first child that's a layout
       const rootLayoutElement = this.findRootLayoutElement(contentPage);
@@ -132,9 +136,114 @@ export class XamlParserService {
         return ElementType.Editor;
       case 'image':
         return ElementType.Image;
+      case 'path':
+        return ElementType.Path;
       default:
         return null;
     }
+  }
+
+  private parseSvgIcon(svgElement: Element): MauiElement {
+    const size = this.getSvgSize(svgElement);
+    const rootElement: MauiElement = {
+      id: this.generateId(),
+      type: ElementType.AbsoluteLayout,
+      name: 'SvgIconLayout',
+      properties: {
+        x: 0,
+        y: 0,
+        width: size.width,
+        height: size.height,
+        backgroundColor: '#ffffff',
+        isVisible: true,
+        isEnabled: true
+      },
+      children: []
+    };
+
+    const pathElements = Array.from(svgElement.querySelectorAll('path'))
+      .filter(pathElement => !!pathElement.getAttribute('d'));
+
+    if (pathElements.length === 0) {
+      throw new Error('SVG does not contain any <path d="..."> elements to convert.');
+    }
+
+    pathElements.forEach((pathElement, index) => {
+      const path: MauiElement = {
+        id: this.generateId(),
+        type: ElementType.Path,
+        name: `IconPath${index + 1}`,
+        properties: {
+          x: 0,
+          y: 0,
+          width: size.width,
+          height: size.height,
+          pathData: pathElement.getAttribute('d') || '',
+          viewBox: size.viewBox,
+          fillColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'fill'), '#000000', '#000000'),
+          strokeColor: this.normalizeSvgPaint(this.getInheritedAttribute(pathElement, 'stroke'), 'Transparent', '#000000'),
+          strokeThickness: this.parseNumber(this.getInheritedAttribute(pathElement, 'stroke-width'), 0),
+          isVisible: true,
+          isEnabled: true
+        },
+        children: [],
+        parent: rootElement
+      };
+      rootElement.children.push(path);
+    });
+
+    return rootElement;
+  }
+
+  private getSvgSize(svgElement: Element): { width: number; height: number; viewBox: string } {
+    const viewBox = svgElement.getAttribute('viewBox');
+    if (viewBox) {
+      const values = viewBox.split(/[\s,]+/).map(value => parseFloat(value)).filter(value => !Number.isNaN(value));
+      if (values.length >= 4 && values[2] > 0 && values[3] > 0) {
+        return { width: values[2], height: values[3], viewBox };
+      }
+    }
+
+    const width = this.parseNumber(svgElement.getAttribute('width'), 24);
+    const height = this.parseNumber(svgElement.getAttribute('height'), 24);
+    return {
+      width,
+      height,
+      viewBox: `0 0 ${width} ${height}`
+    };
+  }
+
+  private getInheritedAttribute(element: Element, attributeName: string): string | null {
+    let current: Element | null = element;
+    while (current) {
+      const value = current.getAttribute(attributeName);
+      if (value !== null) {
+        return value;
+      }
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  private normalizeSvgPaint(value: string | null, fallback: string, currentColor: string): string {
+    if (!value) {
+      return fallback;
+    }
+    if (value === 'currentColor') {
+      return currentColor;
+    }
+    if (value.toLowerCase() === 'none') {
+      return 'Transparent';
+    }
+    return value;
+  }
+
+  private parseNumber(value: string | null, fallback: number): number {
+    if (!value) {
+      return fallback;
+    }
+    const parsed = parseFloat(value);
+    return Number.isNaN(parsed) ? fallback : parsed;
   }
 
   private parseProperties(xmlElement: Element, elementType: ElementType, parent: MauiElement | null): ElementProperties {
@@ -149,6 +258,21 @@ export class XamlParserService {
 
     const placeholder = xmlElement.getAttribute('Placeholder');
     if (placeholder) properties.text = placeholder; // Entry placeholder becomes text property
+
+    const pathData = xmlElement.getAttribute('Data');
+    if (pathData) properties.pathData = pathData;
+
+    const viewBox = xmlElement.getAttribute('ViewBox');
+    if (viewBox) properties.viewBox = viewBox;
+
+    const fill = xmlElement.getAttribute('Fill');
+    if (fill) properties.fillColor = fill;
+
+    const stroke = xmlElement.getAttribute('Stroke');
+    if (stroke) properties.strokeColor = stroke;
+
+    const strokeThickness = xmlElement.getAttribute('StrokeThickness');
+    if (strokeThickness) properties.strokeThickness = parseFloat(strokeThickness);
 
     const widthRequest = xmlElement.getAttribute('WidthRequest');
     if (widthRequest) properties.width = parseFloat(widthRequest);
@@ -275,6 +399,15 @@ export class XamlParserService {
       case ElementType.Image:
         if (properties.width === undefined) properties.width = 100;
         if (properties.height === undefined) properties.height = 100;
+        break;
+      case ElementType.Path:
+        if (properties.width === undefined) properties.width = 24;
+        if (properties.height === undefined) properties.height = 24;
+        if (properties.pathData === undefined) properties.pathData = 'M12 2L2 22h20L12 2Z';
+        if (properties.viewBox === undefined) properties.viewBox = '0 0 24 24';
+        if (properties.fillColor === undefined) properties.fillColor = '#000000';
+        if (properties.strokeColor === undefined) properties.strokeColor = 'Transparent';
+        if (properties.strokeThickness === undefined) properties.strokeThickness = 0;
         break;
       case ElementType.AbsoluteLayout:
         if (properties.width === undefined) properties.width = 800;
