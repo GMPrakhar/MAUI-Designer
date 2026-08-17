@@ -15,11 +15,24 @@ for the design rationale and the alternatives that were considered.
 | `src/MauiDesigner.Core` | `netstandard2.0` | any OS |
 | `tests/MauiDesigner.Core.Tests` | `net8.0` | any OS |
 | `tests/Fakes/*` | `netstandard2.0` | any OS |
-| `src/MauiDesigner.Vsix` | `net472` | **Windows only** |
+| `tests/MauiDesigner.Vsix.CompileCheck` | `net472` | any OS |
+| `src/MauiDesigner.Vsix` | `net472` | **Windows only** (packaging) |
 
 `MauiDesigner.Core.sln` contains everything that is cross-platform and is what CI
-builds and tests. `MauiDesigner.sln` additionally contains the VSIX and requires
-Visual Studio 2022 with the *Visual Studio extension development* workload.
+builds and tests. `MauiDesigner.sln` additionally contains the VSIX project itself
+and requires Visual Studio 2022 with the *Visual Studio extension development*
+workload.
+
+Only *packaging* the VSIX needs Windows — the VSSDK build tools ship with Visual
+Studio. The extension's **source compiles anywhere**, and
+`MauiDesigner.Vsix.CompileCheck` does exactly that: it compiles the same `.cs`
+files against the real Visual Studio SDK reference assemblies, so CI catches a
+wrong interface, signature or enum on Linux instead of at F5 on someone's
+machine. It is part of `MauiDesigner.Core.sln`, so `dotnet build` covers it.
+
+This is also why `DesignerControl` builds its UI in code instead of in XAML: XAML
+markup compilation is Windows-only, and the UI is one WebView plus a status
+label.
 
 ## What the core library does
 
@@ -65,6 +78,10 @@ The tests build two fake assemblies — a stand-in `Microsoft.Maui.Controls` and
 `Contoso.Maui.Controls` control package — so the reflection scanner is exercised
 for real without installing the MAUI workload.
 
+That command also compiles the extension sources through the compile-check
+project. To verify it is doing its job, change a VS interface implementation (say
+drop the `ref` from `IVsEditorFactory.MapLogicalView`) and the build fails.
+
 The VSIX, on Windows:
 
 ```powershell
@@ -98,6 +115,11 @@ Studio install directory is read-only.
 
 ## Limitations
 
+* **Visual Studio does not run on Linux or macOS** — Visual Studio is a Windows
+  product, and Visual Studio for Mac was retired in August 2024. Installing the
+  VSIX and clicking through the designer therefore has to happen on Windows; what
+  CI can prove on Linux is that everything compiles against the real SDK and that
+  the protocol and manifest logic behave correctly.
 * Only Visual Studio 2022 (17.x). The out-of-process `VisualStudio.Extensibility`
   model cannot host WebView2, so the classic in-process VSSDK model is required.
 * The designer understands the subset of XAML the web app supports; unknown tags

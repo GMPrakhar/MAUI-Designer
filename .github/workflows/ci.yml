@@ -49,7 +49,8 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      # Only the cross-platform half is built here; the VSIX itself needs
-      # Windows and the Visual Studio SDK. See extension/README.md.
-      - name: Test
+      # Builds the extension sources against the real Visual Studio SDK reference
+      # assemblies and runs the core unit tests. Only *packaging* the VSIX needs
+      # Windows and the VSSDK build tools. See extension/README.md.
+      - name: Build and test
         run: dotnet test extension/MauiDesigner.Core.sln --configuration Release

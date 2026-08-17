@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      The VSIX itself can only be *packaged* on Windows, because the VSSDK build
+      tools ship with Visual Studio. Its source, though, compiles anywhere: this
+      project builds exactly the same files against the real Visual Studio SDK
+      reference assemblies so CI catches a wrong interface, signature or enum on
+      Linux, long before anyone opens the solution in Visual Studio.
+
+      It intentionally produces a throwaway library and is never shipped.
+    -->
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>MauiDesigner.Vsix.CompileCheck</AssemblyName>
+    <RootNamespace>MauiDesigner.Vsix</RootNamespace>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Supplies the .NET Framework reference assemblies on non-Windows machines -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.11.40262" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="PresentationCore" />
+    <Reference Include="PresentationFramework" />
+    <Reference Include="System.Xaml" />
+    <Reference Include="WindowsBase" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MauiDesigner.Core\MauiDesigner.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The real extension sources, compiled in place -->
+    <Compile Include="..\..\src\MauiDesigner.Vsix\**\*.cs">
+      <Link>Vsix\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Compile>
+    <Compile Remove="..\..\src\MauiDesigner.Vsix\obj\**\*.cs" />
+    <Compile Remove="..\..\src\MauiDesigner.Vsix\bin\**\*.cs" />
+    <!-- Assembly level attributes would collide with the ones generated here -->
+    <Compile Remove="..\..\src\MauiDesigner.Vsix\Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+</Project>

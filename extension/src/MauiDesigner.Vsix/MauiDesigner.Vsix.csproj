@@ -29,7 +29,28 @@
     <DeployExtension Condition="'$(IsBuildingVsix)' == ''">true</DeployExtension>
   </PropertyGroup>
 
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
   <ItemGroup>
+    <!-- Lets the compile step run on machines without the .NET Framework targeting pack -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.11.435" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.11.40262" ExcludeAssets="runtime" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
@@ -43,23 +64,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="Editor\DesignerControl.xaml.cs">
-      <DependentUpon>DesignerControl.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
+    <Compile Include="Editor\DesignerControl.cs" />
     <Compile Include="Editor\DesignerEditorFactory.cs" />
     <Compile Include="Editor\DesignerPane.cs" />
     <Compile Include="Editor\WebAssetLocator.cs" />
     <Compile Include="MauiDesignerPackage.cs" />
     <Compile Include="Projects\ProjectManifestProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Page Include="Editor\DesignerControl.xaml">
-      <Generator>MSBuild:Compile</Generator>
-      <SubType>Designer</SubType>
-    </Page>
   </ItemGroup>
 
   <ItemGroup>
