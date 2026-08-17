@@ -35,7 +35,7 @@
     (dragleave)="onCanvasDragLeave()"
     (drop)="onCanvasDrop($event)"
     (mousedown)="onCanvasMouseDown($event)"
-    (click)="onCanvasClick()">
+    (click)="onCanvasClick($event)">
     
     <!-- Root element content (rendered through the recursive template) -->
     <ng-container *ngIf="rootElement$ | async as rootElement">

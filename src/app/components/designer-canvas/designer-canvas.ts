@@ -60,9 +60,12 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   private marqueeAdditive = false;
   private dragOrigin: { x: number, y: number } | null = null;
   private suppressNextCanvasClick = false;
+  private pointerDownPoint: { x: number, y: number } | null = null;
 
   // Constants
   private readonly MIN_SIZE = 20;
+  /** A click whose pointer travelled further than this came from a drag, not from a click. */
+  private readonly CLICK_SLOP = 4;
 
   // Viewport (zoom / pan / theme / grid) state
   viewport!: ViewportState;
@@ -174,8 +177,7 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   onElementClick(element: MauiElement, event: MouseEvent) {
     event.stopPropagation();
     // A marquee that started on the root layout still emits a click on it
-    if (this.suppressNextCanvasClick) {
-      this.suppressNextCanvasClick = false;
+    if (this.shouldIgnoreClick(event)) {
       return;
     }
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
@@ -185,12 +187,34 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     this.elementService.selectElement(element);
   }
 
-  onCanvasClick() {
-    if (this.suppressNextCanvasClick) {
-      this.suppressNextCanvasClick = false;
+  onCanvasClick(event: MouseEvent) {
+    if (this.shouldIgnoreClick(event)) {
       return;
     }
     this.elementService.selectElement(null);
+  }
+
+  /**
+   * True for the trailing click a marquee or a drag leaves behind. After a drop the element
+   * has moved, so that click lands on whatever is now under the pointer and would hand the
+   * selection to it. The pointer travel is used rather than a flag or a timer because the
+   * click can be delivered either before or after the drag ends.
+   */
+  private shouldIgnoreClick(event: MouseEvent): boolean {
+    const origin = this.pointerDownPoint;
+    this.pointerDownPoint = null;
+
+    if (this.suppressNextCanvasClick) {
+      this.suppressNextCanvasClick = false;
+      return true;
+    }
+
+    if (!origin) {
+      return false;
+    }
+
+    return Math.abs(event.clientX - origin.x) > this.CLICK_SLOP ||
+      Math.abs(event.clientY - origin.y) > this.CLICK_SLOP;
   }
 
   // --- Marquee (rubber band) selection ---------------------------------------
@@ -199,6 +223,13 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     if (event.button !== 0) {
       return;
     }
+
+    // A new press means any click still owed by the previous drag will never arrive
+    this.suppressNextCanvasClick = false;
+
+    // Every left press inside the canvas is remembered so the click it produces can be
+    // told apart from the one a drag leaves behind
+    this.pointerDownPoint = { x: event.clientX, y: event.clientY };
 
     const target = event.target as HTMLElement;
     const owner = target.closest('[data-element-id]') as HTMLElement | null;
@@ -630,11 +661,11 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     // and a leftover translation would offset every following drag.
     event.source.reset();
 
-    // The browser still delivers a click after the drag. By then the element has moved, so the
-    // click can land on whatever is now under the pointer and steal the selection.
+
+    // The browser still delivers a click after the drop. By then the element has moved, so the
+    // click lands on whatever is now under the pointer and would steal the selection. The flag is
+    // cleared by the next press rather than by a timer, because the click can be delivered late.
     this.suppressNextCanvasClick = true;
-    // If no click follows (the drag ended off canvas) the flag must not swallow a later one
-    setTimeout(() => (this.suppressNextCanvasClick = false));
 
     this.dragDropService.handleCanvasDrop(element, target.x, target.y, this.canvas.nativeElement, pointer);
     this.dragDropService.endDrag();

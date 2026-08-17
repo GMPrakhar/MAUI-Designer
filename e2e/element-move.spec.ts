@@ -47,7 +47,6 @@ test.describe('Moving elements on the canvas', () => {
     await page.mouse.up();
     // The element stays selected after a drop, which also means the move has been applied
     await expect(element).toHaveAttribute('data-selected', 'true');
-    await page.keyboard.press('Escape');
   }
 
   /** Drags an element and returns its bounds once the model has caught up. */
