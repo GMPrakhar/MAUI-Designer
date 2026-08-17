@@ -51,6 +51,7 @@ Always reference these instructions first and fallback to search or bash command
 - **Build Tests**: `ng build` -- verifies TypeScript compilation and bundling
 - **E2E Tests**: `npm run e2e` -- headless Playwright suite in `e2e/`; it boots `ng serve` on port 4300 automatically. Run `npx playwright install chromium` once first. Use `E2E_BASE_URL` to target an existing server.
 - **Test hooks**: components expose `data-testid` attributes consumed by `e2e/helpers/designer-page.ts`. Preserve them when editing templates.
+- **Extension tests**: `dotnet test extension/MauiDesigner.Core.sln` -- xUnit suite for the Visual Studio extension's cross-platform core. It runs on any OS; the VSIX itself needs Windows and the VS SDK.
 - **Polling helpers**: the XAML pane and the properties panel re-render from RxJS streams, so assert with `expectXamlToContain`, `xamlWhen`, `expectProperty` or `expectPropertyNumber` instead of one-shot reads, otherwise the tests flake on CI.
 - **Canvas coordinates**: the canvas sits inside a zoomable wrapper - convert client coordinates with `toCanvasPoint` (divide by `viewport.zoom`) in components, and avoid canvas x > ~400 in tests because the right panel overlaps it.
 - **Linting**: Use `ng lint` if ESLint is configured, or standard TypeScript compiler checks
@@ -138,7 +139,8 @@ typescript (5.5.4)
 - **Hot reloading**: Development server auto-reloads on file changes
 - **Keyboard shortcuts**: `Ctrl+Z`/`Ctrl+Y` undo-redo, `Ctrl+C`/`Ctrl+X`/`Ctrl+V` clipboard, `Ctrl+A` select all, `Ctrl+D` duplicate, `Delete` remove, arrow keys nudge, `Space`+drag or middle-drag to pan, `Ctrl`+wheel to zoom
 - **Bulk operations**: wrap multi-element changes in `elementService.runAsSingleChange()` with `{ recordHistory: false }` updates so they undo as one step
-- **CI/CD**: `.github/workflows/ci.yml` builds and runs unit + e2e tests; `.github/workflows/deploy-pages.yml` publishes the static build to GitHub Pages on pushes to `main`
+- **IDE hosting**: `src/app/services/host-bridge.ts` detects Visual Studio (`window.chrome.webview`) or VS Code (`acquireVsCodeApi`). When hosted, the open document replaces browser storage as the source of truth -- `App.connectToHost()` applies `document.load`, streams `document.changed` and routes save to the host. Changing a message name means changing `extension/src/MauiDesigner.Core/Protocol/DesignerProtocol.cs` too.
+- **CI/CD**: `.github/workflows/ci.yml` builds and runs unit + e2e tests plus the extension's `dotnet test`; `.github/workflows/deploy-pages.yml` publishes the static build to GitHub Pages on pushes to `main`
 
 ## Troubleshooting
 - **Build fails with module not found**: Run `npm install` to ensure all dependencies are installed

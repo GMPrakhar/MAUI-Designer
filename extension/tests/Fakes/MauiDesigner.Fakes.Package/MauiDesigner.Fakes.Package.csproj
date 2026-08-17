@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Stand-in for a third party control package such as Syncfusion or Telerik -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>Contoso.Maui.Controls</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MauiDesigner.Fakes.Maui\MauiDesigner.Fakes.Maui.csproj" />
+  </ItemGroup>
+
+</Project>
