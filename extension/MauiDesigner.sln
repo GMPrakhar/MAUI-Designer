@@ -19,6 +19,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MauiDesigner.Fakes.Package"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MauiDesigner.Vsix", "src\MauiDesigner.Vsix\MauiDesigner.Vsix.csproj", "{6E7B4B0D-8F5A-4A63-9F1E-4F2F7B0C6A11}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MauiDesigner.Vsix.CompileCheck", "tests\MauiDesigner.Vsix.CompileCheck\MauiDesigner.Vsix.CompileCheck.csproj", "{520D80E2-606A-4F88-8804-B0776BD5FE1A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,6 +50,10 @@ Global
 		{6E7B4B0D-8F5A-4A63-9F1E-4F2F7B0C6A11}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6E7B4B0D-8F5A-4A63-9F1E-4F2F7B0C6A11}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6E7B4B0D-8F5A-4A63-9F1E-4F2F7B0C6A11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{520D80E2-606A-4F88-8804-B0776BD5FE1A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{520D80E2-606A-4F88-8804-B0776BD5FE1A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{520D80E2-606A-4F88-8804-B0776BD5FE1A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{520D80E2-606A-4F88-8804-B0776BD5FE1A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{84A01464-33A0-41AC-B13D-1E2AB557F945} = {A0C171F4-DBCD-4DE2-B17C-80F56FBF8FB7}
@@ -56,5 +62,6 @@ Global
 		{68503E8F-DC47-456D-902D-67F5DDF7C473} = {C899E7CF-34A4-48FA-90C8-60E31F08536F}
 		{B65ABC78-AA1F-4A57-8CE3-71218FAB1CC3} = {68503E8F-DC47-456D-902D-67F5DDF7C473}
 		{77A797C9-9D0D-4B2F-B3D2-9E2AADBB1542} = {68503E8F-DC47-456D-902D-67F5DDF7C473}
+		{520D80E2-606A-4F88-8804-B0776BD5FE1A} = {C899E7CF-34A4-48FA-90C8-60E31F08536F}
 	EndGlobalSection
 EndGlobal
