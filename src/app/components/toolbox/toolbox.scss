@@ -177,3 +177,68 @@
     &:hover { color: #ef4444; }
   }
 }
+
+/* Custom controls from NuGet package manifests */
+.category-actions .icon-button,
+.manifest-header .icon-button {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 0;
+
+  .material-icons { font-size: 16px; }
+
+  &:hover { color: #2563eb; }
+}
+
+.manifest-header .icon-button:hover { color: #ef4444; }
+
+.category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.category-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
+.manifest-error {
+  margin: 4px 0 8px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 11px;
+}
+
+.manifest-group {
+  margin-bottom: 10px;
+}
+
+.manifest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 4px;
+  color: #6b7280;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.manifest-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

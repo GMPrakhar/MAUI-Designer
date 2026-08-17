@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
 import { CdkDragDrop, CdkDragEnd, CdkDragStart, transferArrayItem } from '@angular/cdk/drag-drop';
 import { ElementService } from './element';
+import { CustomControlRegistryService } from './custom-control-registry';
 import { LayoutDesignerService } from './layout-designer';
-import { MauiElement, ElementType } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties } from '../models/maui-element';
 import { BehaviorSubject, min } from 'rxjs';
 
 export interface DragData {
@@ -25,7 +26,8 @@ export class DragDropService {
 
   constructor(
     private elementService: ElementService,
-    private layoutDesigner: LayoutDesignerService
+    private layoutDesigner: LayoutDesignerService,
+    private registry: CustomControlRegistryService
   ) { }
 
   startDrag(data: DragData): void {
@@ -56,10 +58,16 @@ export class DragDropService {
    * Creates a new element of the given type inside the layout under the drop point.
    * Used by the native drag from the toolbox onto the canvas.
    */
-  createElementAtPosition(elementType: ElementType, dropX: number, dropY: number, canvasElement: HTMLElement): MauiElement {
+  createElementAtPosition(
+    elementType: ElementType,
+    dropX: number,
+    dropY: number,
+    canvasElement: HTMLElement,
+    properties?: Partial<ElementProperties>
+  ): MauiElement {
     const targetLayout = this.findLayoutAtPosition(dropX, dropY, canvasElement) || this.elementService.getRootElement();
 
-    const newElement = this.elementService.createElement(elementType);
+    const newElement = this.elementService.createElement(elementType, properties);
     this.elementService.addElement(newElement, targetLayout);
 
     const position = this.layoutDesigner.getChildLayoutProperties(
@@ -72,7 +80,18 @@ export class DragDropService {
     return newElement;
   }
 
-  private resolveLocalPosition(targetLayout: MauiElement, dropX: number, dropY: number, canvasElement: HTMLElement): { x: number, y: number } {
+  /**
+   * The canvas is rendered inside a CSS scale transform, so client rectangles are zoomed while the
+   * model works in unscaled design pixels. This derives the current scale without a viewport dependency.
+   */
+  private canvasScale(canvasElement: HTMLElement): number {
+    const rect = canvasElement.getBoundingClientRect();
+    const layoutWidth = canvasElement.offsetWidth;
+    return layoutWidth > 0 && rect.width > 0 ? rect.width / layoutWidth : 1;
+  }
+
+  /** Converts a canvas-space point into coordinates local to the given layout. */
+  resolveLocalPosition(targetLayout: MauiElement, dropX: number, dropY: number, canvasElement: HTMLElement): { x: number, y: number } {
     const layoutInfo = this.layoutDesigner.getLayoutInfo(targetLayout.type);
     const dom = targetLayout.domElement;
 
@@ -80,10 +99,11 @@ export class DragDropService {
       return { x: dropX, y: dropY };
     }
 
+    const scale = this.canvasScale(canvasElement);
     const rect = dom.getBoundingClientRect();
     const canvasRect = canvasElement.getBoundingClientRect();
-    const localX = dropX - (rect.left - canvasRect.left);
-    const localY = dropY - (rect.top - canvasRect.top);
+    const localX = dropX - (rect.left - canvasRect.left) / scale;
+    const localY = dropY - (rect.top - canvasRect.top) / scale;
 
     if (layoutInfo.supportsGridPositioning) {
       const cell = this.layoutDesigner.getGridCellAtPosition(targetLayout, localX, localY, dom);
@@ -93,19 +113,21 @@ export class DragDropService {
     return { x: localX, y: localY };
   }
 
-  handleElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement): void {
+  handleElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement, canvasElement?: HTMLElement): void {
     // A move is a single undo step even though it touches several properties
-    this.elementService.runAsSingleChange(() => this.applyElementMove(element, x, y, targetParent));
+    this.elementService.runAsSingleChange(() => this.applyElementMove(element, x, y, targetParent, canvasElement));
   }
 
-  private applyElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement): void {
-    // Get layout info for the target parent
-    const layoutInfo = this.layoutDesigner.getLayoutInfo(targetParent.type);
-    
-    // Calculate appropriate position based on layout type
-    let domElement = targetParent.id === 'root' ? null! : targetParent.domElement!;
-    const position = this.layoutDesigner.calculateDropPosition(targetParent, { clientX: x, clientY: y } as MouseEvent, domElement!);
-    
+  private applyElementMove(element: MauiElement, x: number, y: number, targetParent: MauiElement, canvasElement?: HTMLElement): void {
+    // x/y arrive in canvas space; translate them into the target layout's own coordinates
+    const position = canvasElement
+      ? this.resolveLocalPosition(targetParent, x, y, canvasElement)
+      : this.layoutDesigner.calculateDropPosition(
+          targetParent,
+          { clientX: x, clientY: y } as MouseEvent,
+          targetParent.id === 'root' ? null : targetParent.domElement ?? null
+        );
+
     // Get layout-specific properties for the child element
     const layoutProperties = this.layoutDesigner.getChildLayoutProperties(targetParent, element, position);
     
@@ -148,40 +170,53 @@ export class DragDropService {
     }
     
     // Check if target can accept children
-    return this.canHaveChildren(target.type);
+    return this.canElementHaveChildren(target);
   }
 
   /**
    * Handles dropping an element at a specific position on the canvas
    */
-  handleCanvasDrop(draggedElement: MauiElement, dropX: number, dropY: number, canvasElement: HTMLElement): void {
-    // Find the layout element at the drop position
-    const targetLayout = this.findLayoutAtPosition(dropX, dropY, canvasElement);
-    
+  handleCanvasDrop(
+    draggedElement: MauiElement,
+    dropX: number,
+    dropY: number,
+    canvasElement: HTMLElement,
+    hitPoint?: { x: number, y: number }
+  ): void {
+    // The pointer decides which layout receives the element, the element's own corner decides where
+    const hit = hitPoint ?? { x: dropX, y: dropY };
+    const targetLayout = this.findLayoutAtPosition(hit.x, hit.y, canvasElement, draggedElement);
+
     if (targetLayout && this.canDropOn(targetLayout, draggedElement)) {
-      this.handleElementMove(draggedElement, dropX, dropY, targetLayout);
+      this.handleElementMove(draggedElement, dropX, dropY, targetLayout, canvasElement);
     }
   }
 
   /**
    * Finds the layout element at a specific position on the canvas
    */
-  findLayoutAtPosition(x: number, y: number, canvasElement: HTMLElement): MauiElement | null {
+  findLayoutAtPosition(x: number, y: number, canvasElement: HTMLElement, draggedElement?: MauiElement): MauiElement | null {
     // Get all layout elements from the DOM
     const layoutElements = canvasElement.querySelectorAll('.layout-element');
-    let layoutElementsAtPosition = [];
+    const layoutElementsAtPosition: Element[] = [];
     let deepestLayout: MauiElement | null = null;
+    const scale = this.canvasScale(canvasElement);
+    const canvasRect = canvasElement.getBoundingClientRect();
+    const draggedDom = draggedElement?.domElement;
 
     for (const element of Array.from(layoutElements)) {
+      // A layout can never be dropped into itself or into one of its own descendants
+      if (draggedDom && (element === draggedDom || draggedDom.contains(element))) {
+        continue;
+      }
+
       const rect = element.getBoundingClientRect();
-      const canvasRect = canvasElement.getBoundingClientRect();
-      
-      // Convert absolute coordinates to relative coordinates
-      const relativeX = x - (rect.left - canvasRect.left);
-      const relativeY = y - (rect.top - canvasRect.top);
-      
-      // Check if point is within this element
-      if (relativeX >= 0 && relativeX <= rect.width && relativeY >= 0 && relativeY <= rect.height) {
+
+      // Client rectangles are zoomed, canvas coordinates are not
+      const relativeX = x - (rect.left - canvasRect.left) / scale;
+      const relativeY = y - (rect.top - canvasRect.top) / scale;
+
+      if (relativeX >= 0 && relativeX <= rect.width / scale && relativeY >= 0 && relativeY <= rect.height / scale) {
         layoutElementsAtPosition.push(element);
       }
     }
@@ -190,18 +225,21 @@ export class DragDropService {
       return this.elementService.getRootElement();
     }
 
-    // Find the deepest layout element that can contain children
-    let minNesting = 1000;
-    let finalElement;
+    // Prefer the most deeply nested layout under the point, not the one with the fewest children
+    let finalElement = layoutElementsAtPosition[0];
+    let maxDepth = -1;
     for (const elem of layoutElementsAtPosition) {
-      const numberOfNestings = elem.querySelectorAll('.layout-element').length;
-      if(numberOfNestings < minNesting) {
-        minNesting = numberOfNestings;
+      let depth = 0;
+      for (let node = elem.parentElement; node && node !== canvasElement; node = node.parentElement) {
+        depth++;
+      }
+      if (depth > maxDepth) {
+        maxDepth = depth;
         finalElement = elem;
       }
     }
 
-    deepestLayout = this.getMauiElementFromDOMElement(finalElement!);
+    deepestLayout = this.getMauiElementFromDOMElement(finalElement);
 
     // If no specific layout found, return root element
     return deepestLayout || this.elementService.getRootElement();
@@ -234,6 +272,14 @@ export class DragDropService {
       current = current.parent;
     }
     return false;
+  }
+
+  /** Custom controls declare in their manifest whether they accept children. */
+  canElementHaveChildren(element: MauiElement): boolean {
+    if (element.type === ElementType.Custom) {
+      return this.registry.findForElement(element)?.definition.canHaveChildren ?? false;
+    }
+    return this.canHaveChildren(element.type);
   }
 
   canHaveChildren(elementType: ElementType): boolean {

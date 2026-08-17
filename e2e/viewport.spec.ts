@@ -62,8 +62,12 @@ test.describe('Live preview viewport', () => {
   });
 
   test('the zoom level is restored after a reload', async ({ page }) => {
+    const zoomValue = page.getByTestId('zoom-value');
+    const before = (await zoomValue.textContent())!.trim();
     await page.getByTestId('zoom-in').click();
-    const zoom = await page.getByTestId('zoom-value').textContent();
+    // The label updates through an observable, so wait for the new value before capturing it
+    await expect(zoomValue).not.toHaveText(before);
+    const zoom = await zoomValue.textContent();
 
     await page.reload();
     await expect(page.getByTestId('zoom-value')).toHaveText(zoom!.trim());

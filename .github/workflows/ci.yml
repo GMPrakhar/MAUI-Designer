@@ -38,3 +38,18 @@ jobs:
           name: playwright-report
           path: playwright-report/
           retention-days: 7
+
+  extension-core:
+    name: Visual Studio extension (core library)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      # Only the cross-platform half is built here; the VSIX itself needs
+      # Windows and the Visual Studio SDK. See extension/README.md.
+      - name: Test
+        run: dotnet test extension/MauiDesigner.Core.sln --configuration Release

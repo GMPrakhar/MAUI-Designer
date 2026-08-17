@@ -49,6 +49,81 @@
     </ng-container>
   </div>
 
+  <!-- Custom controls from NuGet package manifests -->
+  <div class="category-group" data-testid="custom-controls-section">
+    <div class="category-header">
+      <h3 class="category-title">Custom controls</h3>
+      <div class="category-actions">
+        <button
+          class="icon-button"
+          type="button"
+          data-testid="import-manifest"
+          title="Import a control manifest (JSON)"
+          (click)="manifestInput.click()">
+          <span class="material-icons">upload_file</span>
+        </button>
+        <button
+          class="icon-button"
+          type="button"
+          data-testid="export-manifests"
+          title="Export all control manifests"
+          (click)="exportManifests()">
+          <span class="material-icons">download</span>
+        </button>
+      </div>
+    </div>
+
+    <input
+      #manifestInput
+      type="file"
+      class="hidden-file-input"
+      accept="application/json,.json"
+      data-testid="manifest-file"
+      (change)="importManifest($event)">
+
+    <p class="manifest-error" *ngIf="manifestError" data-testid="manifest-error">{{ manifestError }}</p>
+
+    <ng-container *ngFor="let manifest of (manifests$ | async)">
+      <div class="manifest-group" *ngIf="visibleControls(manifest).length" [attr.data-testid]="'manifest-' + manifest.id">
+        <div class="manifest-header">
+          <span class="manifest-name" [title]="manifest.description || manifest.package">{{ manifest.package }}</span>
+          <button
+            class="icon-button"
+            type="button"
+            [attr.data-testid]="'manifest-remove-' + manifest.id"
+            [attr.aria-label]="'Remove ' + manifest.package"
+            (click)="removeManifest(manifest)">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+
+        <div class="toolbox-items">
+          <div
+            class="toolbox-item"
+            *ngFor="let control of visibleControls(manifest)"
+            [attr.data-testid]="'custom-item-' + manifest.xmlns.prefix + '-' + control.tag"
+            role="button"
+            tabindex="0"
+            draggable="true"
+            (dragstart)="onCustomDragStart($event, manifest, control)"
+            (dragend)="onDragEnd()"
+            (click)="onCustomItemClick(manifest, control)"
+            (keydown)="onCustomItemKeydown($event, manifest, control)"
+            [title]="control.description || control.tag">
+
+            <div class="item-icon">
+              <span class="material-icons">{{ control.icon }}</span>
+            </div>
+
+            <div class="item-label">
+              {{ control.displayName || control.tag }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+
   <!-- Saved component templates -->
   <div class="category-group" *ngIf="(templates$ | async) as templates" data-testid="templates-section">
     <ng-container *ngIf="templates.length">

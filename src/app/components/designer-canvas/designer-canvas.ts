@@ -7,6 +7,8 @@ import { LayoutDesignerService } from '../../services/layout-designer';
 import { MauiElement, ElementType } from '../../models/maui-element';
 import { AlignmentService, AlignmentGuide } from '../../services/alignment';
 import { ClipboardService } from '../../services/clipboard';
+import { CustomControlRegistryService } from '../../services/custom-control-registry';
+import { CustomPreview } from '../../models/custom-control';
 import { ViewportService, ViewportState } from '../../services/viewport';
 import { Observable, Subscription } from 'rxjs';
 
@@ -56,10 +58,14 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   private marqueeOrigin = { x: 0, y: 0 };
   private isMarqueeSelecting = false;
   private marqueeAdditive = false;
+  private dragOrigin: { x: number, y: number } | null = null;
   private suppressNextCanvasClick = false;
+  private pointerDownPoint: { x: number, y: number } | null = null;
 
   // Constants
   private readonly MIN_SIZE = 20;
+  /** A click whose pointer travelled further than this came from a drag, not from a click. */
+  private readonly CLICK_SLOP = 4;
 
   // Viewport (zoom / pan / theme / grid) state
   viewport!: ViewportState;
@@ -80,7 +86,8 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     private layoutDesigner: LayoutDesignerService,
     private alignmentService: AlignmentService,
     private clipboardService: ClipboardService,
-    private viewportService: ViewportService
+    private viewportService: ViewportService,
+    private registry: CustomControlRegistryService
   ) {
     this.rootElement$ = this.elementService.elements$;
     this.selectedElement$ = this.elementService.selectedElement$;
@@ -170,8 +177,7 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   onElementClick(element: MauiElement, event: MouseEvent) {
     event.stopPropagation();
     // A marquee that started on the root layout still emits a click on it
-    if (this.suppressNextCanvasClick) {
-      this.suppressNextCanvasClick = false;
+    if (this.shouldIgnoreClick(event)) {
       return;
     }
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
@@ -181,12 +187,34 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     this.elementService.selectElement(element);
   }
 
-  onCanvasClick() {
-    if (this.suppressNextCanvasClick) {
-      this.suppressNextCanvasClick = false;
+  onCanvasClick(event: MouseEvent) {
+    if (this.shouldIgnoreClick(event)) {
       return;
     }
     this.elementService.selectElement(null);
+  }
+
+  /**
+   * True for the trailing click a marquee or a drag leaves behind. After a drop the element
+   * has moved, so that click lands on whatever is now under the pointer and would hand the
+   * selection to it. The pointer travel is used rather than a flag or a timer because the
+   * click can be delivered either before or after the drag ends.
+   */
+  private shouldIgnoreClick(event: MouseEvent): boolean {
+    const origin = this.pointerDownPoint;
+    this.pointerDownPoint = null;
+
+    if (this.suppressNextCanvasClick) {
+      this.suppressNextCanvasClick = false;
+      return true;
+    }
+
+    if (!origin) {
+      return false;
+    }
+
+    return Math.abs(event.clientX - origin.x) > this.CLICK_SLOP ||
+      Math.abs(event.clientY - origin.y) > this.CLICK_SLOP;
   }
 
   // --- Marquee (rubber band) selection ---------------------------------------
@@ -195,6 +223,13 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     if (event.button !== 0) {
       return;
     }
+
+    // A new press means any click still owed by the previous drag will never arrive
+    this.suppressNextCanvasClick = false;
+
+    // Every left press inside the canvas is remembered so the click it produces can be
+    // told apart from the one a drag leaves behind
+    this.pointerDownPoint = { x: event.clientX, y: event.clientY };
 
     const target = event.target as HTMLElement;
     const owner = target.closest('[data-element-id]') as HTMLElement | null;
@@ -298,8 +333,8 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
 
   onCanvasDrop(event: DragEvent) {
     this.isDragOver = false;
-    const type = event.dataTransfer?.getData(TOOLBOX_DRAG_MIME) as ElementType;
-    if (!type) {
+    const payload = event.dataTransfer?.getData(TOOLBOX_DRAG_MIME);
+    if (!payload) {
       return;
     }
     event.preventDefault();
@@ -307,7 +342,29 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     const { x, y } = this.toCanvasPoint(event.clientX, event.clientY);
     const snapped = this.applyGridSnap(x, y);
 
-    this.dragDropService.createElementAtPosition(type, snapped.x, snapped.y, this.canvas.nativeElement);
+    // Custom controls are dragged as "Custom:<prefix>:<tag>"
+    if (payload.startsWith('Custom:')) {
+      const [, prefix, tag] = payload.split(':');
+      const lookup = this.registry.find(prefix, tag);
+      if (lookup) {
+        this.dragDropService.createElementAtPosition(
+          ElementType.Custom,
+          snapped.x,
+          snapped.y,
+          this.canvas.nativeElement,
+          this.registry.defaultProperties(lookup)
+        );
+      }
+      this.dragDropService.endDrag();
+      return;
+    }
+
+    this.dragDropService.createElementAtPosition(
+      payload as ElementType,
+      snapped.x,
+      snapped.y,
+      this.canvas.nativeElement
+    );
     this.dragDropService.endDrag();
   }
 
@@ -413,10 +470,10 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
    * Turns a raw cdkDrag position into the final canvas position, applying
    * smart guides first and the grid afterwards.
    */
+  /** Applies smart guides and grid snapping to a position expressed in the parent's own coordinates. */
   private resolveDragPosition(element: MauiElement, rawX: number, rawY: number): { x: number, y: number } {
-    const zoom = this.viewport.zoom || 1;
-    let x = rawX / zoom;
-    let y = rawY / zoom;
+    let x = rawX;
+    let y = rawY;
 
     if (element.parent?.type === ElementType.AbsoluteLayout) {
       if (this.viewport.showGuides) {
@@ -494,6 +551,9 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   }
 
   isLayoutElement(element: MauiElement): boolean {
+    if (element.type === ElementType.Custom) {
+      return this.registry.findForElement(element)?.definition.canHaveChildren ?? false;
+    }
     return [
       ElementType.StackLayout,
       ElementType.Grid,
@@ -504,6 +564,25 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
       ElementType.CollectionView,
       ElementType.ScrollView
     ].includes(element.type);
+  }
+
+  // --- Custom control previews ------------------------------------------------
+
+  /** Preview description of a custom control, with sensible fallbacks. */
+  customPreview(element: MauiElement): CustomPreview {
+    const definition = this.registry.findForElement(element)?.definition;
+    return definition?.preview || { kind: 'box', label: element.properties.customTag || 'Custom', icon: 'extension' };
+  }
+
+  customLabel(element: MauiElement): string {
+    const preview = this.customPreview(element);
+    const label = this.registry.interpolate(preview.label, element).trim();
+    return label || element.properties.customTag || 'Custom';
+  }
+
+  customCornerRadius(element: MauiElement): number | null {
+    const radius = Number(this.registry.interpolate(this.customPreview(element).cornerRadius, element));
+    return Number.isFinite(radius) && radius > 0 ? radius : null;
   }
 
   // --- Control previews -------------------------------------------------------
@@ -549,20 +628,68 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   }
   
   onDragStarted(element: MauiElement) {
+    // Remember where the element started so the drop position is origin + travelled distance
+    this.dragOrigin = { x: element.properties.x || 0, y: element.properties.y || 0 };
   }
 
   onDragEnded(element: MauiElement, event: CdkDragEnd) {
     document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     this.alignmentGuides = [];
 
-    const dropPoint = event.source.getFreeDragPosition();
-    const target = this.resolveDragPosition(element, dropPoint.x, dropPoint.y);
+    const zoom = this.viewport.zoom || 1;
+    const origin = this.dragOrigin ?? { x: element.properties.x || 0, y: element.properties.y || 0 };
+    this.dragOrigin = null;
 
-    this.dragDropService.handleCanvasDrop(element, target.x, target.y, this.canvas.nativeElement);
+    // The pointer position decides which layout receives the element
+    const pointer = this.toCanvasPoint(event.dropPoint.x, event.dropPoint.y);
 
-    //this.elementService.moveElement(element, element.parent!,  element.properties.x! + event.distance.x,  element.properties.y! + event.distance.y)
+    let target: { x: number, y: number };
+    if (this.parentUsesAbsolutePositioning(element)) {
+      // cdkDrag reports the travelled distance in client pixels; the model stores unscaled pixels
+      const local = this.resolveDragPosition(
+        element,
+        origin.x + event.distance.x / zoom,
+        origin.y + event.distance.y / zoom
+      );
+      target = this.toCanvasSpace(element.parent, local.x, local.y);
+    } else {
+      // Stack and grid children have no pixel position of their own, so follow the pointer
+      target = pointer;
+    }
 
+    // Drop the transform cdkDrag applied - the element is repositioned through its own styles,
+    // and a leftover translation would offset every following drag.
+    event.source.reset();
+
+
+    // The browser still delivers a click after the drop. By then the element has moved, so the
+    // click lands on whatever is now under the pointer and would steal the selection. The flag is
+    // cleared by the next press rather than by a timer, because the click can be delivered late.
+    this.suppressNextCanvasClick = true;
+
+    this.dragDropService.handleCanvasDrop(element, target.x, target.y, this.canvas.nativeElement, pointer);
     this.dragDropService.endDrag();
+  }
+
+  private parentUsesAbsolutePositioning(element: MauiElement): boolean {
+    const parent = element.parent;
+    return !!parent && this.layoutDesigner.getLayoutInfo(parent.type).supportsAbsolutePositioning;
+  }
+
+  /** Converts a point expressed in a layout's own coordinates into canvas space. */
+  private toCanvasSpace(parent: MauiElement | undefined, localX: number, localY: number): { x: number, y: number } {
+    const dom = parent?.domElement;
+    if (!parent || parent.id === 'root' || !dom) {
+      return { x: localX, y: localY };
+    }
+
+    const zoom = this.viewport.zoom || 1;
+    const rect = dom.getBoundingClientRect();
+    const canvasRect = this.canvas.nativeElement.getBoundingClientRect();
+    return {
+      x: localX + (rect.left - canvasRect.left) / zoom,
+      y: localY + (rect.top - canvasRect.top) / zoom
+    };
   }
 
   onDragMoved(element: MauiElement, event: CdkDragMove) {
@@ -577,15 +704,16 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     } else {
       this.alignmentGuides = [];
     }
-    // Get layout element over which we are passing currently
-    var layoutOver = this.dragDropService.findLayoutAtPosition(element.properties.x! + event.distance.x, element.properties.y! + event.distance.y, this.canvas.nativeElement)!;
+    // The layout under the pointer is the drop candidate
+    const pointer = this.toCanvasPoint(event.pointerPosition.x, event.pointerPosition.y);
+    const layoutOver = this.dragDropService.findLayoutAtPosition(pointer.x, pointer.y, this.canvas.nativeElement, element)!;
 
-    if(layoutOver.type === ElementType.Grid && this.layoutDesigner.getVisualHints(layoutOver).showGrid) {
-      const rect = (event.source.getRootElement() as HTMLElement).getBoundingClientRect();
+    if(layoutOver?.type === ElementType.Grid && this.layoutDesigner.getVisualHints(layoutOver).showGrid) {
+      const zoom = this.viewport.zoom || 1;
       const parentRect = layoutOver.domElement?.getBoundingClientRect();
 
-      const x = event.pointerPosition.x - (parentRect?.left || 0);
-      const y = event.pointerPosition.y - (parentRect?.top || 0);
+      const x = (event.pointerPosition.x - (parentRect?.left || 0)) / zoom;
+      const y = (event.pointerPosition.y - (parentRect?.top || 0)) / zoom;
       const gridCell = this.layoutDesigner.getGridCellAtPosition(layoutOver, x, y, layoutOver.domElement!);
       if(gridCell) {
         this.highlightedGridCell = { element: layoutOver, row: gridCell.row, column: gridCell.column };

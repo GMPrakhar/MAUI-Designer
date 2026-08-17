@@ -369,6 +369,57 @@
       </ng-container>
     </div>
 
+    <!-- Custom (third party) control properties -->
+    <div class="property-section" *ngIf="isCustom(element)" data-testid="custom-section">
+      <h4 class="section-header">{{ element.properties.customTag }}</h4>
+      <p class="section-hint" data-testid="custom-package">{{ customPackage(element) }}</p>
+
+      <div class="property-group" *ngFor="let property of customProperties(element)">
+        <label class="property-label" [title]="property.description || property.name">{{ property.name }}</label>
+
+        <ng-container [ngSwitch]="property.type">
+          <input *ngSwitchCase="'number'" type="number" class="property-input"
+                 [attr.data-testid]="'custom-' + property.name"
+                 [value]="customValue(element, property.name)"
+                 (input)="updateCustomValue(element, property.name, $any($event.target).value)">
+
+          <input *ngSwitchCase="'color'" type="color" class="property-input color-input"
+                 [attr.data-testid]="'custom-' + property.name"
+                 [value]="customValue(element, property.name) || '#000000'"
+                 (input)="updateCustomValue(element, property.name, $any($event.target).value)">
+
+          <input *ngSwitchCase="'boolean'" type="checkbox" class="property-checkbox"
+                 [attr.data-testid]="'custom-' + property.name"
+                 [checked]="customBoolean(element, property.name)"
+                 (change)="updateCustomValue(element, property.name, $any($event.target).checked)">
+
+          <select *ngSwitchCase="'enum'" class="property-input"
+                  [attr.data-testid]="'custom-' + property.name"
+                  [value]="customValue(element, property.name)"
+                  (change)="updateCustomValue(element, property.name, $any($event.target).value)">
+            <option value="">(unset)</option>
+            <option *ngFor="let option of property.options" [value]="option">{{ option }}</option>
+          </select>
+
+          <input *ngSwitchDefault type="text" class="property-input"
+                 [attr.data-testid]="'custom-' + property.name"
+                 [value]="customValue(element, property.name)"
+                 (input)="updateCustomValue(element, property.name, $any($event.target).value)">
+        </ng-container>
+      </div>
+
+      <ng-container *ngIf="rawAttributeNames(element).length">
+        <h4 class="section-header" data-testid="raw-attributes-header">Other attributes</h4>
+        <div class="property-group" *ngFor="let name of rawAttributeNames(element)">
+          <label class="property-label">{{ name }}</label>
+          <input type="text" class="property-input"
+                 [attr.data-testid]="'raw-' + name"
+                 [value]="rawAttributeValue(element, name)"
+                 (input)="updateRawAttribute(element, name, $any($event.target).value)">
+        </div>
+      </ng-container>
+    </div>
+
     <!-- Data bindings -->
     <div class="property-section" data-testid="bindings-section">
       <h4 class="section-header">Data Bindings</h4>

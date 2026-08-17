@@ -30,7 +30,9 @@ export enum ElementType {
   Frame = 'Frame',
   Border = 'Border',
   ScrollView = 'ScrollView',
-  CollectionView = 'CollectionView'
+  CollectionView = 'CollectionView',
+  /** Any control that comes from a NuGet package manifest or imported XAML. */
+  Custom = 'Custom'
 }
 
 export const DEFAULT_ICON_PATH_DATA = 'M12 2L2 22h20L12 2Z';
@@ -89,6 +91,20 @@ export interface ElementProperties {
   // CollectionView preview
   itemCount?: number;
   itemTemplateText?: string;
+
+  // Custom (third party) control properties
+  /** Local XAML tag of a custom control, e.g. `AvatarView`. */
+  customTag?: string;
+  /** XML prefix the control is emitted with, e.g. `toolkit`. */
+  customPrefix?: string;
+  /** Namespace URI, kept on the element so XAML survives without the manifest. */
+  customNamespace?: string;
+  /** Values for the properties declared in the control's manifest. */
+  customValues?: Record<string, string>;
+  /** Attributes the designer does not model, preserved verbatim. */
+  rawAttributes?: Record<string, string>;
+  /** Property elements of a custom control (e.g. Expander.Header), kept as XML. */
+  rawContentXml?: string[];
 
   // Other properties
   isVisible?: boolean;

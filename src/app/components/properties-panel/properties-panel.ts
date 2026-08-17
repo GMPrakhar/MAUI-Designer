@@ -15,6 +15,8 @@ import {
 } from '../../models/maui-element';
 import { Observable, Subscription } from 'rxjs';
 import { AlignmentService, AlignMode } from '../../services/alignment';
+import { CustomControlRegistryService } from '../../services/custom-control-registry';
+import { CustomControlDefinition, CustomPropertyDefinition } from '../../models/custom-control';
 
 @Component({
   selector: 'app-properties-panel',
@@ -34,7 +36,8 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
 
   constructor(
     private elementService: ElementService,
-    private alignmentService: AlignmentService
+    private alignmentService: AlignmentService,
+    private registry: CustomControlRegistryService
   ) {
     this.selectedElement$ = this.elementService.selectedElement$;
   }
@@ -146,8 +149,68 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
   // --- Data bindings ----------------------------------------------------------
 
   bindableProperties(element: MauiElement): string[] {
-    const specific = BINDABLE_PROPERTIES[element.type] || [];
+    const specific = element.type === ElementType.Custom
+      ? this.registry.bindableProperties(element)
+      : BINDABLE_PROPERTIES[element.type] || [];
     return [...new Set([...specific, ...COMMON_BINDABLE_PROPERTIES])];
+  }
+
+  // --- Custom (third party) controls ------------------------------------------
+
+  isCustom(element: MauiElement): boolean {
+    return element.type === ElementType.Custom;
+  }
+
+  customDefinition(element: MauiElement): CustomControlDefinition | null {
+    return this.registry.findForElement(element)?.definition || null;
+  }
+
+  customPackage(element: MauiElement): string {
+    return this.registry.findForElement(element)?.manifest.package || 'Unknown package';
+  }
+
+  customProperties(element: MauiElement): CustomPropertyDefinition[] {
+    return this.customDefinition(element)?.properties || [];
+  }
+
+  customValue(element: MauiElement, property: string): string {
+    return element.properties.customValues?.[property] ?? '';
+  }
+
+  customBoolean(element: MauiElement, property: string): boolean {
+    return /^true$/i.test(this.customValue(element, property));
+  }
+
+  updateCustomValue(element: MauiElement, property: string, value: string | number | boolean) {
+    const customValues = { ...(element.properties.customValues || {}) };
+    const next = typeof value === 'boolean' ? (value ? 'True' : 'False') : String(value);
+
+    if (next === '') {
+      delete customValues[property];
+    } else {
+      customValues[property] = next;
+    }
+
+    this.elementService.updateElementProperties(element, { customValues });
+  }
+
+  /** Attributes kept from imported XAML that the manifest does not declare. */
+  rawAttributeNames(element: MauiElement): string[] {
+    return Object.keys(element.properties.rawAttributes || {});
+  }
+
+  rawAttributeValue(element: MauiElement, name: string): string {
+    return element.properties.rawAttributes?.[name] ?? '';
+  }
+
+  updateRawAttribute(element: MauiElement, name: string, value: string) {
+    const rawAttributes = { ...(element.properties.rawAttributes || {}) };
+    if (value === '') {
+      delete rawAttributes[name];
+    } else {
+      rawAttributes[name] = value;
+    }
+    this.elementService.updateElementProperties(element, { rawAttributes });
   }
 
   bindingValue(element: MauiElement, property: string): string {

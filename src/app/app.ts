@@ -4,6 +4,10 @@ import { DragDropModule } from '@angular/cdk/drag-drop';
 import { Subscription } from 'rxjs';
 
 import { ElementService } from './services/element';
+import { HostBridgeService } from './services/host-bridge';
+import { XamlParserService } from './services/xaml-parser';
+import { XamlGeneratorService } from './services/xaml-generator';
+import { CustomControlRegistryService } from './services/custom-control-registry';
 import { ToolboxComponent } from './components/toolbox/toolbox';
 import { DesignerCanvasComponent } from './components/designer-canvas/designer-canvas';
 import { PropertiesPanelComponent } from './components/properties-panel/properties-panel';
@@ -40,6 +44,7 @@ export class App implements OnInit, OnDestroy {
   canUndo = false;
   canRedo = false;
   toastMessage = '';
+  hostFileName: string | null = null;
   private toastTimeout: any;
   private subscription = new Subscription();
 
@@ -55,7 +60,13 @@ export class App implements OnInit, OnDestroy {
   private readonly MIN_PANEL_SIZE = 50;
   private readonly MAX_PANEL_RATIO = 0.8;
 
-  constructor(private elementService: ElementService) {}
+  constructor(
+    private elementService: ElementService,
+    private hostBridge: HostBridgeService,
+    private xamlParser: XamlParserService,
+    private xamlGenerator: XamlGeneratorService,
+    private registry: CustomControlRegistryService
+  ) {}
 
   ngOnInit() {
     this.subscription.add(
@@ -64,6 +75,57 @@ export class App implements OnInit, OnDestroy {
         this.canRedo = state.canRedo;
       })
     );
+
+    if (this.hostBridge.isHosted) {
+      this.connectToHost();
+    }
+  }
+
+  /** In Visual Studio or VS Code the open .xaml document is the source of truth. */
+  private connectToHost() {
+    this.subscription.add(
+      this.hostBridge.messages$.subscribe(message => {
+        switch (message.type) {
+          case 'host.ready':
+            this.hostBridge.requestManifests();
+            break;
+          case 'document.load':
+            this.loadFromHost(message.xaml);
+            break;
+          case 'manifests.push':
+            for (const manifest of message.manifests) {
+              this.registry.register(manifest);
+            }
+            break;
+          case 'document.saved':
+            this.showToast('Saved');
+            break;
+        }
+      })
+    );
+
+    // Every change flows back so the host can keep the document in sync
+    this.subscription.add(
+      this.elementService.elements$.subscribe(root => {
+        this.hostBridge.notifyChanged(this.xamlGenerator.generateXaml(root));
+      })
+    );
+
+    this.subscription.add(this.hostBridge.fileName$.subscribe(name => (this.hostFileName = name)));
+  }
+
+  private loadFromHost(xaml: string) {
+    try {
+      this.elementService.setRootElement(this.xamlParser.parseXaml(xaml));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.hostBridge.reportError(message);
+      this.showToast(`Could not open the document: ${message}`);
+    }
+  }
+
+  get isHosted(): boolean {
+    return this.hostBridge.isHosted;
   }
 
   ngOnDestroy() {
@@ -82,6 +144,12 @@ export class App implements OnInit, OnDestroy {
   }
 
   saveDesign() {
+    if (this.hostBridge.isHosted) {
+      // Hosted in an IDE the design belongs to the open file, not to browser storage
+      this.hostBridge.save(this.xamlGenerator.generateXaml(this.elementService.getRootElement()));
+      return;
+    }
+
     this.showToast(
       this.elementService.saveToStorage()
         ? 'Design saved to this browser'

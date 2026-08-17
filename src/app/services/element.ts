@@ -54,12 +54,15 @@ export class ElementService {
   createElement(type: ElementType, properties?: Partial<ElementProperties>): MauiElement {
     this.elementCounter++;
     const defaultProperties = this.getDefaultProperties(type);
-    
+    const merged = { ...defaultProperties, ...properties };
+    // Custom controls are named after their XAML tag, not after "Custom"
+    const baseName = type === ElementType.Custom && merged.customTag ? merged.customTag : type;
+
     return {
       id: `element_${this.elementCounter}`,
       type: type,
-      name: `${type}${this.elementCounter}`,
-      properties: { ...defaultProperties, ...properties },
+      name: `${baseName}${this.elementCounter}`,
+      properties: merged,
       children: []
     };
   }
@@ -248,6 +251,14 @@ export class ElementService {
           ...common,
           width: 200,
           height: 200
+        };
+      case ElementType.Custom:
+        return {
+          ...common,
+          width: 120,
+          height: 48,
+          customValues: {},
+          rawAttributes: {}
         };
       default:
         return common;

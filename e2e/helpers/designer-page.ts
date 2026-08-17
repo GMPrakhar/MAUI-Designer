@@ -37,7 +37,10 @@ export class DesignerPage {
     await this.page.goto('/');
     await expect(this.canvas).toBeVisible();
     // Every spec starts from a clean, predictable viewport
-    await this.page.evaluate(() => localStorage.removeItem('maui-designer.viewport'));
+    await this.page.evaluate(() => {
+      localStorage.removeItem('maui-designer.viewport');
+      localStorage.removeItem('maui-designer.custom-controls');
+    });
   }
 
   /** Ctrl-clicks an element to add or remove it from the selection. */
@@ -78,10 +81,29 @@ export class DesignerPage {
     await expect(this.hierarchy).toBeVisible();
   }
 
-  /** Adds a control by clicking its toolbox entry. */
+  /** Adds a control by clicking its toolbox entry and waits for it to become the selection. */
   async addControl(type: string) {
     await this.openToolbox();
+    const before = await this.canvasElements().count();
     await this.page.getByTestId(`toolbox-item-${type}`).click();
+    await this.waitForNewSelection(before);
+  }
+
+  /** Adds a custom (third party) control from the toolbox by prefix and tag. */
+  async addCustomControl(prefix: string, tag: string) {
+    await this.openToolbox();
+    const before = await this.canvasElements().count();
+    await this.page.getByTestId(`custom-item-${prefix}-${tag}`).click();
+    await this.waitForNewSelection(before);
+  }
+
+  /**
+   * A newly added element is rendered and selected through observables, so the properties panel
+   * can still show the previous element for a tick. Waiting here keeps setProperty deterministic.
+   */
+  private async waitForNewSelection(countBefore: number) {
+    await expect(this.canvasElements()).toHaveCount(countBefore + 1);
+    await expect(this.selectedCanvasElement()).toHaveCount(1);
   }
 
   /** Drags a control from the toolbox onto the canvas. */
@@ -108,7 +130,14 @@ export class DesignerPage {
   }
 
   async selectFirst(type: string) {
-    await this.canvasElements(type).first().click();
+    const element = this.canvasElements(type).first();
+    await element.click();
+    // The properties panel follows the selection through an observable; wait for it to catch up
+    const name = await element.getAttribute('data-element-name');
+    await expect(element).toHaveAttribute('data-selected', 'true');
+    if (name) {
+      await expect(this.page.getByTestId('prop-name')).toHaveValue(name);
+    }
   }
 
   async setXaml(xaml: string) {
@@ -153,8 +182,11 @@ export class DesignerPage {
 
   async setProperty(name: string, value: string) {
     const input = this.page.getByTestId(`prop-${name}`);
+    await expect(input).toBeVisible();
     await input.fill(value);
     await input.dispatchEvent('input');
+    // The model round-trips through an observable; make sure the edit actually stuck
+    await expect(input).toHaveValue(value);
   }
 
   /** Waits for a property input to settle on a value. */
