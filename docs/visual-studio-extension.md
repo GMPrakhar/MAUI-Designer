@@ -1,6 +1,10 @@
 # Converting MAUI Designer into a Visual Studio extension
 
-*Feasibility assessment — verified against Microsoft Learn, WebView2 and VS Code extension docs.*
+*Design rationale — verified against Microsoft Learn, WebView2 and VS Code extension docs.*
+
+> **Status: Route A is implemented.** The VSIX and its cross-platform core library live in
+> [`extension/`](../extension/README.md); this document explains why it is built the way it is, and
+> what the alternatives were. Route B (VS Code) is still open.
 
 ## Short answer
 

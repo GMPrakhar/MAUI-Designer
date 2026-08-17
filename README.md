@@ -385,10 +385,19 @@ We welcome contributions! Please follow these steps:
 
 ## 🧩 IDE Integration
 
-Curious whether this designer can live inside Visual Studio? See
-[docs/visual-studio-extension.md](docs/visual-studio-extension.md) for a feasibility assessment of a
-VS 2022 VSIX (WebView2 + custom `.xaml` editor + NuGet-derived control manifests) and a VS Code
-webview extension.
+The designer also runs **inside Visual Studio 2022**. [`extension/`](extension/README.md) contains a
+VSIX that registers the designer as an alternative editor for `.xaml` files: it edits the same text
+buffer as the built-in XAML editor (so undo, the dirty marker and Ctrl+S all behave normally), and it
+generates toolbox entries from the controls in the project's own NuGet packages by inspecting
+`obj/project.assets.json` and the package assemblies.
+
+- [`extension/README.md`](extension/README.md) — how to build, test and debug the VSIX
+- [`docs/visual-studio-extension.md`](docs/visual-studio-extension.md) — the design rationale, and
+  why the classic in-process VSSDK model is required
+
+The web app detects its host at runtime (`src/app/services/host-bridge.ts`). In a plain browser
+nothing changes; inside an IDE the open document becomes the source of truth instead of browser
+storage.
 
 ## 📚 Resources
 

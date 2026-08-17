@@ -46,3 +46,10 @@ Thumbs.db
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# .NET (extension/)
+[Bb]in/
+[Oo]bj/
+*.user
+*.vsix
+.vs/
