@@ -142,7 +142,8 @@ test.describe('Clipboard, templates and starter pages', () => {
       await page.getByTestId(`starter-${starter}`).click();
 
       await expect(designer.canvasElements().first()).toBeVisible();
-      expect(await designer.canvasElements().count()).toBeGreaterThan(2);
+      // The tree renders from an observable, so poll instead of taking a one-shot count
+      await expect.poll(() => designer.canvasElements().count()).toBeGreaterThan(2);
       await designer.expectXamlToContain('<ContentPage');
     });
   }

@@ -630,6 +630,12 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     // and a leftover translation would offset every following drag.
     event.source.reset();
 
+    // The browser still delivers a click after the drag. By then the element has moved, so the
+    // click can land on whatever is now under the pointer and steal the selection.
+    this.suppressNextCanvasClick = true;
+    // If no click follows (the drag ended off canvas) the flag must not swallow a later one
+    setTimeout(() => (this.suppressNextCanvasClick = false));
+
     this.dragDropService.handleCanvasDrop(element, target.x, target.y, this.canvas.nativeElement, pointer);
     this.dragDropService.endDrag();
   }

@@ -16,16 +16,27 @@ test.describe('Moving elements on the canvas', () => {
     await expect(designer.canvas).toBeVisible();
   });
 
+  /** Reads an element's absolute layout bounds out of the generated XAML. */
   async function bounds(page: any, name: string) {
-    const xaml = await new DesignerPage(page).getXaml();
-    const match = new RegExp(`x:Name="${name}"[^>]*LayoutBounds="([^"]+)"`).exec(xaml);
-    const [x, y] = (match?.[1] ?? '').split(',').map(Number);
+    const pattern = new RegExp(`x:Name="${name}"[^>]*LayoutBounds="([^"]+)"`);
+    // The XAML pane is regenerated from an observable, so poll until the element shows up
+    const xaml = await new DesignerPage(page).xamlWhen(value => pattern.test(value));
+    const [x, y] = pattern.exec(xaml)![1].split(',').map(Number);
     return { x, y };
+  }
+
+  /** Applies a starter page and waits until it is fully rendered. */
+  async function applyStarter(page: any, id: string) {
+    await designer.openToolbox();
+    await page.getByTestId(`starter-${id}`).click();
+    await expect.poll(() => designer.canvasElements().count()).toBeGreaterThan(2);
   }
 
   async function drag(page: any, name: string, dx: number, dy: number) {
     const element = page.locator(`[data-element-name="${name}"]`);
+    await expect(element).toBeVisible();
     await element.click({ position: { x: 6, y: 6 } });
+    await expect(element).toHaveAttribute('data-selected', 'true');
     const box = (await element.boundingBox())!;
     const cx = box.x + box.width / 2;
     const cy = box.y + box.height / 2;
@@ -34,12 +45,23 @@ test.describe('Moving elements on the canvas', () => {
     await page.mouse.move(cx + dx / 2, cy + dy / 2, { steps: 8 });
     await page.mouse.move(cx + dx, cy + dy, { steps: 8 });
     await page.mouse.up();
+    // The element stays selected after a drop, which also means the move has been applied
+    await expect(element).toHaveAttribute('data-selected', 'true');
     await page.keyboard.press('Escape');
   }
 
+  /** Drags an element and returns its bounds once the model has caught up. */
+  async function dragAndRead(page: any, name: string, dx: number, dy: number) {
+    const before = await bounds(page, name);
+    await drag(page, name, dx, dy);
+    await expect
+      .poll(async () => JSON.stringify(await bounds(page, name)))
+      .not.toBe(JSON.stringify(before));
+    return bounds(page, name);
+  }
+
   test('an element lands where it was dropped instead of at the drag distance', async ({ page }) => {
-    await designer.openToolbox();
-    await page.getByTestId('starter-login').click();
+    await applyStarter(page, 'login');
 
     const before = await bounds(page, 'SignInButton');
     expect(before).toEqual({ x: 24, y: 364 });
@@ -52,24 +74,20 @@ test.describe('Moving elements on the canvas', () => {
   });
 
   test('dragging the same element twice does not drift', async ({ page }) => {
-    await designer.openToolbox();
-    await page.getByTestId('starter-login').click();
+    await applyStarter(page, 'login');
 
     const start = await bounds(page, 'Busy');
-    await drag(page, 'Busy', 60, 40);
-    const once = await bounds(page, 'Busy');
+    const once = await dragAndRead(page, 'Busy', 60, 40);
     expect(Math.abs(once.x - (start.x + 60))).toBeLessThanOrEqual(8);
     expect(Math.abs(once.y - (start.y + 40))).toBeLessThanOrEqual(8);
 
-    await drag(page, 'Busy', -60, -40);
-    const twice = await bounds(page, 'Busy');
+    const twice = await dragAndRead(page, 'Busy', -60, -40);
     expect(Math.abs(twice.x - start.x)).toBeLessThanOrEqual(8);
     expect(Math.abs(twice.y - start.y)).toBeLessThanOrEqual(8);
   });
 
   test('a move stays accurate while the canvas is zoomed', async ({ page }) => {
-    await designer.openToolbox();
-    await page.getByTestId('starter-login').click();
+    await applyStarter(page, 'login');
     await page.getByTestId('zoom-out').click();
     await page.getByTestId('zoom-out').click();
 
@@ -83,8 +101,7 @@ test.describe('Moving elements on the canvas', () => {
   });
 
   test('a move is a single undo step that restores the original position', async ({ page }) => {
-    await designer.openToolbox();
-    await page.getByTestId('starter-login').click();
+    await applyStarter(page, 'login');
 
     const start = await bounds(page, 'Subtitle');
     await drag(page, 'Subtitle', 40, 120);
@@ -94,6 +111,19 @@ test.describe('Moving elements on the canvas', () => {
     await expect
       .poll(async () => (await bounds(page, 'Subtitle')).y)
       .toBe(start.y);
+  });
+
+  test('an element stays selected after it has been dragged', async ({ page }) => {
+    await applyStarter(page, 'login');
+
+    const element = page.locator('[data-element-name="Busy"]');
+    await drag(page, 'Busy', 60, 40);
+    await expect(element).toHaveAttribute('data-selected', 'true');
+
+    // Dragging back must not hand the selection to the layout underneath
+    await drag(page, 'Busy', -60, -40);
+    await expect(element).toHaveAttribute('data-selected', 'true');
+    await expect(page.locator('[data-selected="true"]')).toHaveCount(1);
   });
 
   test('an element dropped inside a nested layout is positioned relative to it', async ({ page }) => {
