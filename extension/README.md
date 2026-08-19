@@ -51,16 +51,23 @@ wrong are still catchable there:
 | Host protocol drift | `e2e/ide-host.spec.ts` | Drives the real app against a stubbed `window.chrome.webview` |
 | A VSIX that won't install, or installs without registering | `release-vsix.yml` (`install-check`) | Installs it into a real Visual Studio on a Windows runner |
 
-The last row is the one that needs a Windows machine, and CI supplies one: the
-`windows-latest` image ships Visual Studio Enterprise 2022 with the extension
-development workload. The `install-check` job runs the real `VSIXInstaller.exe`,
-runs `devenv /updateconfiguration` so Visual Studio parses our `.pkgdef` itself,
-then reads back VS 2022's *private registry hive* to confirm what it actually
-stored — the editor factory, its owning package, the `.xaml` association and its
-priority, and the designer logical view. Reading the hive matters: checking the
-`.pkgdef` we shipped would only re-state what we asked for, not what VS accepted.
-It then uninstalls and checks nothing is left behind. Publishing a release is
-gated on that job, so a VSIX that cannot install can never be shipped.
+The last row is the one that needs a Windows machine, and CI supplies two: the
+`windows-2022` image ships Visual Studio 2022 and `windows-latest` now ships
+Visual Studio 2026, both with the extension development workload. The
+`install-check` job runs against **both**, because a supported-version range is
+only a promise until something installs against it — ours claimed `[17.0,18.0)`
+and so excluded Visual Studio 2026 entirely, which this job caught on its first
+run. VSIXInstaller had exited `0` while deploying nothing, so "the installer
+succeeded" is not on its own evidence of anything.
+
+Each run installs with the real `VSIXInstaller.exe`, runs
+`devenv /updateconfiguration` so Visual Studio parses our `.pkgdef` itself, then
+reads back VS's *private registry hive* to confirm what it actually stored — the
+editor factory, its owning package, the `.xaml` association and its priority, and
+the designer logical view. Reading the hive matters: checking the `.pkgdef` we
+shipped would only re-state what we asked for, not what VS accepted. It then
+uninstalls and checks nothing is left behind. Publishing a release is gated on
+that job, so a VSIX that cannot install can never be shipped.
 
 What still needs a human: seeing the designer actually *render* inside the IDE.
 
@@ -172,8 +179,9 @@ Studio install directory is read-only.
   VSIX and clicking through the designer therefore has to happen on Windows; what
   CI can prove on Linux is that everything compiles against the real SDK and that
   the protocol and manifest logic behave correctly.
-* Only Visual Studio 2022 (17.x). The out-of-process `VisualStudio.Extensibility`
-  model cannot host WebView2, so the classic in-process VSSDK model is required.
+* Windows only, Visual Studio 2022 and 2026 (17.x and 18.x). The out-of-process
+  `VisualStudio.Extensibility` model cannot host WebView2, so the classic
+  in-process VSSDK model is required. CI installs the VSIX into both versions.
 * The designer understands the subset of XAML the web app supports; unknown tags
   are preserved verbatim but are not editable beyond their attributes.
 * Manifest generation reads compile-time metadata, so a control's runtime

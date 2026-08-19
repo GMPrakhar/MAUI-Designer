@@ -404,7 +404,7 @@ header of the [live demo](https://gmprakhar.github.io/MAUI-Designer/)), then:
 2. Double-click the downloaded `.vsix` and complete the VSIX installer.
 3. Reopen Visual Studio, right-click a `.xaml` page and choose **Open With… → MAUI Designer**.
 
-Requires Windows, Visual Studio 2022 (17.0 or later) and the WebView2 runtime (already present on
+Requires Windows, Visual Studio 2022 or 2026 (17.0 or later) and the WebView2 runtime (already present on
 current Windows installs). To uninstall, use **Extensions → Manage Extensions**.
 
 [vsix-download]: https://github.com/GMPrakhar/MAUI-Designer/releases/download/vsix-latest/MauiDesigner.vsix

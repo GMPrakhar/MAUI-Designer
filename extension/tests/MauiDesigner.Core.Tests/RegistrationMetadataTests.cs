@@ -173,7 +173,7 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
-        public void The_manifest_targets_visual_studio_2022()
+        public void The_manifest_installs_on_every_supported_visual_studio()
         {
             var manifestPath = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix", "source.extension.vsixmanifest");
             var manifest = XDocument.Load(manifestPath);
@@ -184,7 +184,42 @@ namespace MauiDesigner.Core.Tests
 
             var targets = manifest.Root!.Element(ns + "Installation")!.Elements(ns + "InstallationTarget").ToList();
             Assert.NotEmpty(targets);
-            Assert.All(targets, target => Assert.Equal("[17.0,18.0)", target.Attribute("Version")!.Value));
+
+            // Every architecture has to accept the same range, or the extension
+            // silently installs on some machines and not others.
+            var ranges = targets.Select(target => target.Attribute("Version")!.Value).Distinct().ToList();
+            Assert.True(ranges.Count == 1, $"The installation targets disagree on a version range: {string.Join(", ", ranges)}.");
+
+            // A prerequisite that excludes a version the target allows makes the
+            // install fail on that version, which is only visible at install time.
+            foreach (var prerequisite in manifest.Root!.Element(ns + "Prerequisites")?.Elements(ns + "Prerequisite") ?? Enumerable.Empty<XElement>())
+            {
+                Assert.Equal(ranges[0], prerequisite.Attribute("Version")!.Value);
+            }
+
+            // 17.x is Visual Studio 2022 and 18.x is Visual Studio 2026. Excluding
+            // either one means a whole generation of Visual Studio cannot install
+            // the extension at all -- the exact bug this range already had once.
+            Assert.True(Covers(ranges[0], new Version(17, 0)), $"{ranges[0]} excludes Visual Studio 2022.");
+            Assert.True(Covers(ranges[0], new Version(18, 8)), $"{ranges[0]} excludes Visual Studio 2026.");
+        }
+
+        private static bool Covers(string range, Version version)
+        {
+            var inclusiveLower = range.StartsWith("[", StringComparison.Ordinal);
+            var inclusiveUpper = range.EndsWith("]", StringComparison.Ordinal);
+            var bounds = range.Trim('[', ']', '(', ')').Split(',');
+
+            var lower = Version.Parse(bounds[0].Trim());
+            var lowerOk = inclusiveLower ? version >= lower : version > lower;
+
+            if (bounds.Length == 1 || string.IsNullOrWhiteSpace(bounds[1]))
+            {
+                return lowerOk;
+            }
+
+            var upper = Version.Parse(bounds[1].Trim());
+            return lowerOk && (inclusiveUpper ? version <= upper : version < upper);
         }
 
         private static CustomAttributeData Attribute(Type type, string attributeTypeName)

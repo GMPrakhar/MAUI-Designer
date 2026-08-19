@@ -83,13 +83,23 @@ jobs:
           if-no-files-found: error
 
   install-check:
-    name: Install into Visual Studio 2022
+    name: Install into ${{ matrix.label }}
     needs: package
-    # The runner image ships Visual Studio Enterprise 2022 with the extension
-    # development workload, so the VSIX can be installed into a real IDE rather
-    # than merely inspected. This is the closest thing to a human double-clicking
-    # it that can be automated.
-    runs-on: windows-latest
+    # The Windows runner images ship a real Visual Studio with the extension
+    # development workload, so the VSIX can be installed into an actual IDE
+    # rather than merely inspected. Both generations the manifest claims to
+    # support are exercised, because a version range is only a promise until
+    # something installs against it -- ours excluded Visual Studio 2026
+    # entirely until this job pointed it out.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            label: Visual Studio 2022
+          - runner: windows-latest
+            label: Visual Studio 2026
+    runs-on: ${{ matrix.runner }}
 
     env:
       # Must match Metadata/Identity/@Id in source.extension.vsixmanifest
@@ -108,14 +118,16 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          $vsPath = & $vswhere -latest -products * -property installationPath
-          if (-not $vsPath) { throw 'No Visual Studio installation was found on the runner.' }
+          $vs = & $vswhere -latest -products * -format json | ConvertFrom-Json | Select-Object -First 1
+          if (-not $vs) { throw 'No Visual Studio installation was found on the runner.' }
 
-          $version = & $vswhere -latest -products * -property installationVersion
-          Write-Host "Installing into Visual Studio $version at $vsPath"
-          "VS_PATH=$vsPath" | Out-File $env:GITHUB_ENV -Append
+          Write-Host "Installing into $($vs.displayName) $($vs.installationVersion) at $($vs.installationPath)"
+          "VS_PATH=$($vs.installationPath)" | Out-File $env:GITHUB_ENV -Append
+          # The per-user extension folder is named for the instance, so resolving
+          # it this way keeps working when Visual Studio changes major version.
+          "VS_INSTANCE=$($vs.instanceId)" | Out-File $env:GITHUB_ENV -Append
 
-          $vsixInstaller = Join-Path $vsPath 'Common7\IDE\VSIXInstaller.exe'
+          $vsixInstaller = Join-Path $vs.installationPath 'Common7\IDE\VSIXInstaller.exe'
           $vsix = (Resolve-Path .\MauiDesigner.vsix).Path
           $log = Join-Path $PWD 'vsix-install.log'
 
@@ -136,11 +148,22 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          # Per-user installs land under the VS instance's private folder.
-          $deployed = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\VisualStudio\17.*\Extensions" -Recurse `
+          # VSIXInstaller reports success even when it decides the extension does
+          # not apply to this Visual Studio, so "it exited 0" proves nothing on
+          # its own. Only finding the assembly on disk does.
+          $configRoot = Get-Item "$env:LOCALAPPDATA\Microsoft\VisualStudio\*_$env:VS_INSTANCE" -ErrorAction SilentlyContinue |
+                        Select-Object -First 1
+          if (-not $configRoot) { throw "No configuration folder for Visual Studio instance $env:VS_INSTANCE." }
+
+          "VS_CONFIG_ROOT=$($configRoot.FullName)" | Out-File $env:GITHUB_ENV -Append
+
+          $deployed = Get-ChildItem (Join-Path $configRoot.FullName 'Extensions') -Recurse `
                         -Filter 'MauiDesigner.Vsix.dll' -ErrorAction SilentlyContinue |
                       Select-Object -First 1
-          if (-not $deployed) { throw 'The extension was reported installed but no assembly was deployed.' }
+          if (-not $deployed) {
+            throw "VSIXInstaller reported success but deployed nothing under $($configRoot.FullName)\Extensions. " +
+                  'This usually means the manifest does not target this Visual Studio version.'
+          }
 
           $root = $deployed.Directory.FullName
           Write-Host "Deployed to $root"
@@ -176,25 +199,25 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
 
-          # Visual Studio 2022 keeps its configuration in a private registry hive
+          # Visual Studio keeps its configuration in a private registry hive
           # rather than the system registry, so read it the way VS does. This is
           # the real proof that "Open With > MAUI Designer" would be offered:
           # anything less is only checking what we asked for, not what VS stored.
-          $hive = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\VisualStudio\17.*\privateregistry.bin" |
-                  Select-Object -First 1
-          if (-not $hive) { throw 'Could not find the Visual Studio private registry hive.' }
+          $hive = Join-Path $env:VS_CONFIG_ROOT 'privateregistry.bin'
+          if (-not (Test-Path $hive)) { throw "Could not find the private registry hive at $hive." }
 
           $mount = 'HKLM\MauiDesignerCheck'
-          & reg load $mount $hive.FullName | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "Could not load $($hive.FullName)." }
+          & reg load $mount $hive | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Could not load $hive." }
 
           try {
-            $configRoot = Get-ChildItem 'HKLM:\MauiDesignerCheck\Software\Microsoft\VisualStudio' |
-                          Where-Object { $_.PSChildName -match '^17\.0_[0-9a-f]+$' } |
-                          Select-Object -First 1
-            if (-not $configRoot) { throw 'No 17.0 configuration root inside the private hive.' }
+            $instance = Split-Path $env:VS_CONFIG_ROOT -Leaf
+            $configKey = Get-ChildItem 'HKLM:\MauiDesignerCheck\Software\Microsoft\VisualStudio' |
+                         Where-Object { $_.PSChildName -eq $instance } |
+                         Select-Object -First 1
+            if (-not $configKey) { throw "No '$instance' configuration root inside the private hive." }
 
-            $editor = Join-Path $configRoot.PSPath "Editors\$env:EDITOR_FACTORY_GUID"
+            $editor = Join-Path $configKey.PSPath "Editors\$env:EDITOR_FACTORY_GUID"
             if (-not (Test-Path $editor)) {
               throw "Visual Studio did not register the editor factory $env:EDITOR_FACTORY_GUID."
             }
@@ -220,7 +243,7 @@ jobs:
               throw 'The designer logical view is not registered.'
             }
 
-            $package = Get-ItemProperty (Join-Path $configRoot.PSPath "Packages\$env:PACKAGE_GUID")
+            $package = Get-ItemProperty (Join-Path $configKey.PSPath "Packages\$env:PACKAGE_GUID")
             Write-Host "Visual Studio registered package '$($package.'(default)')'"
             Write-Host "  editor factory : $env:EDITOR_FACTORY_GUID"
             Write-Host "  .xaml priority : 0x$('{0:X}' -f $extensions.xaml)"
@@ -259,7 +282,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: vsix-install-log
+          name: vsix-install-log-${{ matrix.runner }}
           path: vsix-install.log
           if-no-files-found: ignore
 
@@ -290,7 +313,7 @@ jobs:
 
           **Install:** download `MauiDesigner.vsix`, close Visual Studio, double-click the file, then reopen. Right-click any `.xaml` page and choose **Open With… > MAUI Designer**.
 
-          **Requires:** Windows with Visual Studio 2022 (17.0 or later) and the WebView2 runtime.
+          **Requires:** Windows with Visual Studio 2022 or 2026 (17.x or 18.x) and the WebView2 runtime.
           NOTES
           )
 
