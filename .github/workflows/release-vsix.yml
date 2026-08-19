@@ -82,8 +82,202 @@ jobs:
           path: MauiDesigner.vsix
           if-no-files-found: error
 
+  install-check:
+    name: Install into Visual Studio 2022
+    needs: package
+    # The runner image ships Visual Studio Enterprise 2022 with the extension
+    # development workload, so the VSIX can be installed into a real IDE rather
+    # than merely inspected. This is the closest thing to a human double-clicking
+    # it that can be automated.
+    runs-on: windows-latest
+
+    env:
+      # Must match Metadata/Identity/@Id in source.extension.vsixmanifest
+      EXTENSION_IDENTITY: MauiDesigner.6e7b4b0d-8f5a-4a63-9f1e-4f2f7b0c6a11
+      EDITOR_FACTORY_GUID: '{c1e5aa5a-2f4f-4c92-9b1c-8f5a55da0e77}'
+      PACKAGE_GUID: '{3b9a7bd5-51b1-4f2a-9a1d-0f0a4a2f9c31}'
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MauiDesigner-vsix
+
+      - name: Install the extension
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsPath = & $vswhere -latest -products * -property installationPath
+          if (-not $vsPath) { throw 'No Visual Studio installation was found on the runner.' }
+
+          $version = & $vswhere -latest -products * -property installationVersion
+          Write-Host "Installing into Visual Studio $version at $vsPath"
+          "VS_PATH=$vsPath" | Out-File $env:GITHUB_ENV -Append
+
+          $vsixInstaller = Join-Path $vsPath 'Common7\IDE\VSIXInstaller.exe'
+          $vsix = (Resolve-Path .\MauiDesigner.vsix).Path
+          $log = Join-Path $PWD 'vsix-install.log'
+
+          $process = Start-Process $vsixInstaller `
+            -ArgumentList '/quiet', "/logFile:`"$log`"", "`"$vsix`"" `
+            -Wait -PassThru
+
+          # 1001 means "already installed", which is still a valid install.
+          if ($process.ExitCode -notin @(0, 1001)) {
+            if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 }
+            throw "VSIXInstaller failed with exit code $($process.ExitCode)."
+          }
+
+          Write-Host "VSIXInstaller exit code: $($process.ExitCode)"
+
+      - name: Check what landed on disk
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Per-user installs land under the VS instance's private folder.
+          $deployed = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\VisualStudio\17.*\Extensions" -Recurse `
+                        -Filter 'MauiDesigner.Vsix.dll' -ErrorAction SilentlyContinue |
+                      Select-Object -First 1
+          if (-not $deployed) { throw 'The extension was reported installed but no assembly was deployed.' }
+
+          $root = $deployed.Directory.FullName
+          Write-Host "Deployed to $root"
+          "EXTENSION_ROOT=$root" | Out-File $env:GITHUB_ENV -Append
+
+          # The designer is useless without its web assets, and this is the first
+          # point where we see what Visual Studio would actually load.
+          foreach ($required in @('MauiDesigner.Core.dll', 'MauiDesigner.Vsix.pkgdef', 'webview\index.html')) {
+            if (-not (Test-Path (Join-Path $root $required))) {
+              throw "The installed extension is missing $required."
+            }
+          }
+
+          Write-Host 'Installed payload looks complete.'
+
+      - name: Let Visual Studio ingest the registration
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # This is Visual Studio itself parsing our pkgdef and merging it into
+          # its configuration. A malformed registration fails or is dropped here.
+          $devenv = Join-Path $env:VS_PATH 'Common7\IDE\devenv.exe'
+          $process = Start-Process $devenv -ArgumentList '/updateconfiguration' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "devenv /updateconfiguration failed with exit code $($process.ExitCode)."
+          }
+
+          Write-Host 'Visual Studio updated its configuration successfully.'
+
+      - name: Check Visual Studio registered the designer for .xaml
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Visual Studio 2022 keeps its configuration in a private registry hive
+          # rather than the system registry, so read it the way VS does. This is
+          # the real proof that "Open With > MAUI Designer" would be offered:
+          # anything less is only checking what we asked for, not what VS stored.
+          $hive = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\VisualStudio\17.*\privateregistry.bin" |
+                  Select-Object -First 1
+          if (-not $hive) { throw 'Could not find the Visual Studio private registry hive.' }
+
+          $mount = 'HKLM\MauiDesignerCheck'
+          & reg load $mount $hive.FullName | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw "Could not load $($hive.FullName)." }
+
+          try {
+            $configRoot = Get-ChildItem 'HKLM:\MauiDesignerCheck\Software\Microsoft\VisualStudio' |
+                          Where-Object { $_.PSChildName -match '^17\.0_[0-9a-f]+$' } |
+                          Select-Object -First 1
+            if (-not $configRoot) { throw 'No 17.0 configuration root inside the private hive.' }
+
+            $editor = Join-Path $configRoot.PSPath "Editors\$env:EDITOR_FACTORY_GUID"
+            if (-not (Test-Path $editor)) {
+              throw "Visual Studio did not register the editor factory $env:EDITOR_FACTORY_GUID."
+            }
+
+            $owningPackage = (Get-ItemProperty $editor).Package
+            if ($owningPackage -ne $env:PACKAGE_GUID) {
+              throw "The editor factory is owned by $owningPackage, expected $env:PACKAGE_GUID."
+            }
+
+            $extensions = Get-ItemProperty (Join-Path $editor 'Extensions')
+            if ($null -eq $extensions.xaml) {
+              throw 'The editor factory is not registered for the .xaml extension.'
+            }
+
+            # Deliberately low so the built-in XAML editor stays the default and
+            # double-clicking a file behaves exactly as it did before installing.
+            if ($extensions.xaml -ne 0x10) {
+              throw "The .xaml priority is 0x$('{0:X}' -f $extensions.xaml), expected 0x10."
+            }
+
+            $logicalViews = Get-Item (Join-Path $editor 'LogicalViews')
+            if ($logicalViews.Property -notcontains '{7651a702-06e5-11d1-8ebd-00a0c90f26ea}') {
+              throw 'The designer logical view is not registered.'
+            }
+
+            $package = Get-ItemProperty (Join-Path $configRoot.PSPath "Packages\$env:PACKAGE_GUID")
+            Write-Host "Visual Studio registered package '$($package.'(default)')'"
+            Write-Host "  editor factory : $env:EDITOR_FACTORY_GUID"
+            Write-Host "  .xaml priority : 0x$('{0:X}' -f $extensions.xaml)"
+            Write-Host "  logical views  : $($logicalViews.Property -join ', ')"
+          }
+          finally {
+            [gc]::Collect()
+            [gc]::WaitForPendingFinalizers()
+            & reg unload $mount | Out-Null
+          }
+
+      - name: Uninstall cleanly
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $vsixInstaller = Join-Path $env:VS_PATH 'Common7\IDE\VSIXInstaller.exe'
+          $process = Start-Process $vsixInstaller `
+            -ArgumentList '/quiet', "/uninstall:$env:EXTENSION_IDENTITY" `
+            -Wait -PassThru
+
+          if ($process.ExitCode -ne 0) {
+            throw "Uninstalling failed with exit code $($process.ExitCode)."
+          }
+
+          # Visual Studio either removes the folder outright or, if anything still
+          # holds a handle, drops a .deleteme marker and removes it on next start.
+          # Both mean the extension is gone; anything else means it is still live.
+          $root = $env:EXTENSION_ROOT
+          if ((Test-Path $root) -and -not (Test-Path "$root.deleteme")) {
+            throw "The extension directory survived uninstall: $root"
+          }
+
+          Write-Host 'Uninstalled cleanly.'
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: vsix-install-log
+          path: vsix-install.log
+          if-no-files-found: ignore
+
+  publish:
+    name: Publish the pre-release
+    # Only ship something that has been shown to install into a real IDE.
+    needs: [package, install-check]
+    if: github.event_name == 'push' || inputs.tag != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: MauiDesigner-vsix
+
       - name: Publish the pre-release
-        if: github.event_name == 'push' || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
