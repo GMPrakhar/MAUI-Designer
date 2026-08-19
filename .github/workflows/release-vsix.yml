@@ -1,0 +1,101 @@
+name: Package VSIX
+
+# Packaging a VSIX needs the VSSDK build targets, which only run on Windows.
+# Everything else about the extension is verified on Linux by ci.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Publish a pre-release under this tag (leave empty to only produce a build artifact)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'vsix-v*'
+  pull_request:
+    paths:
+      - 'extension/**'
+      - '.github/workflows/release-vsix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Build the extension installer
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install web dependencies
+        run: npm ci
+
+      # The VSIX embeds the compiled Angular app and serves it through a
+      # WebView2 virtual host, so the web build has to happen first.
+      - name: Build the designer web app
+        run: npm run build
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Restore
+        run: msbuild extension\src\MauiDesigner.Vsix\MauiDesigner.Vsix.csproj -t:Restore -p:Configuration=Release
+
+      - name: Build the VSIX
+        run: msbuild extension\src\MauiDesigner.Vsix\MauiDesigner.Vsix.csproj -p:Configuration=Release -p:DeployExtension=false -p:IsBuildingVsix=true
+
+      - name: Check the package really contains the web assets
+        shell: pwsh
+        run: |
+          $vsix = Get-ChildItem -Path extension\src\MauiDesigner.Vsix\bin\Release -Filter *.vsix -Recurse |
+                  Select-Object -First 1
+          if (-not $vsix) { throw 'No .vsix was produced.' }
+
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($vsix.FullName)
+          try {
+            $names = $zip.Entries | ForEach-Object { $_.FullName }
+          } finally {
+            $zip.Dispose()
+          }
+
+          # A VSIX that installs but shows an empty WebView is the failure mode
+          # worth guarding against, so assert on the payload, not just the file.
+          foreach ($required in @('extension.vsixmanifest', 'MauiDesigner.Vsix.dll', 'MauiDesigner.Core.dll')) {
+            if ($names -notcontains $required) { throw "The VSIX is missing $required." }
+          }
+          if (-not ($names -match '^webview/index\.html$')) {
+            throw 'The VSIX does not contain webview/index.html.'
+          }
+
+          Write-Host "$($vsix.Name) contains $($names.Count) entries."
+          Copy-Item $vsix.FullName MauiDesigner.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MauiDesigner-vsix
+          path: MauiDesigner.vsix
+          if-no-files-found: error
+
+      - name: Publish the pre-release
+        if: github.event_name == 'push' || inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+        shell: bash
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 \
+            && gh release upload "$TAG" MauiDesigner.vsix --clobber \
+            || gh release create "$TAG" MauiDesigner.vsix \
+                 --prerelease \
+                 --title "MAUI Designer for Visual Studio $TAG (beta)" \
+                 --notes 'Beta build of the Visual Studio 2022 extension. Expect rough edges and breaking changes.
+
+          **Install:** download `MauiDesigner.vsix`, close Visual Studio, double-click the file, then reopen. Right-click any `.xaml` page and choose **Open With… > MAUI Designer**.
+
+          **Requires:** Windows with Visual Studio 2022 (17.0 or later) and the WebView2 runtime.'

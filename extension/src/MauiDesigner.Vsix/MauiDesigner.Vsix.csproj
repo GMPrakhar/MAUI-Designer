@@ -94,10 +94,17 @@
     under `webview\` and served through a virtual host name.
   -->
   <PropertyGroup>
-    <AngularDistDirectory Condition="'$(AngularDistDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\..\dist\maui-designer\browser</AngularDistDirectory>
+    <AngularDistDirectory Condition="'$(AngularDistDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\..\dist\angular-designer</AngularDistDirectory>
   </PropertyGroup>
 
   <Target Name="IncludeAngularApp" BeforeTargets="PrepareForBuild">
+    <!--
+      Without these assets the editor loads a blank WebView, so this is an error
+      rather than a warning: a VSIX that packages cleanly but cannot render is a
+      worse failure than one that refuses to build.
+    -->
+    <Error Condition="!Exists('$(AngularDistDirectory)')"
+           Text="The Angular application was not found at $(AngularDistDirectory). Run 'npm ci &amp;&amp; npm run build' in the repository root before building the VSIX." />
     <ItemGroup>
       <AngularAsset Include="$(AngularDistDirectory)\**\*" />
       <Content Include="@(AngularAsset)">
@@ -106,8 +113,8 @@
         <IncludeInVSIX>true</IncludeInVSIX>
       </Content>
     </ItemGroup>
-    <Warning Condition="!Exists('$(AngularDistDirectory)')"
-             Text="The Angular application was not found at $(AngularDistDirectory). Run 'npm ci &amp;&amp; npm run build' in the repository root before building the VSIX." />
+    <Error Condition="'@(AngularAsset)' == ''"
+           Text="$(AngularDistDirectory) exists but is empty. Run 'npm run build' in the repository root before building the VSIX." />
   </Target>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
