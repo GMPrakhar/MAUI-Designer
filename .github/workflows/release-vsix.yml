@@ -180,19 +180,34 @@ jobs:
           Write-Host 'Installed payload looks complete.'
 
       - name: Let Visual Studio ingest the registration
-        shell: pwsh
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
-
-          # This is Visual Studio itself parsing our pkgdef and merging it into
-          # its configuration. A malformed registration fails or is dropped here.
           $devenv = Join-Path $env:VS_PATH 'Common7\IDE\devenv.exe'
+
+          # /updateconfiguration only flags the configuration as stale; the
+          # pkgdef files are actually merged into the private hive the next time
+          # the IDE starts. On a fresh runner the IDE has never started, so
+          # without this the hive has no Editors key at all.
           $process = Start-Process $devenv -ArgumentList '/updateconfiguration' -Wait -PassThru
           if ($process.ExitCode -ne 0) {
             throw "devenv /updateconfiguration failed with exit code $($process.ExitCode)."
           }
 
-          Write-Host 'Visual Studio updated its configuration successfully.'
+          # Starting and immediately exiting is what performs the merge. Give it
+          # a bounded amount of time: a first launch is slow, and if it stalls on
+          # a dialog we want a clear failure rather than a hung job.
+          $process = Start-Process $devenv -ArgumentList '/command', '"File.Exit"' -PassThru
+          if (-not $process.WaitForExit(360000)) {
+            $process.Kill($true)
+            Write-Host 'Visual Studio did not exit on its own; killed it after 6 minutes.'
+          } else {
+            Write-Host "Visual Studio started and exited with code $($process.ExitCode)."
+          }
+
+          Get-Process -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^(devenv|PerfWatson2|ServiceHub|VBCSCompiler)' } |
+            Stop-Process -Force -ErrorAction SilentlyContinue
 
       - name: Check Visual Studio registered the designer for .xaml
         # Windows PowerShell keeps the registry types in the framework, which
@@ -254,23 +269,16 @@ jobs:
 
             $editor = $config.OpenSubKey("Editors\$env:EDITOR_FACTORY_GUID")
             if (-not $editor) {
-              # Print where the registration did land, so the next fix is
-              # informed by the runner rather than by guesswork.
-              Write-Host "=== Editors subkeys present: $($config.OpenSubKey('Editors').GetSubKeyNames().Count) ==="
-              Write-Host "=== config root subkeys ==="
-              Write-Host ($config.GetSubKeyNames() -join ', ')
-              Write-Host "=== files under $env:VS_CONFIG_ROOT mentioning the editor GUID ==="
-              Get-ChildItem $env:VS_CONFIG_ROOT -File -Recurse -ErrorAction SilentlyContinue |
-                Where-Object { $_.Length -lt 60MB } |
-                ForEach-Object {
-                  $bytes = [IO.File]::ReadAllBytes($_.FullName)
-                  foreach ($encoding in @([Text.Encoding]::Unicode, [Text.Encoding]::UTF8)) {
-                    if ($encoding.GetString($bytes) -match [regex]::Escape($env:EDITOR_FACTORY_GUID)) {
-                      Write-Host "  $($_.FullName)"
-                      break
-                    }
-                  }
-                }
+              # Report what the runner actually has, so the next fix is informed
+              # rather than guessed at.
+              $editors = $config.OpenSubKey('Editors')
+              if (-not $editors) {
+                throw 'The private hive has no Editors key at all, so Visual Studio never built its configuration. ' +
+                      'The registration cannot be checked until it does.'
+              }
+
+              Write-Host "Editors registered: $($editors.GetSubKeyNames().Count)"
+              Write-Host "Config root subkeys: $($config.GetSubKeyNames() -join ', ')"
               throw "Visual Studio did not register the editor factory $env:EDITOR_FACTORY_GUID."
             }
 
