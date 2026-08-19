@@ -254,6 +254,23 @@ jobs:
 
             $editor = $config.OpenSubKey("Editors\$env:EDITOR_FACTORY_GUID")
             if (-not $editor) {
+              # Print where the registration did land, so the next fix is
+              # informed by the runner rather than by guesswork.
+              Write-Host "=== Editors subkeys present: $($config.OpenSubKey('Editors').GetSubKeyNames().Count) ==="
+              Write-Host "=== config root subkeys ==="
+              Write-Host ($config.GetSubKeyNames() -join ', ')
+              Write-Host "=== files under $env:VS_CONFIG_ROOT mentioning the editor GUID ==="
+              Get-ChildItem $env:VS_CONFIG_ROOT -File -Recurse -ErrorAction SilentlyContinue |
+                Where-Object { $_.Length -lt 60MB } |
+                ForEach-Object {
+                  $bytes = [IO.File]::ReadAllBytes($_.FullName)
+                  foreach ($encoding in @([Text.Encoding]::Unicode, [Text.Encoding]::UTF8)) {
+                    if ($encoding.GetString($bytes) -match [regex]::Escape($env:EDITOR_FACTORY_GUID)) {
+                      Write-Host "  $($_.FullName)"
+                      break
+                    }
+                  }
+                }
               throw "Visual Studio did not register the editor factory $env:EDITOR_FACTORY_GUID."
             }
 
