@@ -34,6 +34,55 @@ This is also why `DesignerControl` builds its UI in code instead of in XAML: XAM
 markup compilation is Windows-only, and the UI is one WebView plus a status
 label.
 
+## What can be verified without Visual Studio
+
+Visual Studio has never run on Linux (VS Code is a different product, and Visual
+Studio for Mac was retired in August 2024), so the VSIX can never be *installed*
+on a Linux agent. Rather less obviously, most of the ways this extension can be
+wrong are still catchable there:
+
+| Failure | Caught by | How |
+| --- | --- | --- |
+| Wrong SDK interface, signature or enum | `MauiDesigner.Vsix.CompileCheck` | Compiles the real sources against the real VS SDK |
+| Deadlocks and shutdown races | the same project | `VSTHRD*`/`VSSDK*` analyzers, escalated to errors |
+| Registration that silently never loads | `RegistrationMetadataTests` | Reads the compiled attributes with `MetadataLoadContext` |
+| A manifest naming a file that isn't there | `RegistrationMetadataTests` | Resolves every path the manifest references |
+| A package that installs but renders nothing | `release-vsix.yml` | Unzips the built VSIX and asserts its contents |
+| Host protocol drift | `e2e/ide-host.spec.ts` | Drives the real app against a stubbed `window.chrome.webview` |
+| A VSIX that won't install, or installs without registering | `release-vsix.yml` (`install-check`) | Installs it into a real Visual Studio on a Windows runner |
+
+The last row is the one that needs a Windows machine, and CI supplies two: the
+`windows-2022` image ships Visual Studio 2022 and `windows-latest` now ships
+Visual Studio 2026, both with the extension development workload. The
+`install-check` job runs against **both**, because a supported-version range is
+only a promise until something installs against it — ours claimed `[17.0,18.0)`
+and so excluded Visual Studio 2026 entirely, which this job caught on its first
+run. VSIXInstaller had exited `0` while deploying nothing, so "the installer
+succeeded" is not on its own evidence of anything.
+
+Each run installs with the real `VSIXInstaller.exe`, runs
+`devenv /updateconfiguration` so Visual Studio parses our `.pkgdef` itself, then
+reads back VS's *private registry hive* to confirm what it actually stored — the
+editor factory, its owning package, the `.xaml` association and its priority, and
+the designer logical view. Reading the hive matters: checking the `.pkgdef` we
+shipped would only re-state what we asked for, not what VS accepted. It then
+uninstalls and checks nothing is left behind. Publishing a release is gated on
+that job, so a VSIX that cannot install can never be shipped.
+
+What still needs a human: seeing the designer actually *render* inside the IDE.
+
+The threading analyzers are worth singling out. They flag exactly the bugs that
+otherwise need a running IDE to find — and they found real ones here: the pane
+was posting the user's designer edits through `ThreadHelper.JoinableTaskFactory`,
+whose tasks explicitly **do not** block Visual Studio from exiting, so an unlucky
+shutdown could have dropped an edit on its way to the text buffer. Both it and
+`DesignerControl` now use the `AsyncPackage`'s factory instead. Note that
+`FileAndForget` alone does *not* fix this; see
+[VSSDK007](https://github.com/Microsoft/VSSDK-Analyzers/blob/main/doc/VSSDK007.md).
+
+What still genuinely requires Windows: installing the VSIX, confirming **Open
+With… → MAUI Designer** appears, and watching WebView2 actually render.
+
 ## What the core library does
 
 * **`Projects/ProjectAssetsReader`** — reads `obj/project.assets.json` (written by
@@ -130,8 +179,9 @@ Studio install directory is read-only.
   VSIX and clicking through the designer therefore has to happen on Windows; what
   CI can prove on Linux is that everything compiles against the real SDK and that
   the protocol and manifest logic behave correctly.
-* Only Visual Studio 2022 (17.x). The out-of-process `VisualStudio.Extensibility`
-  model cannot host WebView2, so the classic in-process VSSDK model is required.
+* Windows only, Visual Studio 2022 and 2026 (17.x and 18.x). The out-of-process
+  `VisualStudio.Extensibility` model cannot host WebView2, so the classic
+  in-process VSSDK model is required. CI installs the VSIX into both versions.
 * The designer understands the subset of XAML the web app supports; unknown tags
   are preserved verbatim but are not editable beyond their attributes.
 * Manifest generation reads compile-time metadata, so a control's runtime

@@ -82,8 +82,317 @@ jobs:
           path: MauiDesigner.vsix
           if-no-files-found: error
 
+  install-check:
+    name: Install into ${{ matrix.label }}
+    needs: package
+    # The Windows runner images ship a real Visual Studio with the extension
+    # development workload, so the VSIX can be installed into an actual IDE
+    # rather than merely inspected. Both generations the manifest claims to
+    # support are exercised, because a version range is only a promise until
+    # something installs against it -- ours excluded Visual Studio 2026
+    # entirely until this job pointed it out.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            label: Visual Studio 2022
+          - runner: windows-latest
+            label: Visual Studio 2026
+    runs-on: ${{ matrix.runner }}
+
+    env:
+      # Must match Metadata/Identity/@Id in source.extension.vsixmanifest
+      EXTENSION_IDENTITY: MauiDesigner.6e7b4b0d-8f5a-4a63-9f1e-4f2f7b0c6a11
+      EDITOR_FACTORY_GUID: '{c1e5aa5a-2f4f-4c92-9b1c-8f5a55da0e77}'
+      PACKAGE_GUID: '{3b9a7bd5-51b1-4f2a-9a1d-0f0a4a2f9c31}'
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: MauiDesigner-vsix
+
+      - name: Install the extension
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -format json | ConvertFrom-Json | Select-Object -First 1
+          if (-not $vs) { throw 'No Visual Studio installation was found on the runner.' }
+
+          Write-Host "Installing into $($vs.displayName) $($vs.installationVersion) at $($vs.installationPath)"
+          "VS_PATH=$($vs.installationPath)" | Out-File $env:GITHUB_ENV -Append
+          # The per-user extension folder is named for the instance, so resolving
+          # it this way keeps working when Visual Studio changes major version.
+          "VS_INSTANCE=$($vs.instanceId)" | Out-File $env:GITHUB_ENV -Append
+
+          $vsixInstaller = Join-Path $vs.installationPath 'Common7\IDE\VSIXInstaller.exe'
+          $vsix = (Resolve-Path .\MauiDesigner.vsix).Path
+          $log = Join-Path $PWD 'vsix-install.log'
+
+          $process = Start-Process $vsixInstaller `
+            -ArgumentList '/quiet', "/logFile:`"$log`"", "`"$vsix`"" `
+            -Wait -PassThru
+
+          # 1001 means "already installed", which is still a valid install.
+          if ($process.ExitCode -notin @(0, 1001)) {
+            if (Test-Path $log) { Get-Content $log | Select-Object -Last 40 }
+            throw "VSIXInstaller failed with exit code $($process.ExitCode)."
+          }
+
+          Write-Host "VSIXInstaller exit code: $($process.ExitCode)"
+
+      - name: Check what landed on disk
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # VSIXInstaller reports success even when it decides the extension does
+          # not apply to this Visual Studio, so "it exited 0" proves nothing on
+          # its own. Only finding the assembly on disk does.
+          $configRoot = Get-Item "$env:LOCALAPPDATA\Microsoft\VisualStudio\*_$env:VS_INSTANCE" -ErrorAction SilentlyContinue |
+                        Select-Object -First 1
+          if (-not $configRoot) { throw "No configuration folder for Visual Studio instance $env:VS_INSTANCE." }
+
+          "VS_CONFIG_ROOT=$($configRoot.FullName)" | Out-File $env:GITHUB_ENV -Append
+
+          $deployed = Get-ChildItem (Join-Path $configRoot.FullName 'Extensions') -Recurse `
+                        -Filter 'MauiDesigner.Vsix.dll' -ErrorAction SilentlyContinue |
+                      Select-Object -First 1
+          if (-not $deployed) {
+            throw "VSIXInstaller reported success but deployed nothing under $($configRoot.FullName)\Extensions. " +
+                  'This usually means the manifest does not target this Visual Studio version.'
+          }
+
+          $root = $deployed.Directory.FullName
+          Write-Host "Deployed to $root"
+          "EXTENSION_ROOT=$root" | Out-File $env:GITHUB_ENV -Append
+
+          # The designer is useless without its web assets, and this is the first
+          # point where we see what Visual Studio would actually load.
+          foreach ($required in @('MauiDesigner.Core.dll', 'MauiDesigner.Vsix.pkgdef', 'webview\index.html')) {
+            if (-not (Test-Path (Join-Path $root $required))) {
+              throw "The installed extension is missing $required."
+            }
+          }
+
+          Write-Host 'Installed payload looks complete.'
+
+      - name: Check the deployed registration
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # This is the file Visual Studio reads to learn about the editor, and
+          # the VSSDK generates it from the registration attributes at build
+          # time -- so checking it catches attributes that compile happily but
+          # describe the wrong editor. It is written as UTF-16.
+          $pkgdef = Join-Path $env:EXTENSION_ROOT 'MauiDesigner.Vsix.pkgdef'
+          $text = [IO.File]::ReadAllText($pkgdef, [Text.Encoding]::Unicode)
+
+          $expected = @(
+            "[`$RootKey`$\Packages\$env:PACKAGE_GUID]",
+            "[`$RootKey`$\Editors\$env:EDITOR_FACTORY_GUID]",
+            "[`$RootKey`$\Editors\$env:EDITOR_FACTORY_GUID\Extensions]",
+            '"xaml"=dword:00000010',
+            '"{7651a702-06e5-11d1-8ebd-00a0c90f26ea}"=""',
+            "`"Package`"=`"$env:PACKAGE_GUID`"",
+            '"AllowsBackgroundLoad"=dword:00000001'
+          )
+
+          foreach ($line in $expected) {
+            if (-not $text.Contains($line)) {
+              Write-Host '--- deployed pkgdef ---'
+              Write-Host $text
+              throw "The deployed registration is missing: $line"
+            }
+          }
+
+          Write-Host 'The deployed registration associates the designer with .xaml as expected.'
+
+      - name: Let Visual Studio ingest the registration
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $devenv = Join-Path $env:VS_PATH 'Common7\IDE\devenv.exe'
+
+          # This is the documented way to make Visual Studio pick up a newly
+          # installed pkgdef. It exits on its own; do not try to drive a full
+          # IDE start here, which sits on first-run UI and never returns.
+          $process = Start-Process $devenv -ArgumentList '/updateconfiguration' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "devenv /updateconfiguration failed with exit code $($process.ExitCode)."
+          }
+
+          # Background service hosts keep the hive open after this returns, and
+          # the next step has to read it.
+          Get-Process -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^(devenv|PerfWatson2|ServiceHub|VBCSCompiler)' } |
+            Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 10
+
+          Write-Host 'Visual Studio updated its configuration.'
+
+      - name: Check Visual Studio registered the designer for .xaml
+        # Windows PowerShell keeps the registry types in the framework, which
+        # keeps the interop below to a few lines.
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Visual Studio keeps its configuration in a private registry hive
+          # rather than the system registry, so read it the way VS does. This is
+          # the real proof that "Open With > MAUI Designer" would be offered:
+          # anything less is only checking what we asked for, not what VS stored.
+          $hive = Join-Path $env:VS_CONFIG_ROOT 'privateregistry.bin'
+          if (-not (Test-Path $hive)) { throw "Could not find the private registry hive at $hive." }
+
+          # RegLoadAppKey is the API Visual Studio itself uses. Unlike `reg load`
+          # it needs no privileges and does not attach the hive to HKLM, so it
+          # copes with the IDE's background processes still holding the file.
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.ComponentModel;
+          using System.Runtime.InteropServices;
+          using Microsoft.Win32;
+          using Microsoft.Win32.SafeHandles;
+
+          public static class VsHive
+          {
+              [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
+              private static extern int RegLoadAppKey(string file, out IntPtr key, int access, int options, int reserved);
+
+              public static RegistryKey Open(string file)
+              {
+                  IntPtr key;
+                  int error = RegLoadAppKey(file, out key, 0x20019, 0, 0);
+                  if (error != 0) { throw new Win32Exception(error); }
+                  return RegistryKey.FromHandle(new SafeRegistryHandle(key, true));
+              }
+          }
+          '@
+
+          $root = $null
+          foreach ($attempt in 1..5) {
+            try { $root = [VsHive]::Open($hive); break }
+            catch {
+              if ($attempt -eq 5) { throw }
+              Write-Host "Hive is still busy ($($_.Exception.Message)); retrying in 10s."
+              # /updateconfiguration leaves service hosts running for a while.
+              Get-Process -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^(devenv|PerfWatson2|ServiceHub|Microsoft\.ServiceHub|VBCSCompiler)' } |
+                Stop-Process -Force -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 10
+            }
+          }
+
+          try {
+            # Visual Studio merges pkgdef registrations into the *_Config key,
+            # not the bare instance key -- the instance key holds user settings.
+            # Reading the wrong one returns null, which is easy to misread as
+            # "the registration was rejected" when it means "wrong key".
+            $instance = Split-Path $env:VS_CONFIG_ROOT -Leaf
+            $versions = $root.OpenSubKey('Software\Microsoft\VisualStudio')
+            if (-not $versions) {
+              throw 'The private hive has no Software\Microsoft\VisualStudio key.'
+            }
+
+            $config = $versions.OpenSubKey("${instance}_Config")
+            if (-not $config) {
+              Write-Host "Keys present under Software\Microsoft\VisualStudio: $($versions.GetSubKeyNames() -join ', ')"
+              throw "No '${instance}_Config' key inside the private hive."
+            }
+
+            $editor = $config.OpenSubKey("Editors\$env:EDITOR_FACTORY_GUID")
+            if (-not $editor) {
+              $editors = $config.OpenSubKey('Editors')
+              $count = if ($editors) { $editors.GetSubKeyNames().Count } else { 0 }
+              Write-Host "Editors registered in the merged configuration: $count"
+              Write-Host "Config subkeys: $($config.GetSubKeyNames() -join ', ')"
+              throw "Visual Studio did not register the editor factory $env:EDITOR_FACTORY_GUID."
+            }
+
+            $owningPackage = $editor.GetValue('Package')
+            if ($owningPackage -ne $env:PACKAGE_GUID) {
+              throw "The editor factory is owned by $owningPackage, expected $env:PACKAGE_GUID."
+            }
+
+            $extensions = $editor.OpenSubKey('Extensions')
+            $priority = if ($extensions) { $extensions.GetValue('xaml') } else { $null }
+            if ($null -eq $priority) {
+              throw 'The editor factory is not registered for the .xaml extension.'
+            }
+
+            # Deliberately low so the built-in XAML editor stays the default and
+            # double-clicking a file behaves exactly as it did before installing.
+            if ($priority -ne 0x10) {
+              throw "The .xaml priority is 0x$('{0:X}' -f $priority), expected 0x10."
+            }
+
+            $logicalViews = $editor.OpenSubKey('LogicalViews')
+            if (-not $logicalViews -or $logicalViews.GetValueNames() -notcontains '{7651a702-06e5-11d1-8ebd-00a0c90f26ea}') {
+              throw 'The designer logical view is not registered.'
+            }
+
+            $package = $config.OpenSubKey("Packages\$env:PACKAGE_GUID")
+            if (-not $package) { throw "Visual Studio did not register package $env:PACKAGE_GUID." }
+
+            Write-Host "Visual Studio registered package '$($package.GetValue(''))'"
+            Write-Host "  editor factory : $env:EDITOR_FACTORY_GUID"
+            Write-Host "  .xaml priority : 0x$('{0:X}' -f $priority)"
+            Write-Host "  logical views  : $($logicalViews.GetValueNames() -join ', ')"
+          }
+          finally {
+            $root.Dispose()
+          }
+
+      - name: Uninstall cleanly
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $vsixInstaller = Join-Path $env:VS_PATH 'Common7\IDE\VSIXInstaller.exe'
+          $process = Start-Process $vsixInstaller `
+            -ArgumentList '/quiet', "/uninstall:$env:EXTENSION_IDENTITY" `
+            -Wait -PassThru
+
+          if ($process.ExitCode -ne 0) {
+            throw "Uninstalling failed with exit code $($process.ExitCode)."
+          }
+
+          # Visual Studio either removes the folder outright or, if anything still
+          # holds a handle, drops a .deleteme marker and removes it on next start.
+          # Both mean the extension is gone; anything else means it is still live.
+          $root = $env:EXTENSION_ROOT
+          if ((Test-Path $root) -and -not (Test-Path "$root.deleteme")) {
+            throw "The extension directory survived uninstall: $root"
+          }
+
+          Write-Host 'Uninstalled cleanly.'
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: vsix-install-log-${{ matrix.runner }}
+          path: vsix-install.log
+          if-no-files-found: ignore
+
+  publish:
+    name: Publish the pre-release
+    # Only ship something that has been shown to install into a real IDE.
+    needs: [package, install-check]
+    if: github.event_name == 'push' || inputs.tag != ''
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: MauiDesigner-vsix
+
       - name: Publish the pre-release
-        if: github.event_name == 'push' || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
@@ -96,7 +405,7 @@ jobs:
 
           **Install:** download `MauiDesigner.vsix`, close Visual Studio, double-click the file, then reopen. Right-click any `.xaml` page and choose **Open With… > MAUI Designer**.
 
-          **Requires:** Windows with Visual Studio 2022 (17.0 or later) and the WebView2 runtime.
+          **Requires:** Windows with Visual Studio 2022 or 2026 (17.x or 18.x) and the WebView2 runtime.
           NOTES
           )
 
