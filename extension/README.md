@@ -60,14 +60,26 @@ and so excluded Visual Studio 2026 entirely, which this job caught on its first
 run. VSIXInstaller had exited `0` while deploying nothing, so "the installer
 succeeded" is not on its own evidence of anything.
 
-Each run installs with the real `VSIXInstaller.exe`, runs
-`devenv /updateconfiguration` so Visual Studio parses our `.pkgdef` itself, then
+Each run installs with the real `VSIXInstaller.exe`, asserts the **deployed**
+`.pkgdef` associates the editor factory with `.xaml`, runs
+`devenv /updateconfiguration` so Visual Studio parses that `.pkgdef` itself, then
 reads back VS's *private registry hive* to confirm what it actually stored — the
 editor factory, its owning package, the `.xaml` association and its priority, and
-the designer logical view. Reading the hive matters: checking the `.pkgdef` we
-shipped would only re-state what we asked for, not what VS accepted. It then
-uninstalls and checks nothing is left behind. Publishing a release is gated on
-that job, so a VSIX that cannot install can never be shipped.
+the designer logical view. The two checks answer different questions: the
+`.pkgdef` is generated from the registration attributes, so it catches attributes
+that compile happily while describing the wrong editor, but it is still only what
+we asked for. Only the hive shows what Visual Studio accepted. It then uninstalls
+and checks nothing is left behind. Publishing a release is gated on that job, so
+a VSIX that cannot install can never be shipped.
+
+Two things about that hive are easy to get wrong, and both cost real runs here.
+Visual Studio merges `.pkgdef` registrations into
+`Software\Microsoft\VisualStudio\<version>_<instance>`**`_Config`**, not the bare
+`<version>_<instance>` key, which holds user settings — read the wrong one and
+you get a null that looks exactly like a rejected registration. And the hive must
+be opened with `RegLoadAppKey`, the API Visual Studio itself uses: `reg load`
+fails with *Access is denied* because the IDE's background service hosts still
+hold the file.
 
 What still needs a human: seeing the designer actually *render* inside the IDE.
 

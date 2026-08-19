@@ -150,7 +150,8 @@ namespace MauiDesigner.Core.Tests
         [Fact]
         public void Every_file_the_manifest_references_exists()
         {
-            var manifestPath = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix", "source.extension.vsixmanifest");
+            var projectDirectory = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix");
+            var manifestPath = Path.Combine(projectDirectory, "source.extension.vsixmanifest");
             var manifest = XDocument.Load(manifestPath);
             XNamespace ns = "http://schemas.microsoft.com/developer/vsx-schema/2011";
 
@@ -167,9 +168,88 @@ namespace MauiDesigner.Core.Tests
 
             foreach (var relativePath in referenced)
             {
-                var full = Path.Combine(Path.GetDirectoryName(manifestPath)!, relativePath!.Replace('\\', Path.DirectorySeparatorChar));
-                Assert.True(File.Exists(full), $"The manifest references '{relativePath}', which does not exist.");
+                var full = Path.Combine(projectDirectory, relativePath!.Replace('\\', Path.DirectorySeparatorChar));
+                if (File.Exists(full))
+                {
+                    continue;
+                }
+
+                // Not every referenced file is checked in. LICENSE.txt is copied
+                // out of the repository's LICENSE.md during the build, because a
+                // VSIX cannot package a file from outside the project directory.
+                // Such a file is only as safe as the thing that generates it, so
+                // follow the build back to a real source rather than assuming.
+                var generatedFrom = SourceOfGeneratedVsixFile(projectDirectory, relativePath!);
+                Assert.True(
+                    generatedFrom is not null,
+                    $"The manifest references '{relativePath}', which is neither in {projectDirectory} nor produced by the project file.");
+                Assert.True(
+                    File.Exists(generatedFrom),
+                    $"The manifest references '{relativePath}', which the build copies from '{generatedFrom}' - and that file does not exist.");
             }
+        }
+
+        /// <summary>
+        /// Follows a file the VSIX packages back to the file the build copies it
+        /// from, or <c>null</c> when nothing in the project produces it.
+        /// </summary>
+        private static string? SourceOfGeneratedVsixFile(string projectDirectory, string vsixName)
+        {
+            var projectPath = Path.Combine(projectDirectory, "MauiDesigner.Vsix.csproj");
+            var project = XDocument.Load(projectPath);
+
+            // The SDK-style project file here declares no namespace.
+            var items = project.Descendants()
+                .Where(element => element.Elements().Any(child => child.Name.LocalName == "IncludeInVSIX"
+                                                                 && child.Value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase)));
+
+            var item = items.FirstOrDefault(candidate =>
+            {
+                var link = candidate.Elements().FirstOrDefault(child => child.Name.LocalName == "Link")?.Value;
+                var name = link ?? candidate.Attribute("Include")?.Value;
+                return Path.GetFileName(name?.Replace('\\', '/')) == Path.GetFileName(vsixName.Replace('\\', '/'));
+            });
+
+            var include = item?.Attribute("Include")?.Value;
+            if (include is null)
+            {
+                return null;
+            }
+
+            // The item is packaged from an intermediate copy, so the source of
+            // truth is whatever the Copy task reads. Match on the unexpanded
+            // property so this does not have to reimplement MSBuild.
+            var copy = project.Descendants()
+                .FirstOrDefault(element => element.Name.LocalName == "Copy"
+                                           && element.Attribute("DestinationFiles")?.Value == include);
+
+            var source = copy?.Attribute("SourceFiles")?.Value;
+            return source is null ? null : ExpandProperties(project, source, projectDirectory);
+        }
+
+        /// <summary>
+        /// Expands the handful of MSBuild properties these paths use.
+        /// </summary>
+        private static string ExpandProperties(XDocument project, string value, string projectDirectory)
+        {
+            var properties = project.Descendants()
+                .Where(element => element.Parent?.Name.LocalName == "PropertyGroup")
+                .GroupBy(element => element.Name.LocalName)
+                .ToDictionary(group => group.Key, group => group.Last().Value, StringComparer.OrdinalIgnoreCase);
+
+            properties["MSBuildThisFileDirectory"] = projectDirectory + Path.DirectorySeparatorChar;
+
+            // Properties can be defined in terms of each other, so keep going
+            // until the value stops changing.
+            for (var pass = 0; pass < 10 && value.Contains("$("); pass++)
+            {
+                foreach (var property in properties)
+                {
+                    value = value.Replace($"$({property.Key})", property.Value, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+
+            return Path.GetFullPath(value.Replace('\\', Path.DirectorySeparatorChar));
         }
 
         [Fact]
