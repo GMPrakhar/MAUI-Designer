@@ -44,4 +44,39 @@ test.describe('Designer shell', () => {
     await expect(designer.undoButton).toBeDisabled();
     await expect(designer.redoButton).toBeDisabled();
   });
+
+  test.describe('Visual Studio extension download', () => {
+    test('offers the extension and warns that it is beta', async ({ page }) => {
+      const link = page.getByTestId('vsix-download-link');
+
+      await expect(link).toBeVisible();
+      await expect(link).toContainText('VS Extension');
+      await expect(link).toContainText('Beta');
+      await expect(link).toHaveAttribute(
+        'href',
+        'https://github.com/GMPrakhar/MAUI-Designer/releases/download/vsix-latest/MauiDesigner.vsix'
+      );
+      await expect(link).toHaveAttribute('title', /beta/i);
+      await expect(link).toHaveAttribute('title', /break/i);
+    });
+
+    test('restates the beta warning when the download starts', async ({ page }) => {
+      // Stop the click from navigating away so the assertion runs against the page.
+      await page.getByTestId('vsix-download-link').evaluate(node => node.removeAttribute('href'));
+      await page.getByTestId('vsix-download-link').click();
+
+      await expect(page.getByTestId('app-toast')).toContainText(/beta/i);
+      await expect(page.getByTestId('app-toast')).toContainText(/unstable or broken/i);
+    });
+
+    test('is hidden when the designer is already hosted inside an IDE', async ({ page }) => {
+      await page.addInitScript(() => {
+        (window as any).chrome = { webview: { postMessage: () => {}, addEventListener: () => {} } };
+      });
+      await page.reload();
+
+      await expect(page.getByTestId('save-button')).toBeVisible();
+      await expect(page.getByTestId('vsix-download-link')).toHaveCount(0);
+    });
+  });
 });

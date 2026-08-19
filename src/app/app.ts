@@ -45,6 +45,15 @@ export class App implements OnInit, OnDestroy {
   canRedo = false;
   toastMessage = '';
   hostFileName: string | null = null;
+
+  /**
+   * Points at the rolling `vsix-latest` release rather than `releases/latest`,
+   * which GitHub resolves only to full releases and would 404 while the
+   * extension is still published as a pre-release.
+   */
+  readonly vsixDownloadUrl =
+    'https://github.com/GMPrakhar/MAUI-Designer/releases/download/vsix-latest/MauiDesigner.vsix';
+
   private toastTimeout: any;
   private subscription = new Subscription();
 
@@ -168,6 +177,11 @@ export class App implements OnInit, OnDestroy {
   clearDesign() {
     this.elementService.clearDesign();
     this.showToast('Canvas cleared');
+  }
+
+  onVsixDownload() {
+    // The tooltip is easy to miss, so restate the warning where it will be seen.
+    this.showToast('Downloading the beta extension - it may be unstable or broken.');
   }
 
   private showToast(message: string) {
