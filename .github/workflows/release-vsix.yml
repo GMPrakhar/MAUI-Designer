@@ -195,7 +195,9 @@ jobs:
           Write-Host 'Visual Studio updated its configuration successfully.'
 
       - name: Check Visual Studio registered the designer for .xaml
-        shell: pwsh
+        # Windows PowerShell keeps the registry types in the framework, which
+        # keeps the interop below to a few lines.
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
 
@@ -206,53 +208,87 @@ jobs:
           $hive = Join-Path $env:VS_CONFIG_ROOT 'privateregistry.bin'
           if (-not (Test-Path $hive)) { throw "Could not find the private registry hive at $hive." }
 
-          $mount = 'HKLM\MauiDesignerCheck'
-          & reg load $mount $hive | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw "Could not load $hive." }
+          # RegLoadAppKey is the API Visual Studio itself uses. Unlike `reg load`
+          # it needs no privileges and does not attach the hive to HKLM, so it
+          # copes with the IDE's background processes still holding the file.
+          Add-Type -TypeDefinition @'
+          using System;
+          using System.ComponentModel;
+          using System.Runtime.InteropServices;
+          using Microsoft.Win32;
+          using Microsoft.Win32.SafeHandles;
+
+          public static class VsHive
+          {
+              [DllImport("advapi32.dll", CharSet = CharSet.Unicode)]
+              private static extern int RegLoadAppKey(string file, out IntPtr key, int access, int options, int reserved);
+
+              public static RegistryKey Open(string file)
+              {
+                  IntPtr key;
+                  int error = RegLoadAppKey(file, out key, 0x20019, 0, 0);
+                  if (error != 0) { throw new Win32Exception(error); }
+                  return RegistryKey.FromHandle(new SafeRegistryHandle(key, true));
+              }
+          }
+          '@
+
+          $root = $null
+          foreach ($attempt in 1..5) {
+            try { $root = [VsHive]::Open($hive); break }
+            catch {
+              if ($attempt -eq 5) { throw }
+              Write-Host "Hive is still busy ($($_.Exception.Message)); retrying in 10s."
+              # /updateconfiguration leaves service hosts running for a while.
+              Get-Process -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^(devenv|PerfWatson2|ServiceHub|Microsoft\.ServiceHub|VBCSCompiler)' } |
+                Stop-Process -Force -ErrorAction SilentlyContinue
+              Start-Sleep -Seconds 10
+            }
+          }
 
           try {
             $instance = Split-Path $env:VS_CONFIG_ROOT -Leaf
-            $configKey = Get-ChildItem 'HKLM:\MauiDesignerCheck\Software\Microsoft\VisualStudio' |
-                         Where-Object { $_.PSChildName -eq $instance } |
-                         Select-Object -First 1
-            if (-not $configKey) { throw "No '$instance' configuration root inside the private hive." }
+            $config = $root.OpenSubKey("Software\Microsoft\VisualStudio\$instance")
+            if (-not $config) { throw "No '$instance' configuration root inside the private hive." }
 
-            $editor = Join-Path $configKey.PSPath "Editors\$env:EDITOR_FACTORY_GUID"
-            if (-not (Test-Path $editor)) {
+            $editor = $config.OpenSubKey("Editors\$env:EDITOR_FACTORY_GUID")
+            if (-not $editor) {
               throw "Visual Studio did not register the editor factory $env:EDITOR_FACTORY_GUID."
             }
 
-            $owningPackage = (Get-ItemProperty $editor).Package
+            $owningPackage = $editor.GetValue('Package')
             if ($owningPackage -ne $env:PACKAGE_GUID) {
               throw "The editor factory is owned by $owningPackage, expected $env:PACKAGE_GUID."
             }
 
-            $extensions = Get-ItemProperty (Join-Path $editor 'Extensions')
-            if ($null -eq $extensions.xaml) {
+            $extensions = $editor.OpenSubKey('Extensions')
+            $priority = if ($extensions) { $extensions.GetValue('xaml') } else { $null }
+            if ($null -eq $priority) {
               throw 'The editor factory is not registered for the .xaml extension.'
             }
 
             # Deliberately low so the built-in XAML editor stays the default and
             # double-clicking a file behaves exactly as it did before installing.
-            if ($extensions.xaml -ne 0x10) {
-              throw "The .xaml priority is 0x$('{0:X}' -f $extensions.xaml), expected 0x10."
+            if ($priority -ne 0x10) {
+              throw "The .xaml priority is 0x$('{0:X}' -f $priority), expected 0x10."
             }
 
-            $logicalViews = Get-Item (Join-Path $editor 'LogicalViews')
-            if ($logicalViews.Property -notcontains '{7651a702-06e5-11d1-8ebd-00a0c90f26ea}') {
+            $logicalViews = $editor.OpenSubKey('LogicalViews')
+            if (-not $logicalViews -or $logicalViews.GetValueNames() -notcontains '{7651a702-06e5-11d1-8ebd-00a0c90f26ea}') {
               throw 'The designer logical view is not registered.'
             }
 
-            $package = Get-ItemProperty (Join-Path $configKey.PSPath "Packages\$env:PACKAGE_GUID")
-            Write-Host "Visual Studio registered package '$($package.'(default)')'"
+            $package = $config.OpenSubKey("Packages\$env:PACKAGE_GUID")
+            if (-not $package) { throw "Visual Studio did not register package $env:PACKAGE_GUID." }
+
+            Write-Host "Visual Studio registered package '$($package.GetValue(''))'"
             Write-Host "  editor factory : $env:EDITOR_FACTORY_GUID"
-            Write-Host "  .xaml priority : 0x$('{0:X}' -f $extensions.xaml)"
-            Write-Host "  logical views  : $($logicalViews.Property -join ', ')"
+            Write-Host "  .xaml priority : 0x$('{0:X}' -f $priority)"
+            Write-Host "  logical views  : $($logicalViews.GetValueNames() -join ', ')"
           }
           finally {
-            [gc]::Collect()
-            [gc]::WaitForPendingFinalizers()
-            & reg unload $mount | Out-Null
+            $root.Dispose()
           }
 
       - name: Uninstall cleanly
