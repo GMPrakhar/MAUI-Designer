@@ -4,7 +4,7 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 
 **Live demo:** https://gmprakhar.github.io/MAUI-Designer/ (deployed to GitHub Pages from `main`)
 
-![MAUI Designer](https://img.shields.io/badge/Angular-18.2.0-red) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5.4-blue) ![License](https://img.shields.io/badge/License-MIT-green)
+![MAUI Designer](https://img.shields.io/badge/Angular-18.2.0-red) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5.4-blue) ![License](https://img.shields.io/badge/License-PolyForm%20Noncommercial-blue)
 
 ## 🚀 Features
 
@@ -426,7 +426,17 @@ storage.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). Use it freely for
+any noncommercial purpose — personal projects, study, research, hobby work — and for charitable,
+educational, government and other noncommercial organisations. Commercial use needs a separate
+licence; open an issue to ask.
+
+This is a source-available licence, not an OSI-approved open source one, so GitHub will not
+label the repository "open source". Earlier revisions of this README stated MIT, and nothing here
+retroactively withdraws rights anyone already relied on under that statement.
+
+The dependencies keep their own licences (Angular and the rest are MIT); this applies only to the
+code in this repository.
 
 ## 👨‍💻 Author
 

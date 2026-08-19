@@ -66,7 +66,9 @@ jobs:
 
           # A VSIX that installs but shows an empty WebView is the failure mode
           # worth guarding against, so assert on the payload, not just the file.
-          foreach ($required in @('extension.vsixmanifest', 'MauiDesigner.Vsix.dll', 'MauiDesigner.Core.dll')) {
+          # LICENSE.txt is here because the manifest points at it: if it goes
+          # missing the package silently ships with no terms shown at install.
+          foreach ($required in @('extension.vsixmanifest', 'MauiDesigner.Vsix.dll', 'MauiDesigner.Core.dll', 'LICENSE.txt')) {
             if ($names -notcontains $required) { throw "The VSIX is missing $required." }
           }
           if (-not ($names -match '^webview/index\.html$')) {

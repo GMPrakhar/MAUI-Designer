@@ -5,6 +5,7 @@
     <DisplayName>MAUI Designer</DisplayName>
     <Description xml:space="preserve">A drag and drop visual designer for .NET MAUI XAML pages, including controls that come from NuGet packages.</Description>
     <MoreInfo>https://github.com/GMPrakhar/MAUI-Designer</MoreInfo>
+    <License>LICENSE.txt</License>
     <Tags>maui, xaml, designer, dotnet</Tags>
   </Metadata>
   <Installation>
