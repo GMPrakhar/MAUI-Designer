@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" Version="8.0.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
@@ -18,6 +19,15 @@
     <!-- Stand-ins for Microsoft.Maui.Controls and a third party control package -->
     <ProjectReference Include="..\Fakes\MauiDesigner.Fakes.Maui\MauiDesigner.Fakes.Maui.csproj" />
     <ProjectReference Include="..\Fakes\MauiDesigner.Fakes.Package\MauiDesigner.Fakes.Package.csproj" />
+    <!--
+      Built, but never referenced: RegistrationMetadataTests reads the resulting
+      net472 assembly as data. Linking it would drag .NET Framework targeting
+      into a net8.0 test project.
+    -->
+    <ProjectReference Include="..\MauiDesigner.Vsix.CompileCheck\MauiDesigner.Vsix.CompileCheck.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

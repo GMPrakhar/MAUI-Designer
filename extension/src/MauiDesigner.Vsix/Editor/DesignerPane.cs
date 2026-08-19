@@ -26,20 +26,35 @@ namespace MauiDesigner.Vsix
         private readonly IVsHierarchy _hierarchy;
         private readonly DesignerControl _control;
         private readonly DesignerSession _session;
+
+        /// <summary>
+        /// Taken from the package rather than <see cref="ThreadHelper"/>, whose
+        /// tasks deliberately do not block the IDE from exiting. This pane writes
+        /// the user's designer edits back into the text buffer, so losing that
+        /// work to a shutdown race would mean losing their changes.
+        /// </summary>
+        private readonly JoinableTaskFactory _joinableTaskFactory;
+
         private bool _applyingDesignerEdit;
 
         public DesignerPane(
-            IServiceProvider serviceProvider,
+            AsyncPackage package,
             IVsTextLines textLines,
             string documentMoniker,
             IVsHierarchy hierarchy)
-            : base(serviceProvider)
+            : base(package)
         {
+            if (package is null)
+            {
+                throw new ArgumentNullException(nameof(package));
+            }
+
+            _joinableTaskFactory = package.JoinableTaskFactory;
             _textLines = textLines ?? throw new ArgumentNullException(nameof(textLines));
             _documentMoniker = documentMoniker;
             _hierarchy = hierarchy;
 
-            _control = new DesignerControl();
+            _control = new DesignerControl(_joinableTaskFactory);
             _session = new DesignerSession(_control.PostMessage);
 
             _control.MessageReceived += (_, json) => _session.HandleMessage(json);
@@ -57,7 +72,8 @@ namespace MauiDesigner.Vsix
         {
             base.Initialize();
 
-            _ = _control.InitializeAsync(WebAssetLocator.WebRootDirectory);
+            _joinableTaskFactory.RunAsync(() => _control.InitializeAsync(WebAssetLocator.WebRootDirectory))
+                .FileAndForget("vs/mauidesigner/initialize");
 
             ThreadHelper.ThrowIfNotOnUIThread();
             _session.OpenDocument(ReadBuffer(), _documentMoniker);
@@ -65,18 +81,18 @@ namespace MauiDesigner.Vsix
 
         private void OnDesignerEdited(object sender, DocumentChangedEventArgs args)
         {
-            _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            _joinableTaskFactory.RunAsync(async () =>
             {
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
                 WriteBuffer(args.Xaml);
-            });
+            }).FileAndForget("vs/mauidesigner/documentchanged");
         }
 
         private void OnSaveRequested(object sender, DocumentSaveRequestedEventArgs args)
         {
-            _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            _joinableTaskFactory.RunAsync(async () =>
             {
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
 
                 WriteBuffer(args.Xaml);
 
@@ -91,14 +107,14 @@ namespace MauiDesigner.Vsix
                 }
 
                 _session.NotifySaved();
-            });
+            }).FileAndForget("vs/mauidesigner/save");
         }
 
         private void OnManifestsRequested(object sender, EventArgs args)
         {
-            _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            _joinableTaskFactory.RunAsync(async () =>
             {
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
                 var projectFile = ProjectManifestProvider.FindProjectFile(_hierarchy, _documentMoniker);
 
                 await TaskScheduler.Default;
@@ -113,9 +129,9 @@ namespace MauiDesigner.Vsix
                     return;
                 }
 
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
                 _session.PushManifests(manifests);
-            });
+            }).FileAndForget("vs/mauidesigner/manifests");
         }
 
         private string ReadBuffer()
@@ -168,15 +184,15 @@ namespace MauiDesigner.Vsix
 
         private void WriteToOutput(string message)
         {
-            _ = ThreadHelper.JoinableTaskFactory.RunAsync(async () =>
+            _joinableTaskFactory.RunAsync(async () =>
             {
-                await ThreadHelper.JoinableTaskFactory.SwitchToMainThreadAsync();
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
 
                 if (GetService(typeof(SVsGeneralOutputWindowPane)) is IVsOutputWindowPane pane)
                 {
                     pane.OutputStringThreadSafe($"MAUI Designer: {message}{Environment.NewLine}");
                 }
-            });
+            }).FileAndForget("vs/mauidesigner/output");
         }
 
         /// <inheritdoc />

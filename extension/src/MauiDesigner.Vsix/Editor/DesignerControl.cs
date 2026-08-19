@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
@@ -6,6 +7,8 @@ using System.Windows.Controls;
 
 using System.Windows.Media;
 
+using Microsoft.VisualStudio.Shell;
+using Microsoft.VisualStudio.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.Wpf;
 
@@ -28,13 +31,26 @@ namespace MauiDesigner.Vsix
         private readonly WebView2 _webView;
         private readonly TextBlock _status;
 
-        private readonly TaskCompletionSource<bool> _ready =
-            new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        /// <summary>
+        /// Messages posted before WebView2 finished booting. The session starts
+        /// talking to the designer as soon as the document opens, which is
+        /// routinely before the browser is ready. Only touched on the UI thread.
+        /// </summary>
+        private readonly List<string> _pending = new List<string>();
 
+        private bool _isReady;
         private bool _disposed;
 
-        public DesignerControl()
+        /// <summary>
+        /// Supplied by the package rather than taken from <see cref="ThreadHelper"/>
+        /// so queued messages still block the IDE from exiting mid-flight.
+        /// </summary>
+        private readonly JoinableTaskFactory _joinableTaskFactory;
+
+        public DesignerControl(JoinableTaskFactory joinableTaskFactory)
         {
+            _joinableTaskFactory = joinableTaskFactory ?? throw new ArgumentNullException(nameof(joinableTaskFactory));
+
             _webView = new WebView2();
 
             _status = new TextBlock
@@ -74,6 +90,11 @@ namespace MauiDesigner.Vsix
                 var environment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
                 await _webView.EnsureCoreWebView2Async(environment);
 
+                // WebView2 resumes on the UI thread here in practice, but say so
+                // explicitly rather than relying on it: everything below touches
+                // WPF state.
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+
                 var core = _webView.CoreWebView2;
                 core.SetVirtualHostNameToFolderMapping(
                     VirtualHost,
@@ -89,12 +110,14 @@ namespace MauiDesigner.Vsix
                 core.Navigate($"https://{VirtualHost}/index.html");
 
                 _status.Visibility = Visibility.Collapsed;
-                _ready.TrySetResult(true);
+
+                _isReady = true;
+                FlushPending();
             }
             catch (Exception error)
             {
                 ShowStatus($"The designer could not start: {error.Message}");
-                _ready.TrySetResult(false);
+                _pending.Clear();
             }
         }
 
@@ -106,17 +129,53 @@ namespace MauiDesigner.Vsix
                 return;
             }
 
-            _ = Dispatcher.InvokeAsync(async () =>
+            // Callers include the manifest scan, which runs on a background
+            // thread. Marshal through the JoinableTaskFactory rather than the
+            // dispatcher so the work joins Visual Studio's own task tracking
+            // instead of racing it during shutdown.
+            _joinableTaskFactory.RunAsync(async () =>
             {
-                if (!await _ready.Task || _disposed || _webView.CoreWebView2 is null)
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+
+                if (_disposed)
                 {
                     return;
                 }
 
-                // The designer listens for `window` message events, so the payload
-                // is delivered as a string and parsed there.
-                _webView.CoreWebView2.PostWebMessageAsString(json);
-            });
+                if (!_isReady)
+                {
+                    _pending.Add(json);
+                    return;
+                }
+
+                Send(json);
+            }).FileAndForget("vs/mauidesigner/postmessage");
+        }
+
+        private void FlushPending()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            foreach (var message in _pending)
+            {
+                Send(message);
+            }
+
+            _pending.Clear();
+        }
+
+        private void Send(string json)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (_disposed || _webView.CoreWebView2 is null)
+            {
+                return;
+            }
+
+            // The designer listens for `window` message events, so the payload
+            // is delivered as a string and parsed there.
+            _webView.CoreWebView2.PostWebMessageAsString(json);
         }
 
         private void OnWebMessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
@@ -149,7 +208,7 @@ namespace MauiDesigner.Vsix
             }
 
             _disposed = true;
-            _ready.TrySetResult(false);
+            _pending.Clear();
 
             if (_webView.CoreWebView2 is not null)
             {
