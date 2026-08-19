@@ -89,13 +89,33 @@ jobs:
           TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
         shell: bash
         run: |
-          gh release view "$TAG" >/dev/null 2>&1 \
-            && gh release upload "$TAG" MauiDesigner.vsix --clobber \
-            || gh release create "$TAG" MauiDesigner.vsix \
-                 --prerelease \
-                 --title "MAUI Designer for Visual Studio $TAG (beta)" \
-                 --notes 'Beta build of the Visual Studio 2022 extension. Expect rough edges and breaking changes.
+          set -euo pipefail
+
+          notes=$(cat <<'NOTES'
+          Beta build of the Visual Studio 2022 extension. Expect rough edges and breaking changes.
 
           **Install:** download `MauiDesigner.vsix`, close Visual Studio, double-click the file, then reopen. Right-click any `.xaml` page and choose **Open With… > MAUI Designer**.
 
-          **Requires:** Windows with Visual Studio 2022 (17.0 or later) and the WebView2 runtime.'
+          **Requires:** Windows with Visual Studio 2022 (17.0 or later) and the WebView2 runtime.
+          NOTES
+          )
+
+          publish() {
+            local tag="$1" title="$2"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              gh release upload "$tag" MauiDesigner.vsix --clobber
+            else
+              gh release create "$tag" MauiDesigner.vsix \
+                --prerelease --target "$GITHUB_SHA" \
+                --title "$title" --notes "$notes"
+            fi
+          }
+
+          publish "$TAG" "MAUI Designer for Visual Studio $TAG (beta)"
+
+          # `releases/latest/download/...` skips pre-releases, so the website
+          # would get a 404 from it. This rolling release gives the site a URL
+          # that keeps working without a redeploy, while every build also stays
+          # available under its own version tag.
+          gh release delete vsix-latest --yes --cleanup-tag 2>/dev/null || true
+          publish "vsix-latest" "Latest beta build ($TAG)"

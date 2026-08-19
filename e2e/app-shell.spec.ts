@@ -54,7 +54,7 @@ test.describe('Designer shell', () => {
       await expect(link).toContainText('Beta');
       await expect(link).toHaveAttribute(
         'href',
-        'https://github.com/GMPrakhar/MAUI-Designer/releases/latest/download/MauiDesigner.vsix'
+        'https://github.com/GMPrakhar/MAUI-Designer/releases/download/vsix-latest/MauiDesigner.vsix'
       );
       await expect(link).toHaveAttribute('title', /beta/i);
       await expect(link).toHaveAttribute('title', /break/i);

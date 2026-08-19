@@ -407,7 +407,7 @@ header of the [live demo](https://gmprakhar.github.io/MAUI-Designer/)), then:
 Requires Windows, Visual Studio 2022 (17.0 or later) and the WebView2 runtime (already present on
 current Windows installs). To uninstall, use **Extensions → Manage Extensions**.
 
-[vsix-download]: https://github.com/GMPrakhar/MAUI-Designer/releases/latest/download/MauiDesigner.vsix
+[vsix-download]: https://github.com/GMPrakhar/MAUI-Designer/releases/download/vsix-latest/MauiDesigner.vsix
 
 - [`extension/README.md`](extension/README.md) — how to build, test and debug the VSIX
 - [`docs/visual-studio-extension.md`](docs/visual-studio-extension.md) — the design rationale, and

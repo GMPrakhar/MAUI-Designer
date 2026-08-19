@@ -47,11 +47,12 @@ export class App implements OnInit, OnDestroy {
   hostFileName: string | null = null;
 
   /**
-   * Always resolves to the newest published asset, so the site never has to be
-   * redeployed to point at a new build of the extension.
+   * Points at the rolling `vsix-latest` release rather than `releases/latest`,
+   * which GitHub resolves only to full releases and would 404 while the
+   * extension is still published as a pre-release.
    */
   readonly vsixDownloadUrl =
-    'https://github.com/GMPrakhar/MAUI-Designer/releases/latest/download/MauiDesigner.vsix';
+    'https://github.com/GMPrakhar/MAUI-Designer/releases/download/vsix-latest/MauiDesigner.vsix';
 
   private toastTimeout: any;
   private subscription = new Subscription();
