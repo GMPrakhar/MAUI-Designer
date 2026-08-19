@@ -34,6 +34,34 @@ This is also why `DesignerControl` builds its UI in code instead of in XAML: XAM
 markup compilation is Windows-only, and the UI is one WebView plus a status
 label.
 
+## What can be verified without Visual Studio
+
+Visual Studio has never run on Linux (VS Code is a different product, and Visual
+Studio for Mac was retired in August 2024), so the VSIX can never be *installed*
+on a Linux agent. Rather less obviously, most of the ways this extension can be
+wrong are still catchable there:
+
+| Failure | Caught by | How |
+| --- | --- | --- |
+| Wrong SDK interface, signature or enum | `MauiDesigner.Vsix.CompileCheck` | Compiles the real sources against the real VS SDK |
+| Deadlocks and shutdown races | the same project | `VSTHRD*`/`VSSDK*` analyzers, escalated to errors |
+| Registration that silently never loads | `RegistrationMetadataTests` | Reads the compiled attributes with `MetadataLoadContext` |
+| A manifest naming a file that isn't there | `RegistrationMetadataTests` | Resolves every path the manifest references |
+| A package that installs but renders nothing | `release-vsix.yml` | Unzips the built VSIX and asserts its contents |
+| Host protocol drift | `e2e/ide-host.spec.ts` | Drives the real app against a stubbed `window.chrome.webview` |
+
+The threading analyzers are worth singling out. They flag exactly the bugs that
+otherwise need a running IDE to find — and they found real ones here: the pane
+was posting the user's designer edits through `ThreadHelper.JoinableTaskFactory`,
+whose tasks explicitly **do not** block Visual Studio from exiting, so an unlucky
+shutdown could have dropped an edit on its way to the text buffer. Both it and
+`DesignerControl` now use the `AsyncPackage`'s factory instead. Note that
+`FileAndForget` alone does *not* fix this; see
+[VSSDK007](https://github.com/Microsoft/VSSDK-Analyzers/blob/main/doc/VSSDK007.md).
+
+What still genuinely requires Windows: installing the VSIX, confirming **Open
+With… → MAUI Designer** appears, and watching WebView2 actually render.
+
 ## What the core library does
 
 * **`Projects/ProjectAssetsReader`** — reads `obj/project.assets.json` (written by

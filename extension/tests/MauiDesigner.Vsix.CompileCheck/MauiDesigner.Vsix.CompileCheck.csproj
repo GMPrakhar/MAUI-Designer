@@ -18,6 +18,14 @@
     <AssemblyName>MauiDesigner.Vsix.CompileCheck</AssemblyName>
     <RootNamespace>MauiDesigner.Vsix</RootNamespace>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!--
+      This project exists to catch mistakes, so its warnings are failures. It
+      matters most for the VSTHRD/VSSDK threading analyzers that ship with the
+      VS SDK: they flag deadlock and shutdown races that are otherwise only
+      discoverable by running Visual Studio, which no Linux agent can do.
+      Add specific codes to NoWarn above if an analyzer update ever adds noise.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
   <ItemGroup>
@@ -48,5 +56,18 @@
     <!-- Assembly level attributes would collide with the ones generated here -->
     <Compile Remove="..\..\src\MauiDesigner.Vsix\Properties\AssemblyInfo.cs" />
   </ItemGroup>
+
+  <!--
+    The Visual Studio SDK is referenced for its reference assemblies only, so
+    they are never copied next to the output. RegistrationMetadataTests needs
+    them to resolve the attribute types it inspects, so record where MSBuild
+    found them rather than guessing at NuGet cache layout from the test.
+  -->
+  <Target Name="WriteReferenceList" AfterTargets="Build">
+    <WriteLinesToFile File="$(TargetDir)compile-check-references.txt"
+                      Lines="@(ReferencePathWithRefAssemblies)"
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
 
 </Project>
