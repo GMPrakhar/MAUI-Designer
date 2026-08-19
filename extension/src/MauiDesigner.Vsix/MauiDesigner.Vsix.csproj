@@ -82,16 +82,30 @@
   <!--
     Visual Studio shows this before the user accepts the install, which is the
     one moment the noncommercial terms are guaranteed to be seen. The manifest
-    names it LICENSE.txt, so the repository's LICENSE.md is linked under that
-    name rather than copied, keeping a single source of truth.
+    names it LICENSE.txt, so the repository's LICENSE.md is copied under that
+    name rather than duplicated in the tree, keeping one source of truth.
+    A statically declared item is not enough: the VSSDK builds its file list
+    from items it can map into the package, and rejects the manifest reference
+    with VSSDK1310 unless the file is contributed the same way the web assets
+    are.
   -->
-  <ItemGroup>
-    <Content Include="$(MSBuildThisFileDirectory)..\..\..\LICENSE.md">
-      <Link>LICENSE.txt</Link>
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      <IncludeInVSIX>true</IncludeInVSIX>
-    </Content>
-  </ItemGroup>
+  <PropertyGroup>
+    <LicenseSourceFile Condition="'$(LicenseSourceFile)' == ''">$(MSBuildThisFileDirectory)..\..\..\LICENSE.md</LicenseSourceFile>
+    <LicenseVsixFile>$(IntermediateOutputPath)LICENSE.txt</LicenseVsixFile>
+  </PropertyGroup>
+
+  <Target Name="IncludeLicense" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('$(LicenseSourceFile)')"
+           Text="The manifest declares a licence but $(LicenseSourceFile) does not exist. Either restore the file or remove &lt;License&gt; from source.extension.vsixmanifest." />
+    <Copy SourceFiles="$(LicenseSourceFile)" DestinationFiles="$(LicenseVsixFile)" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <Content Include="$(LicenseVsixFile)">
+        <Link>LICENSE.txt</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <IncludeInVSIX>true</IncludeInVSIX>
+      </Content>
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <Reference Include="PresentationCore" />
