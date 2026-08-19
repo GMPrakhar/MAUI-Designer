@@ -49,6 +49,20 @@
         <span class="material-icons">delete_sweep</span>
         Clear
       </button>
+
+      <a
+        *ngIf="!isHosted"
+        class="header-button extension-download"
+        data-testid="vsix-download-link"
+        [href]="vsixDownloadUrl"
+        target="_blank"
+        rel="noopener"
+        title="Download the Visual Studio 2022 extension. Beta software - expect bugs, and expect it to break."
+        (click)="onVsixDownload()">
+        <span class="material-icons">extension</span>
+        VS Extension
+        <span class="beta-tag">Beta</span>
+      </a>
     </div>
   </div>
 

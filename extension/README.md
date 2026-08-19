@@ -86,13 +86,23 @@ The VSIX, on Windows:
 
 ```powershell
 npm ci
-npm run build            # produces dist/maui-designer/browser, embedded in the VSIX
+npm run build            # produces dist/angular-designer, embedded in the VSIX
 cd extension
 msbuild MauiDesigner.sln /p:Configuration=Release /restore
 ```
 
 `bin\Release\MauiDesigner.Vsix.vsix` can then be installed, or press F5 to debug
-in the experimental instance.
+in the experimental instance. Building without running `npm run build` first is a
+hard error: a VSIX that installs but renders an empty WebView is a worse failure
+than one that refuses to build.
+
+You do not need a Windows machine to get an installer, though —
+`.github/workflows/release-vsix.yml` packages the VSIX on a `windows-latest`
+runner. It runs on every pull request that touches `extension/`, unzips the
+result and asserts that `webview/index.html` and both assemblies are actually
+inside, then uploads it as a build artifact. Pushing a `vsix-v*` tag publishes
+the same file as a pre-release asset named `MauiDesigner.vsix`, which is what the
+website's download link points at.
 
 ## How it works inside Visual Studio
 

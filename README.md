@@ -391,6 +391,24 @@ buffer as the built-in XAML editor (so undo, the dirty marker and Ctrl+S all beh
 generates toolbox entries from the controls in the project's own NuGet packages by inspecting
 `obj/project.assets.json` and the package assemblies.
 
+### Installing the extension (beta)
+
+> **Beta — expect it to break.** The extension is new and has had far less real-world use than the
+> web app. It may misbehave or fail outright; don't rely on it for important work, and keep your
+> XAML in source control.
+
+Download **`MauiDesigner.vsix`** from the [latest release][vsix-download] (also linked from the
+header of the [live demo](https://gmprakhar.github.io/MAUI-Designer/)), then:
+
+1. Close Visual Studio.
+2. Double-click the downloaded `.vsix` and complete the VSIX installer.
+3. Reopen Visual Studio, right-click a `.xaml` page and choose **Open With… → MAUI Designer**.
+
+Requires Windows, Visual Studio 2022 (17.0 or later) and the WebView2 runtime (already present on
+current Windows installs). To uninstall, use **Extensions → Manage Extensions**.
+
+[vsix-download]: https://github.com/GMPrakhar/MAUI-Designer/releases/latest/download/MauiDesigner.vsix
+
 - [`extension/README.md`](extension/README.md) — how to build, test and debug the VSIX
 - [`docs/visual-studio-extension.md`](docs/visual-studio-extension.md) — the design rationale, and
   why the classic in-process VSSDK model is required

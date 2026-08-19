@@ -90,7 +90,7 @@
 
   <!--
     The VSIX ships the compiled Angular application. Run `npm run build` in the
-    repository root first; the output of dist/maui-designer/browser is embedded
+    repository root first; the output of dist/angular-designer is embedded
     under `webview\` and served through a virtual host name.
   -->
   <PropertyGroup>

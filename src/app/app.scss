@@ -185,6 +185,28 @@
   }
 }
 
+.extension-download {
+  text-decoration: none;
+  margin-left: 4px;
+  border-color: rgba(129, 230, 217, 0.7);
+  background: rgba(129, 230, 217, 0.16);
+
+  &:hover {
+    background: rgba(129, 230, 217, 0.3);
+  }
+}
+
+.beta-tag {
+  padding: 1px 5px;
+  border-radius: 8px;
+  background: #f6ad55;
+  color: #1a202c;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
 .toast {
   position: fixed;
   top: 70px;
