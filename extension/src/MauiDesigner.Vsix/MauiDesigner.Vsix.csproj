@@ -79,6 +79,20 @@
     </None>
   </ItemGroup>
 
+  <!--
+    Visual Studio shows this before the user accepts the install, which is the
+    one moment the noncommercial terms are guaranteed to be seen. The manifest
+    names it LICENSE.txt, so the repository's LICENSE.md is linked under that
+    name rather than copied, keeping a single source of truth.
+  -->
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)..\..\..\LICENSE.md">
+      <Link>LICENSE.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />

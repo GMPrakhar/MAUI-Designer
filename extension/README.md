@@ -136,3 +136,9 @@ Studio install directory is read-only.
   are preserved verbatim but are not editable beyond their attributes.
 * Manifest generation reads compile-time metadata, so a control's runtime
   defaults are not known — the designer falls back to its own defaults.
+
+## Licence
+
+[PolyForm Noncommercial 1.0.0](../LICENSE.md), the same as the rest of the
+repository. The manifest points Visual Studio at it, so the terms are shown
+before the extension installs rather than buried in a file nobody opens.
