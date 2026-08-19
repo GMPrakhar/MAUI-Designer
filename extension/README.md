@@ -49,6 +49,20 @@ wrong are still catchable there:
 | A manifest naming a file that isn't there | `RegistrationMetadataTests` | Resolves every path the manifest references |
 | A package that installs but renders nothing | `release-vsix.yml` | Unzips the built VSIX and asserts its contents |
 | Host protocol drift | `e2e/ide-host.spec.ts` | Drives the real app against a stubbed `window.chrome.webview` |
+| A VSIX that won't install, or installs without registering | `release-vsix.yml` (`install-check`) | Installs it into a real Visual Studio on a Windows runner |
+
+The last row is the one that needs a Windows machine, and CI supplies one: the
+`windows-latest` image ships Visual Studio Enterprise 2022 with the extension
+development workload. The `install-check` job runs the real `VSIXInstaller.exe`,
+runs `devenv /updateconfiguration` so Visual Studio parses our `.pkgdef` itself,
+then reads back VS 2022's *private registry hive* to confirm what it actually
+stored — the editor factory, its owning package, the `.xaml` association and its
+priority, and the designer logical view. Reading the hive matters: checking the
+`.pkgdef` we shipped would only re-state what we asked for, not what VS accepted.
+It then uninstalls and checks nothing is left behind. Publishing a release is
+gated on that job, so a VSIX that cannot install can never be shipped.
+
+What still needs a human: seeing the designer actually *render* inside the IDE.
 
 The threading analyzers are worth singling out. They flag exactly the bugs that
 otherwise need a running IDE to find — and they found real ones here: the pane
