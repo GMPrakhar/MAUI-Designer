@@ -4,7 +4,10 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 
+using System.Windows.Media;
+
 using Microsoft.Web.WebView2.Core;
+using Microsoft.Web.WebView2.Wpf;
 
 namespace MauiDesigner.Vsix
 {
@@ -13,9 +16,17 @@ namespace MauiDesigner.Vsix
     /// through a virtual host name because `file://` origins cannot use the
     /// browser storage and module loading the designer relies on.
     /// </summary>
-    public partial class DesignerControl : UserControl, IDisposable
+    /// <remarks>
+    /// The UI is built in code rather than in XAML on purpose: it is a single WebView with a
+    /// status message, and avoiding markup compilation keeps the whole assembly buildable (and
+    /// therefore compile-checkable in CI) on any operating system.
+    /// </remarks>
+    public sealed class DesignerControl : UserControl, IDisposable
     {
         private const string VirtualHost = "maui-designer.invalid";
+
+        private readonly WebView2 _webView;
+        private readonly TextBlock _status;
 
         private readonly TaskCompletionSource<bool> _ready =
             new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -24,7 +35,19 @@ namespace MauiDesigner.Vsix
 
         public DesignerControl()
         {
-            InitializeComponent();
+            _webView = new WebView2();
+
+            _status = new TextBlock
+            {
+                Text = "Starting the MAUI designer...",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var root = new Grid();
+            root.Children.Add(_webView);
+            root.Children.Add(_status);
+            Content = root;
         }
 
         /// <summary>Raised for every JSON message the designer posts to the host.</summary>
@@ -49,9 +72,9 @@ namespace MauiDesigner.Vsix
                 Directory.CreateDirectory(userDataFolder);
 
                 var environment = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
-                await WebView.EnsureCoreWebView2Async(environment);
+                await _webView.EnsureCoreWebView2Async(environment);
 
-                var core = WebView.CoreWebView2;
+                var core = _webView.CoreWebView2;
                 core.SetVirtualHostNameToFolderMapping(
                     VirtualHost,
                     webRootDirectory,
@@ -65,7 +88,7 @@ namespace MauiDesigner.Vsix
 
                 core.Navigate($"https://{VirtualHost}/index.html");
 
-                StatusText.Visibility = Visibility.Collapsed;
+                _status.Visibility = Visibility.Collapsed;
                 _ready.TrySetResult(true);
             }
             catch (Exception error)
@@ -85,14 +108,14 @@ namespace MauiDesigner.Vsix
 
             _ = Dispatcher.InvokeAsync(async () =>
             {
-                if (!await _ready.Task || _disposed || WebView.CoreWebView2 is null)
+                if (!await _ready.Task || _disposed || _webView.CoreWebView2 is null)
                 {
                     return;
                 }
 
                 // The designer listens for `window` message events, so the payload
                 // is delivered as a string and parsed there.
-                WebView.CoreWebView2.PostWebMessageAsString(json);
+                _webView.CoreWebView2.PostWebMessageAsString(json);
             });
         }
 
@@ -113,8 +136,8 @@ namespace MauiDesigner.Vsix
 
         private void ShowStatus(string message)
         {
-            StatusText.Text = message;
-            StatusText.Visibility = Visibility.Visible;
+            _status.Text = message;
+            _status.Visibility = Visibility.Visible;
         }
 
         /// <inheritdoc />
@@ -128,12 +151,12 @@ namespace MauiDesigner.Vsix
             _disposed = true;
             _ready.TrySetResult(false);
 
-            if (WebView.CoreWebView2 is not null)
+            if (_webView.CoreWebView2 is not null)
             {
-                WebView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
+                _webView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
             }
 
-            WebView.Dispose();
+            _webView.Dispose();
         }
     }
 }
