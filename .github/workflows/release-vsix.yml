@@ -179,35 +179,60 @@ jobs:
 
           Write-Host 'Installed payload looks complete.'
 
+      - name: Check the deployed registration
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # This is the file Visual Studio reads to learn about the editor, and
+          # the VSSDK generates it from the registration attributes at build
+          # time -- so checking it catches attributes that compile happily but
+          # describe the wrong editor. It is written as UTF-16.
+          $pkgdef = Join-Path $env:EXTENSION_ROOT 'MauiDesigner.Vsix.pkgdef'
+          $text = [IO.File]::ReadAllText($pkgdef, [Text.Encoding]::Unicode)
+
+          $expected = @(
+            "[`$RootKey`$\Packages\$env:PACKAGE_GUID]",
+            "[`$RootKey`$\Editors\$env:EDITOR_FACTORY_GUID]",
+            "[`$RootKey`$\Editors\$env:EDITOR_FACTORY_GUID\Extensions]",
+            '"xaml"=dword:00000010',
+            '"{7651a702-06e5-11d1-8ebd-00a0c90f26ea}"=""',
+            "`"Package`"=`"$env:PACKAGE_GUID`"",
+            '"AllowsBackgroundLoad"=dword:00000001'
+          )
+
+          foreach ($line in $expected) {
+            if (-not $text.Contains($line)) {
+              Write-Host '--- deployed pkgdef ---'
+              Write-Host $text
+              throw "The deployed registration is missing: $line"
+            }
+          }
+
+          Write-Host 'The deployed registration associates the designer with .xaml as expected.'
+
       - name: Let Visual Studio ingest the registration
         shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           $devenv = Join-Path $env:VS_PATH 'Common7\IDE\devenv.exe'
 
-          # /updateconfiguration only flags the configuration as stale; the
-          # pkgdef files are actually merged into the private hive the next time
-          # the IDE starts. On a fresh runner the IDE has never started, so
-          # without this the hive has no Editors key at all.
+          # This is the documented way to make Visual Studio pick up a newly
+          # installed pkgdef. It exits on its own; do not try to drive a full
+          # IDE start here, which sits on first-run UI and never returns.
           $process = Start-Process $devenv -ArgumentList '/updateconfiguration' -Wait -PassThru
           if ($process.ExitCode -ne 0) {
             throw "devenv /updateconfiguration failed with exit code $($process.ExitCode)."
           }
 
-          # Starting and immediately exiting is what performs the merge. Give it
-          # a bounded amount of time: a first launch is slow, and if it stalls on
-          # a dialog we want a clear failure rather than a hung job.
-          $process = Start-Process $devenv -ArgumentList '/command', '"File.Exit"' -PassThru
-          if (-not $process.WaitForExit(360000)) {
-            $process.Kill($true)
-            Write-Host 'Visual Studio did not exit on its own; killed it after 6 minutes.'
-          } else {
-            Write-Host "Visual Studio started and exited with code $($process.ExitCode)."
-          }
-
+          # Background service hosts keep the hive open after this returns, and
+          # the next step has to read it.
           Get-Process -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -match '^(devenv|PerfWatson2|ServiceHub|VBCSCompiler)' } |
             Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 10
+
+          Write-Host 'Visual Studio updated its configuration.'
 
       - name: Check Visual Studio registered the designer for .xaml
         # Windows PowerShell keeps the registry types in the framework, which
@@ -263,22 +288,28 @@ jobs:
           }
 
           try {
+            # Visual Studio merges pkgdef registrations into the *_Config key,
+            # not the bare instance key -- the instance key holds user settings.
+            # Reading the wrong one returns null, which is easy to misread as
+            # "the registration was rejected" when it means "wrong key".
             $instance = Split-Path $env:VS_CONFIG_ROOT -Leaf
-            $config = $root.OpenSubKey("Software\Microsoft\VisualStudio\$instance")
-            if (-not $config) { throw "No '$instance' configuration root inside the private hive." }
+            $versions = $root.OpenSubKey('Software\Microsoft\VisualStudio')
+            if (-not $versions) {
+              throw 'The private hive has no Software\Microsoft\VisualStudio key.'
+            }
+
+            $config = $versions.OpenSubKey("${instance}_Config")
+            if (-not $config) {
+              Write-Host "Keys present under Software\Microsoft\VisualStudio: $($versions.GetSubKeyNames() -join ', ')"
+              throw "No '${instance}_Config' key inside the private hive."
+            }
 
             $editor = $config.OpenSubKey("Editors\$env:EDITOR_FACTORY_GUID")
             if (-not $editor) {
-              # Report what the runner actually has, so the next fix is informed
-              # rather than guessed at.
               $editors = $config.OpenSubKey('Editors')
-              if (-not $editors) {
-                throw 'The private hive has no Editors key at all, so Visual Studio never built its configuration. ' +
-                      'The registration cannot be checked until it does.'
-              }
-
-              Write-Host "Editors registered: $($editors.GetSubKeyNames().Count)"
-              Write-Host "Config root subkeys: $($config.GetSubKeyNames() -join ', ')"
+              $count = if ($editors) { $editors.GetSubKeyNames().Count } else { 0 }
+              Write-Host "Editors registered in the merged configuration: $count"
+              Write-Host "Config subkeys: $($config.GetSubKeyNames() -join ', ')"
               throw "Visual Studio did not register the editor factory $env:EDITOR_FACTORY_GUID."
             }
 
