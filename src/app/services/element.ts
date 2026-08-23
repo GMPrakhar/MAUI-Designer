@@ -1,6 +1,12 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';import { MauiElement, ElementType, ElementProperties, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
 
+/**
+ * How to restack the selection among its siblings. Later children paint on top,
+ * so "front" is the end of the array.
+ */
+export type ReorderMode = 'front' | 'back' | 'forward' | 'backward';
+
 @Injectable({
   providedIn: 'root'
 })
@@ -467,6 +473,107 @@ export class ElementService {
         }, { recordHistory: false })
       );
     });
+  }
+
+  /**
+   * Restacks the selection within its parent.
+   *
+   * Both the canvas and the generated XAML take their stacking order straight
+   * from `children`, so reordering the array is the whole feature -- there is no
+   * separate z-index to keep in sync.
+   */
+  reorderSelection(mode: ReorderMode): boolean {
+    const targets = this.selectedElements.filter(element => element !== this.rootElement && element.parent);
+    if (targets.length === 0) {
+      return false;
+    }
+
+    // A selection can span several parents, and "front" means the front of your
+    // own parent -- there is no ordering between separate containers.
+    const byParent = new Map<MauiElement, MauiElement[]>();
+    for (const element of targets) {
+      const siblings = byParent.get(element.parent!) ?? [];
+      siblings.push(element);
+      byParent.set(element.parent!, siblings);
+    }
+
+    let changed = false;
+    const willChange = [...byParent].some(([parent, group]) => this.wouldReorder(parent, group, mode));
+    if (!willChange) {
+      // Nothing to do -- bail before opening a history batch, or the selection
+      // being already at the edge would cost the user an empty undo step.
+      return false;
+    }
+
+    this.runAsSingleChange(() => {
+      byParent.forEach((group, parent) => {
+        if (this.reorderWithinParent(parent, group, mode)) {
+          changed = true;
+        }
+      });
+    });
+
+    if (changed) {
+      this.elementsSubject.next(this.rootElement);
+    }
+    return changed;
+  }
+
+  /** True when the selection sits in a container that has something to restack against. */
+  canReorderSelection(): boolean {
+    return this.selectedElements.some(
+      element => element !== this.rootElement && (element.parent?.children.length ?? 0) > 1
+    );
+  }
+
+  /**
+   * Whether the move would actually change anything.
+   *
+   * Moving up is a no-op exactly when the group already occupies a contiguous
+   * block at the end -- every member is either at the edge or blocked by another
+   * member. Moving down is the mirror image.
+   */
+  private wouldReorder(parent: MauiElement, group: MauiElement[], mode: ReorderMode): boolean {
+    const children = parent.children;
+    const indices = group.map(child => children.indexOf(child)).sort((a, b) => a - b);
+    const contiguous = indices.every((index, offset) => index === indices[0] + offset);
+
+    if (mode === 'front' || mode === 'forward') {
+      return !(contiguous && indices[indices.length - 1] === children.length - 1);
+    }
+    return !(contiguous && indices[0] === 0);
+  }
+
+  private reorderWithinParent(parent: MauiElement, group: MauiElement[], mode: ReorderMode): boolean {
+    const children = parent.children;
+    const before = [...children];
+
+    // Keep the group's own relative order intact whichever end it moves to.
+    const ordered = group.slice().sort((a, b) => children.indexOf(a) - children.indexOf(b));
+
+    if (mode === 'front' || mode === 'back') {
+      const rest = children.filter(child => !group.includes(child));
+      const next = mode === 'front' ? [...rest, ...ordered] : [...ordered, ...rest];
+      children.splice(0, children.length, ...next);
+    } else {
+      // One step at a time. Walking from the edge the group moves towards stops
+      // members of the same group from hopping over each other, which would
+      // scramble their relative order instead of moving them as a block.
+      const step = mode === 'forward' ? 1 : -1;
+      const walk = mode === 'forward' ? ordered.slice().reverse() : ordered;
+
+      for (const element of walk) {
+        const index = children.indexOf(element);
+        const swapWith = index + step;
+        if (swapWith < 0 || swapWith >= children.length || group.includes(children[swapWith])) {
+          continue;
+        }
+        children[index] = children[swapWith];
+        children[swapWith] = element;
+      }
+    }
+
+    return children.some((child, index) => child !== before[index]);
   }
 
   updateElementProperties(element: MauiElement, properties: Partial<ElementProperties>, options: { recordHistory?: boolean } = {}): void {

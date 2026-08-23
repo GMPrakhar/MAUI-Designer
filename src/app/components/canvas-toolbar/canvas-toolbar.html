@@ -103,6 +103,21 @@
   </div>
 
   <div class="toolbar-group">
+    <button class="toolbar-button" data-testid="bring-to-front" title="Bring to front (Ctrl+Shift+])" [disabled]="!canReorder" (click)="reorder('front')">
+      <span class="material-icons">flip_to_front</span>
+    </button>
+    <button class="toolbar-button" data-testid="bring-forward" title="Bring forward (Ctrl+])" [disabled]="!canReorder" (click)="reorder('forward')">
+      <span class="material-icons">arrow_upward</span>
+    </button>
+    <button class="toolbar-button" data-testid="send-backward" title="Send backward (Ctrl+[)" [disabled]="!canReorder" (click)="reorder('backward')">
+      <span class="material-icons">arrow_downward</span>
+    </button>
+    <button class="toolbar-button" data-testid="send-to-back" title="Send to back (Ctrl+Shift+[)" [disabled]="!canReorder" (click)="reorder('back')">
+      <span class="material-icons">flip_to_back</span>
+    </button>
+  </div>
+
+  <div class="toolbar-group">
     <button class="toolbar-button" data-testid="toolbar-copy" title="Copy (Ctrl+C)" [disabled]="!hasSelection" (click)="copy()">
       <span class="material-icons">content_copy</span>
     </button>
