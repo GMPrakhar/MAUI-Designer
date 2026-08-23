@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 
-import { ElementService } from '../../services/element';
+import { ElementService, ReorderMode } from '../../services/element';
 import { AlignmentService, AlignMode, DistributeMode } from '../../services/alignment';
 import { ClipboardService } from '../../services/clipboard';
 import { ViewportService, ViewportState, DEVICE_PRESETS } from '../../services/viewport';
@@ -123,6 +123,16 @@ export class CanvasToolbarComponent implements OnInit, OnDestroy {
 
   distribute(mode: DistributeMode) {
     this.alignmentService.distribute(this.selection, mode);
+  }
+
+  // --- Z-order ----------------------------------------------------------------
+
+  get canReorder(): boolean {
+    return this.elementService.canReorderSelection();
+  }
+
+  reorder(mode: ReorderMode) {
+    this.elementService.reorderSelection(mode);
   }
 
   // --- Clipboard --------------------------------------------------------------

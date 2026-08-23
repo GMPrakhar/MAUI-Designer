@@ -518,6 +518,13 @@
   }
 }
 
+/* Keep the element being dragged above its siblings for the duration of the
+   drag. Outside an interaction, elements paint in their real stacking order so
+   the z-order controls have a visible effect. */
+.cdk-drag-dragging {
+  z-index: 9999 !important;
+}
+
 .cdk-drag-preview {
   .selection-handles {
     display: none;

@@ -418,6 +418,15 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
       return;
     }
 
+    if (ctrl && (event.key === ']' || event.key === '[')) {
+      event.preventDefault();
+      const toFront = event.key === ']';
+      this.elementService.reorderSelection(
+        event.shiftKey ? (toFront ? 'front' : 'back') : (toFront ? 'forward' : 'backward')
+      );
+      return;
+    }
+
     const selected = this.elementService.getSelectedElement();
     if (!selected) {
       return;
@@ -521,7 +530,11 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     const styles: any = {
       width: props.width + 'px',
       height: props.height + 'px',
-      zIndex: this.isSelected(element) ? 9999 : 'auto',
+      // Only lift the element while it is actively being resized. Lifting it for
+      // the whole time it is selected would hide the effect of send-to-back:
+      // the user restacks an element, sees nothing move, and assumes it failed.
+      // Dragging is covered by `.cdk-drag-dragging` in the stylesheet.
+      zIndex: this.isSelected(element) && this.isResizing ? 9999 : 'auto',
       transform: `translate3d(${props.x}px, ${props.y}px, 0px)`
     };
 
