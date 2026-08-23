@@ -176,9 +176,12 @@ ${xamlContent}
       for (const [name, value] of Object.entries(props.customValues || {})) {
         push(name, this.escapeXml(String(value)));
       }
-      for (const [name, value] of Object.entries(props.rawAttributes || {})) {
-        push(name, this.escapeXml(value));
-      }
+    }
+
+    // Attributes the designer does not model are re-emitted verbatim for every
+    // element type, so importing XAML never silently deletes markup.
+    for (const [name, value] of Object.entries(props.rawAttributes || {})) {
+      push(name, this.escapeXml(value));
     }
     
     // For children of AbsoluteLayout
@@ -304,6 +307,10 @@ ${xamlContent}
       }
     }
     
+    // Layout alignment within the parent container
+    push('HorizontalOptions', props.horizontalOptions);
+    push('VerticalOptions', props.verticalOptions);
+
     // Visibility and enabled state
     if (props.isVisible === false) {
       push('IsVisible', 'False');

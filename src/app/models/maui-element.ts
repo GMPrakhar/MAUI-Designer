@@ -37,6 +37,11 @@ export enum ElementType {
 
 export const DEFAULT_ICON_PATH_DATA = 'M12 2L2 22h20L12 2Z';
 
+/** MAUI `LayoutOptions` values, as accepted by HorizontalOptions/VerticalOptions. */
+export const LAYOUT_OPTIONS = ['Start', 'Center', 'End', 'Fill'] as const;
+
+export type LayoutOptions = typeof LAYOUT_OPTIONS[number];
+
 export interface ElementProperties {
   // Layout properties
   x?: number;
@@ -45,6 +50,8 @@ export interface ElementProperties {
   height?: number;
   margin?: Thickness;
   padding?: Thickness;
+  horizontalOptions?: LayoutOptions;
+  verticalOptions?: LayoutOptions;
   
   // Visual properties
   backgroundColor?: string;

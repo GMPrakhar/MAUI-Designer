@@ -746,6 +746,37 @@
         </div>
       </div>
     </div>
+
+    <!-- Alignment Properties -->
+    <div class="property-section" data-testid="alignment-options-section">
+      <h4 class="section-header">Alignment</h4>
+
+      <div class="property-group">
+        <label class="property-label">Horizontal</label>
+        <select
+          class="property-input"
+          data-testid="prop-horizontalOptions"
+          [value]="element.properties.horizontalOptions || ''"
+          (change)="updateLayoutOptions(element, 'horizontalOptions', $any($event.target).value)">
+          <option value="" [selected]="!element.properties.horizontalOptions">(inherit)</option>
+          <option *ngFor="let option of layoutOptions" [value]="option"
+                  [selected]="option === element.properties.horizontalOptions">{{ option }}</option>
+        </select>
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Vertical</label>
+        <select
+          class="property-input"
+          data-testid="prop-verticalOptions"
+          [value]="element.properties.verticalOptions || ''"
+          (change)="updateLayoutOptions(element, 'verticalOptions', $any($event.target).value)">
+          <option value="" [selected]="!element.properties.verticalOptions">(inherit)</option>
+          <option *ngFor="let option of layoutOptions" [value]="option"
+                  [selected]="option === element.properties.verticalOptions">{{ option }}</option>
+        </select>
+      </div>
+    </div>
   </div>
 
   </ng-container>
