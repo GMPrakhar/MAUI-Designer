@@ -8,6 +8,16 @@ export interface LayoutInfo {
   supportsGridPositioning: boolean;
 }
 
+/**
+ * The implicit 2x2 grid used when an element has no explicit definition.
+ *
+ * Shared so hit-testing and sizing cannot disagree about the fallback.
+ */
+export const DEFAULT_GRID_DEFINITION = {
+  rows: [{ height: { value: 1, type: 'Star' } }, { height: { value: 1, type: 'Star' } }],
+  columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
+};
+
 @Injectable({
   providedIn: 'root'
 })
@@ -68,9 +78,16 @@ export class LayoutDesignerService {
       return { x: event.clientX, y: event.clientY };
     }
     
+    // clientX/Y are viewport coordinates, so they have to be rebased onto the
+    // container. properties.x/y are the element's position within *its own*
+    // parent, which is a different space entirely and lands the drop in the
+    // wrong cell whenever the layout is not at the canvas origin.
     const rect = containerElement.getBoundingClientRect();
-    const x = event.clientX - parentElement.properties.x!;
-    const y = event.clientY - parentElement.properties.y!;
+    const scale = rect.width && containerElement.offsetWidth
+      ? containerElement.offsetWidth / rect.width
+      : 1;
+    const x = (event.clientX - rect.left) * scale;
+    const y = (event.clientY - rect.top) * scale;
     
     const layoutInfo = this.getLayoutInfo(parentElement.type);
     
@@ -88,26 +105,80 @@ export class LayoutDesignerService {
   }
 
   private calculateGridPosition(gridElement: MauiElement, x: number, y: number, containerElement: HTMLElement): { x: number, y: number } {
-    // Get grid dimensions from element properties or use defaults
-    const gridDefinition = gridElement.properties.gridDefinition || {
-      rows: [{ height: { value: 1, type: 'Star' } }, { height: { value: 1, type: 'Star' } }],
-      columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
-    };
-    
+    const gridDefinition = gridElement.properties.gridDefinition || DEFAULT_GRID_DEFINITION;
+
     // offsetWidth/Height are unscaled, so grid maths stay correct while the canvas is zoomed
     const rect = containerElement.getBoundingClientRect();
     const width = containerElement.offsetWidth || rect.width;
     const height = containerElement.offsetHeight || rect.height;
-    const rows = gridDefinition.rows.length;
-    const columns = gridDefinition.columns.length;
 
-    const cellWidth = width / columns;
-    const cellHeight = height / rows;
-    
-    const column = Math.min(Math.floor(x / cellWidth), columns - 1);
-    const row = Math.min(Math.floor(y / cellHeight), rows - 1);
-    
-    return { x: column, y: row }; // These represent grid coordinates, not pixel coordinates
+    const columnSizes = this.measureTracks(containerElement, 'column')
+      ?? this.calculateGridSizes(gridDefinition.columns.map(c => c.width), width);
+    const rowSizes = this.measureTracks(containerElement, 'row')
+      ?? this.calculateGridSizes(gridDefinition.rows.map(r => r.height), height);
+
+    return {
+      x: this.trackAtOffset(columnSizes, x),
+      y: this.trackAtOffset(rowSizes, y)
+    };
+  }
+
+  /**
+   * Find the track containing an offset, given the size of each track.
+   *
+   * Tracks are rarely equal - a Grid can mix Star, Absolute and Auto - so the
+   * boundaries have to be accumulated rather than derived by division.
+   */
+  private trackAtOffset(sizes: number[], offset: number): number {
+    let edge = 0;
+    for (let index = 0; index < sizes.length; index++) {
+      edge += sizes[index];
+      if (offset < edge) {
+        // Clamp below: a pointer left of/above the grid belongs to the first
+        // track, and a negative index would generate invalid XAML.
+        return Math.max(0, index);
+      }
+    }
+
+    return Math.max(0, sizes.length - 1);
+  }
+
+  /**
+   * Measure the rendered grid tracks, or null when the overlay is not laid out.
+   *
+   * The cell overlay is a real CSS grid, so the browser has already resolved
+   * Auto tracks and any gap between them. Measuring is therefore exact, where
+   * recomputing the sizes here can only ever approximate Auto and would have to
+   * duplicate the gap. Sizes are read from offsetWidth/offsetHeight, which are
+   * unscaled, so the result does not change as the canvas is zoomed.
+   */
+  private measureTracks(containerElement: HTMLElement, axis: 'column' | 'row'): number[] | null {
+    const overlay = containerElement.querySelector<HTMLElement>(':scope > .grid-visualization');
+    const cells = overlay ? Array.from(overlay.children) as HTMLElement[] : [];
+    if (!cells.length) {
+      return null;
+    }
+
+    // One row of cells gives every column width, and one column gives every
+    // row height. Deduplicate by start offset to pick a single line out.
+    const starts = new Map<number, number>();
+    for (const cell of cells) {
+      const start = axis === 'column' ? cell.offsetLeft : cell.offsetTop;
+      const size = axis === 'column' ? cell.offsetWidth : cell.offsetHeight;
+      if (!starts.has(start)) {
+        starts.set(start, size);
+      }
+    }
+
+    const ordered = [...starts.entries()].sort((a, b) => a[0] - b[0]);
+    if (!ordered.length || ordered.every(([, size]) => size === 0)) {
+      return null;
+    }
+
+    // Stretch each track to the start of the next one so any gap belongs to a
+    // cell. Without this, hovering a gap highlights whichever cell was last.
+    return ordered.map(([start, size], index) =>
+      index < ordered.length - 1 ? ordered[index + 1][0] - start : size);
   }
 
   getChildLayoutProperties(parent: MauiElement, child: MauiElement, position: { x: number, y: number }): Partial<MauiElement['properties']> {
@@ -219,12 +290,12 @@ export class LayoutDesignerService {
       return null;
     }
 
-    const gridDefinition = gridElement.properties.gridDefinition || {
-      rows: [{ height: { value: 1, type: 'Star' } }, { height: { value: 1, type: 'Star' } }],
-      columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
-    };
+    const gridDefinition = gridElement.properties.gridDefinition || DEFAULT_GRID_DEFINITION;
 
     const rect = gridContainerElement.getBoundingClientRect();
+    // Unscaled, so a zoomed canvas does not shrink the size cap it computes.
+    const width = gridContainerElement.offsetWidth || rect.width;
+    const height = gridContainerElement.offsetHeight || rect.height;
     const totalColumns = gridDefinition.columns.length;
     const totalRows = gridDefinition.rows.length;
 
@@ -234,9 +305,12 @@ export class LayoutDesignerService {
     const columnSpan = childElement.properties.columnSpan || 1;
     const rowSpan = childElement.properties.rowSpan || 1;
 
-    // Calculate column widths
-    const columnWidths = this.calculateGridSizes(gridDefinition.columns.map(c => c.width), rect.width);
-    const rowHeights = this.calculateGridSizes(gridDefinition.rows.map(r => r.height), rect.height);
+    // Prefer the rendered tracks for the same reason hit-testing does: they
+    // already account for Auto sizing and the gap between cells.
+    const columnWidths = this.measureTracks(gridContainerElement, 'column')
+      ?? this.calculateGridSizes(gridDefinition.columns.map(c => c.width), width);
+    const rowHeights = this.measureTracks(gridContainerElement, 'row')
+      ?? this.calculateGridSizes(gridDefinition.rows.map(r => r.height), height);
 
     // Calculate max width by summing up the widths of spanned columns
     let maxWidth = 0;
@@ -263,12 +337,17 @@ export class LayoutDesignerService {
 
     // First pass: calculate fixed sizes and count star units
     definitions.forEach(def => {
-      if (def.type === 'Star') {
-        starCount += def.value;
-      } else if (def.type === 'Absolute') {
+      if (def.type === 'Absolute') {
         fixedSize += def.value;
+      } else if (def.type === 'Star') {
+        starCount += def.value;
+      } else {
+        // Auto needs content measurement, which is only available from the DOM.
+        // Treat it as one star so the tracks still sum to the container: the
+        // second pass hands Auto a star's worth, so counting it here too is
+        // what keeps the total honest.
+        starCount += 1;
       }
-      // Auto sizing is complex and would need content measurement, treating as 1 star for now
     });
 
     // Calculate size per star unit

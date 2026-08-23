@@ -954,11 +954,20 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   onLayoutHover(event: MouseEvent, element: MauiElement) {
 
     if (element.type === ElementType.Grid) {
-      const rect = (event.target as HTMLElement).getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      
-      const gridCell = this.layoutDesigner.getGridCellAtPosition(element, x, y, event.target as HTMLElement);
+      // The event bubbles, so event.target is whatever sits under the pointer -
+      // often a child element, whose rect would put the pointer in the wrong
+      // cell. The grid's own element is the only correct frame of reference.
+      const container = element.domElement ?? (event.currentTarget as HTMLElement | null);
+      if (!container) {
+        return;
+      }
+
+      const rect = container.getBoundingClientRect();
+      const zoom = this.viewport.zoom || 1;
+      const x = (event.clientX - rect.left) / zoom;
+      const y = (event.clientY - rect.top) / zoom;
+
+      const gridCell = this.layoutDesigner.getGridCellAtPosition(element, x, y, container);
       if (gridCell) {
         this.highlightedGridCell = { element, row: gridCell.row, column: gridCell.column };
       }

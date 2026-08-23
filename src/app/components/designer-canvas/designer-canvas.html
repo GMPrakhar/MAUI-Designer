@@ -103,7 +103,7 @@
     (cdkDragMoved)="onDragMoved(element, $event)"
     (cdkDragEnded)="onDragEnded(element, $event)"
     (click)="onElementClick(element, $event)"
-    (mouseover)="onLayoutHover($event, element)"
+    (mousemove)="onLayoutHover($event, element)"
     (mouseleave)="onLayoutHoverExit(element)"
     [cdkDragData]="element">
 
@@ -243,6 +243,8 @@
            [cdkDropListData]="element.children"
            (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
            (mouseenter)="setElementRef(element, layoutDiv)"
+           (mousemove)="onLayoutHover($event, element)"
+           (mouseleave)="onLayoutHoverExit(element)"
            [style.grid-template-columns]="getGridTemplateColumns(element)"
            [style.grid-template-rows]="getGridTemplateRows(element)">
         <!-- Grid visualization -->
@@ -254,9 +256,7 @@
                class="grid-cell"
                [class.highlight-cell]="isHighlightedCell(element, i)"
                [style.grid-row]="getGridRowPosition(i, element)"
-               [style.grid-column]="getGridColumnPosition(i, element)"
-               (mousemove)="onLayoutHover($event, element)"
-               (mouseleave)="onLayoutHoverExit(element)">
+               [style.grid-column]="getGridColumnPosition(i, element)">
           </div>
         </div>
         
