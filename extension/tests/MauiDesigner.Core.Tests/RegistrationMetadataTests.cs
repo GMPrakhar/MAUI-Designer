@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
 using Xunit;
@@ -282,6 +283,38 @@ namespace MauiDesigner.Core.Tests
             // the extension at all -- the exact bug this range already had once.
             Assert.True(Covers(ranges[0], new Version(17, 0)), $"{ranges[0]} excludes Visual Studio 2022.");
             Assert.True(Covers(ranges[0], new Version(18, 8)), $"{ranges[0]} excludes Visual Studio 2026.");
+        }
+
+        [Fact]
+        public void The_manifest_and_the_assembly_agree_on_the_version()
+        {
+            var manifestPath = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix", "source.extension.vsixmanifest");
+            var manifest = XDocument.Load(manifestPath);
+            XNamespace ns = "http://schemas.microsoft.com/developer/vsx-schema/2011";
+
+            var manifestVersion = Version.Parse(
+                manifest.Root!.Element(ns + "Metadata")!.Element(ns + "Identity")!.Attribute("Version")!.Value);
+
+            var assemblyInfo = File.ReadAllText(
+                Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix", "Properties", "AssemblyInfo.cs"));
+
+            // Visual Studio decides whether a VSIX is an upgrade purely from the
+            // manifest version. Shipping a fix without bumping it leaves everyone
+            // who already installed the extension stuck on the broken build, and
+            // nothing fails loudly when that happens -- the install is simply
+            // refused as "already installed".
+            foreach (var attribute in new[] { "AssemblyVersion", "AssemblyFileVersion" })
+            {
+                var match = Regex.Match(assemblyInfo, $@"{attribute}\(""([^""]+)""\)");
+                Assert.True(match.Success, $"AssemblyInfo.cs is missing [assembly: {attribute}].");
+
+                var declared = Version.Parse(match.Groups[1].Value);
+                Assert.True(
+                    declared.Major == manifestVersion.Major
+                        && declared.Minor == manifestVersion.Minor
+                        && declared.Build == manifestVersion.Build,
+                    $"{attribute} is {declared} but the manifest ships {manifestVersion}.");
+            }
         }
 
         private static bool Covers(string range, Version version)
