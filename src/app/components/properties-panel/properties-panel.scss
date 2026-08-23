@@ -222,3 +222,20 @@
     background: #f3f4f6;
   }
 }
+
+/* Accessibility */
+.contrast-readout {
+  margin: 4px 0 0;
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.accessibility-issue {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+  border-left: 3px solid #d97706;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 11px;
+  line-height: 1.4;
+}

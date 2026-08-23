@@ -33,6 +33,7 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **Smart Guides**: Live guides when a dragged element lines up with a sibling or the page edges/centre
 - **Rulers**: Optional horizontal and vertical rulers around the design surface
 - **Theming**: Per-property light/dark colours emitted as `AppThemeBinding`, previewed against the toolbar theme
+- **Accessibility**: `SemanticProperties` editing plus live WCAG AA contrast checking
 - **Z-Order**: Bring to front, send to back and single-step restacking (`Ctrl+]` / `Ctrl+[`, add `Shift` to jump to either end)
 
 ### Clipboard, Templates & Starter Pages

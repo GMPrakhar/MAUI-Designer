@@ -18,7 +18,10 @@ const RESERVED_ATTRIBUTES = new Set([
   'margin',
   'padding',
   'isvisible',
-  'isenabled'
+  'isenabled',
+  'semanticproperties.description',
+  'semanticproperties.hint',
+  'semanticproperties.headinglevel'
 ]);
 
 @Injectable({
@@ -596,9 +599,17 @@ export class XamlParserService {
 
     const fontSize = xmlElement.getAttribute('FontSize');
     if (fontSize) properties.fontSize = parseFloat(fontSize);
-
     const fontFamily = xmlElement.getAttribute('FontFamily');
     if (fontFamily) properties.fontFamily = fontFamily;
+
+    const semanticDescription = literal('SemanticProperties.Description');
+    if (semanticDescription) properties.semanticDescription = semanticDescription;
+
+    const semanticHint = literal('SemanticProperties.Hint');
+    if (semanticHint) properties.semanticHint = semanticHint;
+
+    const semanticHeadingLevel = literal('SemanticProperties.HeadingLevel');
+    if (semanticHeadingLevel) properties.semanticHeadingLevel = semanticHeadingLevel;
 
     const fontAttributes = xmlElement.getAttribute('FontAttributes');
     if (fontAttributes) properties.fontAttributes = fontAttributes as any;

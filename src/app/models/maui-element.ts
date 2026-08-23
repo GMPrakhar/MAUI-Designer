@@ -110,6 +110,13 @@ export interface ElementProperties {
   isVisible?: boolean;
   isEnabled?: boolean;
 
+  /** MAUI SemanticProperties.Description -- what a screen reader announces. */
+  semanticDescription?: string;
+  /** MAUI SemanticProperties.Hint -- extra context about what the control does. */
+  semanticHint?: string;
+  /** MAUI SemanticProperties.HeadingLevel, e.g. `Level1`. */
+  semanticHeadingLevel?: string;
+
   /**
    * Data bindings keyed by MAUI property name, e.g. `{ Text: 'UserName' }`
    * is generated as Text="{Binding UserName}".
