@@ -115,6 +115,19 @@ export interface ElementProperties {
    * is generated as Text="{Binding UserName}".
    */
   bindings?: Record<string, string>;
+
+  /**
+   * Per-theme colour overrides keyed by MAUI property name, e.g.
+   * `{ BackgroundColor: { light: '#FFFFFF', dark: '#1E1E1E' } }` is generated as
+   * BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}".
+   */
+  appTheme?: Record<string, AppThemeColor>;
+}
+
+/** Light and dark values for a single colour property. */
+export interface AppThemeColor {
+  light?: string;
+  dark?: string;
 }
 
 /** Properties that can be bound to a view model, per element type. */

@@ -228,6 +228,57 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
     this.elementService.updateElementProperties(element, { bindings });
   }
 
+  // --- Theming (AppThemeBinding) -----------------------------------------------
+
+  /**
+   * The colour properties worth theming for this element. Derived from the
+   * element type rather than a fixed list because `Stroke` means the border of
+   * a Border but the outline of a Path, and only one applies at a time.
+   */
+  themeableColors(element: MauiElement): { name: string; label: string; fallback: string }[] {
+    const colors = [{ name: 'BackgroundColor', label: 'Background', fallback: '#ffffff' }];
+
+    if (element.properties.text !== undefined) {
+      colors.push({ name: 'TextColor', label: 'Text', fallback: '#000000' });
+    }
+    if (element.type === ElementType.Path) {
+      colors.push({ name: 'Fill', label: 'Fill', fallback: '#000000' });
+      colors.push({ name: 'Stroke', label: 'Stroke', fallback: '#000000' });
+    } else if (element.type === ElementType.Border) {
+      colors.push({ name: 'Stroke', label: 'Border', fallback: '#cccccc' });
+    }
+
+    return colors;
+  }
+
+  themeColor(element: MauiElement, property: string, mode: 'light' | 'dark'): string {
+    return element.properties.appTheme?.[property]?.[mode] || '';
+  }
+
+  hasThemeColor(element: MauiElement, property: string): boolean {
+    const theme = element.properties.appTheme?.[property];
+    return !!(theme?.light || theme?.dark);
+  }
+
+  updateThemeColor(element: MauiElement, property: string, mode: 'light' | 'dark', value: string) {
+    const appTheme = { ...(element.properties.appTheme || {}) };
+    const entry = { ...(appTheme[property] || {}), [mode]: value };
+
+    if (!entry.light && !entry.dark) {
+      delete appTheme[property];
+    } else {
+      appTheme[property] = entry;
+    }
+
+    this.elementService.updateElementProperties(element, { appTheme });
+  }
+
+  clearThemeColor(element: MauiElement, property: string) {
+    const appTheme = { ...(element.properties.appTheme || {}) };
+    delete appTheme[property];
+    this.elementService.updateElementProperties(element, { appTheme });
+  }
+
   isStackLayout(element: MauiElement): boolean {
     return element.type === ElementType.StackLayout || element.type === ElementType.VerticalStackLayout;
   }

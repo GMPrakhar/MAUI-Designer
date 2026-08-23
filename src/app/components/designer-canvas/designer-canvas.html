@@ -199,8 +199,8 @@
            preserveAspectRatio="xMidYMid meet"
            aria-label="Icon path preview">
         <path [attr.d]="element.properties.pathData"
-              [attr.fill]="element.properties.fillColor || 'transparent'"
-              [attr.stroke]="element.properties.strokeColor || 'transparent'"
+              [attr.fill]="themedColor(element, 'Fill', element.properties.fillColor) || 'transparent'"
+              [attr.stroke]="themedColor(element, 'Stroke', element.properties.strokeColor) || 'transparent'"
               [attr.stroke-width]="element.properties.strokeThickness || 0"></path>
       </svg>
        
@@ -296,7 +296,7 @@
            [cdkDropListData]="element.children"
            (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
            (mouseenter)="setElementRef(element, layoutDiv)"
-           [style.border-color]="element.properties.borderColor || '#cccccc'"
+           [style.border-color]="themedColor(element, 'Stroke', element.properties.borderColor) || '#cccccc'"
            [style.border-width.px]="element.properties.borderWidth || 1"
            [style.border-radius.px]="element.properties.cornerRadius || 0">
         <ng-container *ngFor="let child of element.children">

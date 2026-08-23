@@ -538,12 +538,14 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
       transform: `translate3d(${props.x}px, ${props.y}px, 0px)`
     };
 
-    if (props.backgroundColor) {
-      styles.backgroundColor = props.backgroundColor;
+    const background = this.themedColor(element, 'BackgroundColor', props.backgroundColor);
+    if (background) {
+      styles.backgroundColor = background;
     }
 
-    if (props.textColor) {
-      styles.color = props.textColor;
+    const text = this.themedColor(element, 'TextColor', props.textColor);
+    if (text) {
+      styles.color = text;
     }
 
     if (props.fontSize) {
@@ -561,6 +563,20 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     }
 
     return styles;
+  }
+
+  /**
+   * The colour to paint for a property, honouring any AppThemeBinding against
+   * the current preview theme. Falls back to the literal designer value, so a
+   * property with only a light override still renders in dark mode.
+   */
+  themedColor(element: MauiElement, property: string, fallback?: string): string | undefined {
+    const theme = element.properties.appTheme?.[property];
+    if (!theme) {
+      return fallback;
+    }
+    const preferred = this.viewport.theme === 'dark' ? theme.dark : theme.light;
+    return preferred || theme.light || theme.dark || fallback;
   }
 
   isLayoutElement(element: MauiElement): boolean {

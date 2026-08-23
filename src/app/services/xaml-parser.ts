@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA, AppThemeColor } from '../models/maui-element';
 import { CustomControlRegistryService } from './custom-control-registry';
 
 /** Attributes the designer models itself, so they never end up in rawAttributes. */
@@ -500,6 +500,26 @@ export class XamlParserService {
       return value === null || this.isBindingExpression(value) ? null : value;
     };
 
+    /**
+     * Reads a colour attribute, unpacking `{AppThemeBinding Light=..., Dark=...}`
+     * into `appTheme` and returning the value the canvas should paint with. The
+     * light value is the fallback so a design opened in light mode looks right.
+     */
+    const color = (name: string): string | null => {
+      const value = xmlElement.getAttribute(name);
+      if (value === null || this.isBindingExpression(value)) {
+        return null;
+      }
+
+      const theme = XamlParserService.parseAppThemeBinding(value);
+      if (!theme) {
+        return value;
+      }
+
+      properties.appTheme = { ...(properties.appTheme || {}), [name]: theme };
+      return theme.light ?? theme.dark ?? null;
+    };
+
     // Parse basic properties
     const text = literal('Text');
     if (text) properties.text = text;
@@ -544,7 +564,7 @@ export class XamlParserService {
     }
 
     if (elementType === ElementType.Border) {
-      const borderColor = literal('Stroke');
+      const borderColor = color('Stroke');
       if (borderColor) properties.borderColor = borderColor;
       const borderWidth = literal('StrokeThickness');
       if (borderWidth) properties.borderWidth = parseFloat(borderWidth);
@@ -553,10 +573,10 @@ export class XamlParserService {
     const pathData = xmlElement.getAttribute('Data');
     if (pathData) properties.pathData = pathData;
 
-    const fill = xmlElement.getAttribute('Fill');
+    const fill = color('Fill');
     if (fill) properties.fillColor = fill;
 
-    const stroke = xmlElement.getAttribute('Stroke');
+    const stroke = color('Stroke');
     if (stroke) properties.strokeColor = stroke;
 
     const strokeThickness = xmlElement.getAttribute('StrokeThickness');
@@ -568,10 +588,10 @@ export class XamlParserService {
     const heightRequest = xmlElement.getAttribute('HeightRequest');
     if (heightRequest) properties.height = parseFloat(heightRequest);
 
-    const backgroundColor = xmlElement.getAttribute('BackgroundColor');
+    const backgroundColor = color('BackgroundColor');
     if (backgroundColor) properties.backgroundColor = backgroundColor;
 
-    const textColor = xmlElement.getAttribute('TextColor');
+    const textColor = color('TextColor');
     if (textColor) properties.textColor = textColor;
 
     const fontSize = xmlElement.getAttribute('FontSize');
@@ -668,6 +688,35 @@ export class XamlParserService {
       bindings[attribute.name] = path.replace(/^Path\s*=\s*/i, '');
     }
     return bindings;
+  }
+
+  /**
+   * Reads `{AppThemeBinding Light=#FFF, Dark=#333}`. Returns null for anything
+   * that is not an AppThemeBinding so callers can fall back to a plain value.
+   * MAUI also allows a bare `Default=`, which is treated as the light value.
+   */
+  static parseAppThemeBinding(value: string): AppThemeColor | null {
+    if (!/^\s*\{\s*AppThemeBinding\b/i.test(value)) {
+      return null;
+    }
+
+    const body = value.trim().replace(/^\{\s*AppThemeBinding\s*/i, '').replace(/\}\s*$/, '');
+    const theme: AppThemeColor = {};
+
+    for (const part of body.split(',')) {
+      const match = /^\s*(Light|Dark|Default)\s*=\s*(.+?)\s*$/i.exec(part);
+      if (!match) {
+        continue;
+      }
+      const key = match[1].toLowerCase();
+      if (key === 'dark') {
+        theme.dark = match[2];
+      } else if (!theme.light) {
+        theme.light = match[2];
+      }
+    }
+
+    return theme.light || theme.dark ? theme : null;
   }
 
   private parseThickness(value: string): Thickness {
