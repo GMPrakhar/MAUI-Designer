@@ -135,6 +135,7 @@ ${xamlContent}
     const props = element.properties;
     const attributes: string[] = [];
     const bindings = props.bindings || {};
+    const appTheme = props.appTheme || {};
 
     /** A bound property wins over the literal designer value. */
     const push = (name: string, value: string | number | undefined) => {
@@ -144,6 +145,25 @@ ${xamlContent}
       if (value !== undefined && value !== null && value !== '') {
         attributes.push(`${name}="${value}"`);
       }
+    };
+
+    /**
+     * Colours may carry per-theme values. Routing them through here rather than
+     * pushing directly also makes them honour bindings: attributes are
+     * de-duplicated first-writer-wins and the binding loop runs last, so a
+     * literal written directly would silently shadow the binding.
+     */
+    const pushColor = (name: string, value: string | undefined) => {
+      const theme = appTheme[name];
+      if (theme && (theme.light || theme.dark)) {
+        const parts = [
+          theme.light ? `Light=${theme.light}` : '',
+          theme.dark ? `Dark=${theme.dark}` : ''
+        ].filter(Boolean);
+        push(name, `{AppThemeBinding ${parts.join(', ')}}`);
+        return;
+      }
+      push(name, value === undefined ? undefined : this.escapeXml(value));
     };
     
     // Add name attribute
@@ -241,10 +261,10 @@ ${xamlContent}
         attributes.push(`Data="${this.escapeXml(props.pathData)}"`);
       }
       if (props.fillColor) {
-        attributes.push(`Fill="${this.escapeXml(props.fillColor)}"`);
+        pushColor('Fill', props.fillColor);
       }
       if (props.strokeColor) {
-        attributes.push(`Stroke="${this.escapeXml(props.strokeColor)}"`);
+        pushColor('Stroke', props.strokeColor);
       }
       if (props.strokeThickness !== undefined) {
         attributes.push(`StrokeThickness="${props.strokeThickness}"`);
@@ -252,11 +272,11 @@ ${xamlContent}
     }
     
     // Colors
-    if (props.backgroundColor) {
-      attributes.push(`BackgroundColor="${props.backgroundColor}"`);
+    if (props.backgroundColor || appTheme['BackgroundColor']) {
+      pushColor('BackgroundColor', props.backgroundColor);
     }
-    if (props.textColor) {
-      attributes.push(`TextColor="${props.textColor}"`);
+    if (props.textColor || appTheme['TextColor']) {
+      pushColor('TextColor', props.textColor);
     }
     
     // Font attributes

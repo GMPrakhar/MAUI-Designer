@@ -32,6 +32,7 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **Snap to Grid**: Configurable grid size with snapping while dragging
 - **Smart Guides**: Live guides when a dragged element lines up with a sibling or the page edges/centre
 - **Rulers**: Optional horizontal and vertical rulers around the design surface
+- **Theming**: Per-property light/dark colours emitted as `AppThemeBinding`, previewed against the toolbar theme
 - **Z-Order**: Bring to front, send to back and single-step restacking (`Ctrl+]` / `Ctrl+[`, add `Shift` to jump to either end)
 
 ### Clipboard, Templates & Starter Pages

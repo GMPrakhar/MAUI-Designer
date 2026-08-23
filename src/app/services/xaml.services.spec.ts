@@ -127,4 +127,92 @@ describe('XAML Services', () => {
       expect(icon.properties.strokeThickness).toBe(1.5);
     });
   });
+
+  describe('AppThemeBinding', () => {
+    /** Builds a single-child page and returns the generated XAML. */
+    function generate(properties: Record<string, unknown>, type = ElementType.Label) {
+      const root = elementService.getRootElement();
+      const element = elementService.createElement(type, properties as any);
+      elementService.addElement(element, root);
+      return xamlGenerator.generateXaml(root);
+    }
+
+    it('emits a light and dark pair as an AppThemeBinding', () => {
+      const xaml = generate({
+        text: 'Hi',
+        textColor: '#112233',
+        appTheme: { TextColor: { light: '#FFFFFF', dark: '#333333' } }
+      });
+
+      expect(xaml).toContain('TextColor="{AppThemeBinding Light=#FFFFFF, Dark=#333333}"');
+      // The literal must not also be written, or the first one would win.
+      expect(xaml).not.toContain('TextColor="#112233"');
+    });
+
+    it('emits only the half that is set', () => {
+      expect(generate({ appTheme: { BackgroundColor: { light: '#ABCDEF' } } }))
+        .toContain('BackgroundColor="{AppThemeBinding Light=#ABCDEF}"');
+
+      elementService.clearDesign();
+
+      expect(generate({ appTheme: { BackgroundColor: { dark: '#101010' } } }))
+        .toContain('BackgroundColor="{AppThemeBinding Dark=#101010}"');
+    });
+
+    it('lets a data binding win over both the literal and the theme colour', () => {
+      const xaml = generate({
+        text: 'Hi',
+        textColor: '#112233',
+        bindings: { TextColor: 'Accent' },
+        appTheme: { TextColor: { light: '#FFFFFF' } }
+      });
+
+      // Regression guard: colours used to be written directly instead of going
+      // through the binding-aware push, and attributes are de-duplicated
+      // first-writer-wins, so the literal silently shadowed the binding.
+      expect(xaml).toContain('TextColor="{Binding Accent}"');
+      expect(xaml).not.toContain('TextColor="#112233"');
+      expect(xaml).not.toContain('AppThemeBinding');
+    });
+
+    it('parses an AppThemeBinding back into light and dark values', () => {
+      const page = `<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+  <AbsoluteLayout>
+    <Label x:Name="L1" Text="Hi" TextColor="{AppThemeBinding Light=#FFFFFF, Dark=#333333}" />
+  </AbsoluteLayout>
+</ContentPage>`;
+
+      const label = xamlParser.parseXaml(page).children[0];
+
+      expect(label.properties.appTheme?.['TextColor']).toEqual({ light: '#FFFFFF', dark: '#333333' });
+      // The canvas needs something concrete to paint; light is the fallback.
+      expect(label.properties.textColor).toBe('#FFFFFF');
+    });
+
+    it('round trips an AppThemeBinding without losing either value', () => {
+      const page = `<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+  <AbsoluteLayout>
+    <Label x:Name="L1" Text="Hi" BackgroundColor="{AppThemeBinding Light=#EEEEEE, Dark=#111111}" />
+  </AbsoluteLayout>
+</ContentPage>`;
+
+      const regenerated = xamlGenerator.generateXaml(xamlParser.parseXaml(page));
+
+      expect(regenerated).toContain('BackgroundColor="{AppThemeBinding Light=#EEEEEE, Dark=#111111}"');
+    });
+
+    it('treats Default as the light value', () => {
+      expect(XamlParserService.parseAppThemeBinding('{AppThemeBinding Default=#AAAAAA, Dark=#000000}'))
+        .toEqual({ light: '#AAAAAA', dark: '#000000' });
+    });
+
+    it('ignores anything that is not an AppThemeBinding', () => {
+      expect(XamlParserService.parseAppThemeBinding('#FFFFFF')).toBeNull();
+      expect(XamlParserService.parseAppThemeBinding('{Binding Accent}')).toBeNull();
+    });
+  });
 });

@@ -155,6 +155,41 @@
       </div>
     </div>
 
+    <!-- Theming: per-property light/dark colours emitted as AppThemeBinding -->
+    <div class="property-section">
+      <h4 class="section-header">Theming</h4>
+      <p class="section-hint">Set a light and dark colour to emit an AppThemeBinding. The canvas previews whichever matches the toolbar theme.</p>
+
+      <div class="property-group theme-row" *ngFor="let color of themeableColors(element)"
+           [attr.data-testid]="'theme-row-' + color.name">
+        <label class="property-label">{{ color.label }}</label>
+        <div class="theme-swatches">
+          <label class="theme-swatch">
+            <span class="theme-swatch-label">Light</span>
+            <input type="color"
+                   class="property-input color-input"
+                   [attr.data-testid]="'theme-light-' + color.name"
+                   [value]="themeColor(element, color.name, 'light') || color.fallback"
+                   (input)="updateThemeColor(element, color.name, 'light', $any($event.target).value)">
+          </label>
+          <label class="theme-swatch">
+            <span class="theme-swatch-label">Dark</span>
+            <input type="color"
+                   class="property-input color-input"
+                   [attr.data-testid]="'theme-dark-' + color.name"
+                   [value]="themeColor(element, color.name, 'dark') || color.fallback"
+                   (input)="updateThemeColor(element, color.name, 'dark', $any($event.target).value)">
+          </label>
+          <button type="button"
+                  class="theme-clear"
+                  title="Remove the theme binding"
+                  [attr.data-testid]="'theme-clear-' + color.name"
+                  [disabled]="!hasThemeColor(element, color.name)"
+                  (click)="clearThemeColor(element, color.name)">Clear</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Text Properties -->
     <div class="property-section" *ngIf="element.properties.text !== undefined">
       <h4 class="section-header">Text</h4>
