@@ -282,7 +282,9 @@
       right: 0;
       bottom: 0;
       display: grid;
-      gap: 1px;
+      // No gap: this overlay has to line up exactly with .element-grid, which
+      // has none. A gap here shifts every track and the highlight then sits
+      // beside the cell a child would actually drop into.
       pointer-events: none;
       z-index: 1;
 
@@ -293,11 +295,6 @@
         min-width: 0;
         min-height: 0;
         
-        &:hover {
-          background: rgba(66, 153, 225, 0.1);
-          border-color: rgba(66, 153, 225, 0.4);
-        }
-
         &.highlight-cell {
           background: rgba(66, 153, 225, 0.2);
           border-color: rgba(66, 153, 225, 0.6);
@@ -561,8 +558,11 @@
     border: 1px dashed rgba(66, 153, 225, 0.3);
     transition: all 0.2s ease;
 
-    &:hover {
-      background-color: rgba(66, 153, 225, 0.1);
+    // The overlay takes no pointer events, so the hovered cell is decided in
+    // code from the pointer position and flagged with .highlight-cell. A CSS
+    // :hover here would never match.
+    &.highlight-cell {
+      background-color: rgba(66, 153, 225, 0.2);
       border-color: rgba(66, 153, 225, 0.6);
     }
   }

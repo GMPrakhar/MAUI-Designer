@@ -182,12 +182,37 @@ export class XamlParserService {
       }
     }
 
+    // MAUI also accepts a comma separated shorthand - RowDefinitions="Auto,*".
+    // It is the form most real XAML uses, and ignoring it silently produced a
+    // default 2x2 grid, so an imported layout came back with the wrong shape.
+    if (!rows.length) {
+      rows.push(...this.parseGridLengthList(gridXmlElement.getAttribute('RowDefinitions'))
+        .map(height => ({ height })));
+    }
+
+    if (!columns.length) {
+      columns.push(...this.parseGridLengthList(gridXmlElement.getAttribute('ColumnDefinitions'))
+        .map(width => ({ width })));
+    }
+
     const defaultLength = (): GridLength => ({ value: 1, type: GridLengthType.Star });
 
     return {
       rows: rows.length ? rows : [{ height: defaultLength() }, { height: defaultLength() }],
       columns: columns.length ? columns : [{ width: defaultLength() }, { width: defaultLength() }]
     };
+  }
+
+  private parseGridLengthList(value: string | null): GridLength[] {
+    if (!value) {
+      return [];
+    }
+
+    return value
+      .split(',')
+      .map(part => part.trim())
+      .filter(part => part.length > 0)
+      .map(part => this.parseGridLength(part));
   }
 
   private parseGridLength(value: string | null): GridLength {

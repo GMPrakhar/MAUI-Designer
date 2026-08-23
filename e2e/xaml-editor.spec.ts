@@ -93,8 +93,27 @@ test.describe('XAML editor', () => {
     expect(xaml).toContain('Grid.Column="2"');
   });
 
-  test('downloads the XAML file', async ({ page }) => {
-    await designer.addControl('Label');
+  test('reads the comma separated grid definition shorthand', async () => {
+    // MAUI accepts RowDefinitions="Auto,2*" as shorthand for the property
+    // element form. It used to be ignored, so a grid written this way - which
+    // is how most real XAML writes it - imported as a default 2x2.
+    await designer.applyXaml(`<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+    <Grid x:Name="Layout" WidthRequest="400" HeightRequest="300"
+          RowDefinitions="Auto,2*" ColumnDefinitions="80,*,*">
+        <Label x:Name="Cell" Text="Cell" Grid.Row="1" Grid.Column="2" />
+    </Grid>
+</ContentPage>`);
+
+    const xaml = await designer.xamlWhen(value => value.includes('<RowDefinition '));
+    expect(xaml).toContain('<RowDefinition Height="Auto" />');
+    expect(xaml).toContain('<RowDefinition Height="2*" />');
+    expect(xaml).toContain('<ColumnDefinition Width="80" />');
+    expect((xaml.match(/<ColumnDefinition /g) || []).length).toBe(3);
+    expect((xaml.match(/<RowDefinition /g) || []).length).toBe(2);
+  });
+
+  test('downloads the XAML file', async ({ page }) => {    await designer.addControl('Label');
     const downloadPromise = page.waitForEvent('download');
     await page.getByTestId('xaml-download').click();
     const download = await downloadPromise;
