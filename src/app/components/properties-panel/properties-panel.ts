@@ -17,6 +17,7 @@ import { Observable, Subscription } from 'rxjs';
 import { AlignmentService, AlignMode } from '../../services/alignment';
 import { CustomControlRegistryService } from '../../services/custom-control-registry';
 import { CustomControlDefinition, CustomPropertyDefinition } from '../../models/custom-control';
+import { AccessibilityService, AccessibilityIssue } from '../../services/accessibility';
 
 @Component({
   selector: 'app-properties-panel',
@@ -37,7 +38,8 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
   constructor(
     private elementService: ElementService,
     private alignmentService: AlignmentService,
-    private registry: CustomControlRegistryService
+    private registry: CustomControlRegistryService,
+    private accessibilityService: AccessibilityService
   ) {
     this.selectedElement$ = this.elementService.selectedElement$;
   }
@@ -277,6 +279,19 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
     const appTheme = { ...(element.properties.appTheme || {}) };
     delete appTheme[property];
     this.elementService.updateElementProperties(element, { appTheme });
+  }
+
+  // --- Accessibility -----------------------------------------------------------
+
+  readonly headingLevels = ['', 'Level1', 'Level2', 'Level3', 'Level4', 'Level5', 'Level6', 'Level7', 'Level8', 'Level9'];
+
+  accessibilityIssues(element: MauiElement): AccessibilityIssue[] {
+    return this.accessibilityService.inspect(element);
+  }
+
+  /** The measured contrast, shown so the user can see how close to the line they are. */
+  contrastRatio(element: MauiElement): number | null {
+    return this.accessibilityService.contrastOf(element);
   }
 
   isStackLayout(element: MauiElement): boolean {

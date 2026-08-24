@@ -311,6 +311,18 @@ ${xamlContent}
     if (props.isEnabled === false) {
       push('IsEnabled', 'False');
     }
+
+    // Accessibility. These are attached properties, so they read as
+    // SemanticProperties.X rather than plain attributes.
+    if (props.semanticDescription) {
+      push('SemanticProperties.Description', this.escapeXml(props.semanticDescription));
+    }
+    if (props.semanticHint) {
+      push('SemanticProperties.Hint', this.escapeXml(props.semanticHint));
+    }
+    if (props.semanticHeadingLevel) {
+      push('SemanticProperties.HeadingLevel', this.escapeXml(props.semanticHeadingLevel));
+    }
     
     // Layout specific attributes
     if (element.type === ElementType.StackLayout) {

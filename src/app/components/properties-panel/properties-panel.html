@@ -471,6 +471,54 @@
       </div>
     </div>
 
+    <!-- Accessibility -->
+    <div class="property-section" data-testid="accessibility-section">
+      <h4 class="section-header">Accessibility</h4>
+
+      <div class="property-group">
+        <label class="property-label">Description</label>
+        <input
+          type="text"
+          class="property-input"
+          data-testid="prop-semanticDescription"
+          placeholder="What a screen reader announces"
+          [value]="element.properties.semanticDescription || ''"
+          (input)="updateProperty(element, 'semanticDescription', $any($event.target).value)">
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Hint</label>
+        <input
+          type="text"
+          class="property-input"
+          data-testid="prop-semanticHint"
+          placeholder="What happens when it is used"
+          [value]="element.properties.semanticHint || ''"
+          (input)="updateProperty(element, 'semanticHint', $any($event.target).value)">
+      </div>
+
+      <div class="property-group">
+        <label class="property-label">Heading Level</label>
+        <select
+          class="property-input"
+          data-testid="prop-semanticHeadingLevel"
+          [value]="element.properties.semanticHeadingLevel || ''"
+          (change)="updateProperty(element, 'semanticHeadingLevel', $any($event.target).value)">
+          <option *ngFor="let level of headingLevels" [value]="level">{{ level || 'None' }}</option>
+        </select>
+      </div>
+
+      <p class="contrast-readout" *ngIf="contrastRatio(element) as ratio" data-testid="contrast-ratio">
+        Contrast {{ ratio.toFixed(2) }}:1
+      </p>
+
+      <p class="accessibility-issue"
+         *ngFor="let issue of accessibilityIssues(element)"
+         [attr.data-testid]="'a11y-issue-' + issue.kind">
+        {{ issue.message }}
+      </p>
+    </div>
+
     <!-- Stack layout properties -->
     <div class="property-section" *ngIf="isStackLayout(element)">
       <h4 class="section-header">Layout</h4>
