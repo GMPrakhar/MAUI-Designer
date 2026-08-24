@@ -184,5 +184,22 @@ describe('ElementService', () => {
       service.addElement(second, service.getRootElement());
       expect(service.canReorderSelection()).toBe(true);
     });
+
+    it('reorders siblings with the CDK drop-list index convention', () => {
+      const labels = addLabels(3);
+      const root = service.getRootElement();
+
+      expect(service.reorderChild(root, 0, 2)).toBe(true);
+      expect(root.children.map(child => child.id)).toEqual([labels[1].id, labels[2].id, labels[0].id]);
+    });
+
+    it('moves a sibling one slot at a time', () => {
+      const labels = addLabels(2);
+      const root = service.getRootElement();
+
+      expect(service.moveSibling(labels[0], 1)).toBe(true);
+      expect(root.children.map(child => child.id)).toEqual([labels[1].id, labels[0].id]);
+      expect(service.moveSibling(labels[0], 1)).toBe(false);
+    });
   });
 });

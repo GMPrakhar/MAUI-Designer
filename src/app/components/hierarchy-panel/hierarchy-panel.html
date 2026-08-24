@@ -1,5 +1,5 @@
 <div class="hierarchy-panel" data-testid="hierarchy-panel">
-  <div class="hierarchy-tree" *ngIf="rootElement$ | async as rootElement">
+  <div class="hierarchy-tree" cdkDropListGroup *ngIf="rootElement$ | async as rootElement">
     <ng-container *ngTemplateOutlet="hierarchyNode; context: { $implicit: rootElement, level: 0 }"></ng-container>
   </div>
   
@@ -12,31 +12,61 @@
 
 <!-- Template for recursive hierarchy node rendering -->
 <ng-template #hierarchyNode let-element let-level="level">
-  <div class="hierarchy-node" [style.padding-left.px]="level * 20">
-    <div 
-      class="node-content"
-      [class.selected]="isSelected(element)"
-      [attr.data-testid]="'hierarchy-node-' + element.id"
-      [attr.data-element-type]="element.type"
-      [attr.data-selected]="isSelected(element)"
-      (click)="onElementSelect(element)">
-      
-      <div class="node-icon">
-        <span class="material-icons">{{ getElementIcon(element) }}</span>
+  <div class="hierarchy-node"
+       [style.padding-left.px]="level * 20"
+       cdkDrag
+       [cdkDragData]="element"
+       [cdkDragDisabled]="element.id === 'root'">
+    <div class="node-row">
+      <div 
+        class="node-content"
+        cdkDragHandle
+        tabindex="0"
+        [class.selected]="isSelected(element)"
+        [attr.data-testid]="'hierarchy-node-' + element.id"
+        [attr.data-element-type]="element.type"
+        [attr.data-element-name]="element.name"
+        [attr.data-selected]="isSelected(element)"
+        (click)="onElementSelect(element)"
+        (keydown)="onNodeKeydown($event, element)">
+        
+        <div class="node-icon">
+          <span class="material-icons">{{ getElementIcon(element) }}</span>
+        </div>
+        
+        <div class="node-label">
+          {{ element.name }}
+        </div>
+        
+        <div class="node-type">
+          ({{ element.type }})
+        </div>
       </div>
-      
-      <div class="node-label">
-        {{ element.name }}
-      </div>
-      
-      <div class="node-type">
-        ({{ element.type }})
-      </div>
-      
+
       <div class="node-actions" *ngIf="element.id !== 'root'">
-        <button 
+        <button
+          type="button"
+          class="action-button"
+          [attr.data-testid]="'hierarchy-move-up-' + element.id"
+          (mousedown)="$event.stopPropagation()"
+          (click)="onMoveSibling(element, -1, $event)"
+          title="Move up">
+          <span class="material-icons">keyboard_arrow_up</span>
+        </button>
+        <button
+          type="button"
+          class="action-button"
+          [attr.data-testid]="'hierarchy-move-down-' + element.id"
+          (mousedown)="$event.stopPropagation()"
+          (click)="onMoveSibling(element, 1, $event)"
+          title="Move down">
+          <span class="material-icons">keyboard_arrow_down</span>
+        </button>
+        <button
+          type="button"
           class="action-button delete-button"
           [attr.data-testid]="'hierarchy-delete-' + element.id"
+          (mousedown)="$event.stopPropagation()"
           (click)="onElementDelete(element, $event)"
           title="Delete element">
           <span class="material-icons">delete</span>
@@ -44,8 +74,12 @@
       </div>
     </div>
     
-    <!-- Render children recursively -->
-    <div class="node-children" *ngIf="element.children?.length">
+    <div class="node-children"
+         cdkDropList
+         [cdkDropListData]="element"
+         [cdkDropListEnterPredicate]="canEnter"
+         [attr.data-testid]="'hierarchy-drop-' + element.id"
+         (cdkDropListDropped)="onDrop($event, element)">
       <ng-container *ngFor="let child of element.children">
         <ng-container *ngTemplateOutlet="hierarchyNode; context: { $implicit: child, level: level + 1 }"></ng-container>
       </ng-container>

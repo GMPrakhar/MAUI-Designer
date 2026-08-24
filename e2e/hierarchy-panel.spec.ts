@@ -54,8 +54,8 @@ test.describe('Hierarchy panel', () => {
     const gridNode = designer.hierarchy.locator('[data-element-type="Grid"]');
     const labelNode = designer.hierarchy.locator('[data-element-type="Label"]');
 
-    const gridPadding = await gridNode.locator('xpath=..').evaluate(node => getComputedStyle(node).paddingLeft);
-    const labelPadding = await labelNode.locator('xpath=..').evaluate(node => getComputedStyle(node).paddingLeft);
+    const gridPadding = await gridNode.locator('xpath=ancestor::*[contains(@class,"hierarchy-node")][1]').evaluate(node => getComputedStyle(node).paddingLeft);
+    const labelPadding = await labelNode.locator('xpath=ancestor::*[contains(@class,"hierarchy-node")][1]').evaluate(node => getComputedStyle(node).paddingLeft);
 
     expect(parseFloat(labelPadding)).toBeGreaterThan(parseFloat(gridPadding));
   });
