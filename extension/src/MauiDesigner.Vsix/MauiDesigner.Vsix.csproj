@@ -81,7 +81,7 @@
 
   <!--
     Visual Studio shows this before the user accepts the install, which is the
-    one moment the noncommercial terms are guaranteed to be seen. The manifest
+    one moment the GPL terms are guaranteed to be seen. The manifest
     names it LICENSE.txt, so the repository's LICENSE.md is copied under that
     name rather than duplicated in the tree, keeping one source of truth.
     A statically declared item is not enough: the VSSDK builds its file list
