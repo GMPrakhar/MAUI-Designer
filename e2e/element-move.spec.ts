@@ -33,7 +33,7 @@ test.describe('Moving elements on the canvas', () => {
   }
 
   async function drag(page: any, name: string, dx: number, dy: number) {
-    const element = page.locator(`[data-element-name="${name}"]`);
+    const element = page.getByTestId('designer-canvas').locator(`[data-element-name="${name}"]`);
     await expect(element).toBeVisible();
     await element.click({ position: { x: 6, y: 6 } });
     await expect(element).toHaveAttribute('data-selected', 'true');
@@ -115,7 +115,7 @@ test.describe('Moving elements on the canvas', () => {
   test('an element stays selected after it has been dragged', async ({ page }) => {
     await applyStarter(page, 'login');
 
-    const element = page.locator('[data-element-name="Busy"]');
+    const element = page.getByTestId('designer-canvas').locator('[data-element-name="Busy"]');
     await drag(page, 'Busy', 60, 40);
     await expect(element).toHaveAttribute('data-selected', 'true');
 
