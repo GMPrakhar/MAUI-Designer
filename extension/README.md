@@ -201,6 +201,6 @@ Studio install directory is read-only.
 
 ## Licence
 
-[PolyForm Noncommercial 1.0.0](../LICENSE.md), the same as the rest of the
-repository. The manifest points Visual Studio at it, so the terms are shown
-before the extension installs rather than buried in a file nobody opens.
+[GNU GPL v3](../LICENSE.md), the same as the rest of the repository. The
+manifest points Visual Studio at it, so the terms are shown before the
+extension installs rather than buried in a file nobody opens.

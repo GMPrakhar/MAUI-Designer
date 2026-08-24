@@ -1,7 +1,7 @@
 {
   "name": "angular-designer",
   "version": "0.0.0",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "GPL-3.0-only",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
