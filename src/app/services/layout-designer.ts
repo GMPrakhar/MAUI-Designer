@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType } from '../models/maui-element';
+import { MauiElement, ElementType, GridDefinition, GridLength, GridLengthType, LayoutOptions } from '../models/maui-element';
 
 export interface LayoutInfo {
   canHaveChildren: boolean;
@@ -13,9 +13,9 @@ export interface LayoutInfo {
  *
  * Shared so hit-testing and sizing cannot disagree about the fallback.
  */
-export const DEFAULT_GRID_DEFINITION = {
-  rows: [{ height: { value: 1, type: 'Star' } }, { height: { value: 1, type: 'Star' } }],
-  columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
+export const DEFAULT_GRID_DEFINITION: GridDefinition = {
+  rows: [{ height: { value: 1, type: GridLengthType.Star } }, { height: { value: 1, type: GridLengthType.Star } }],
+  columns: [{ width: { value: 1, type: GridLengthType.Star } }, { width: { value: 1, type: GridLengthType.Star } }]
 };
 
 @Injectable({
@@ -366,5 +366,76 @@ export class LayoutDesignerService {
     });
 
     return sizes;
+  }
+
+  /**
+   * CSS `grid-template-*` value for one MAUI GridLength.
+   *
+   * Star tracks use `minmax(0, Nfr)` so a neighbouring Auto track can shrink
+   * them instead of every track pretending to be equal. Absolute is pixels.
+   * Auto is `auto` so the track sizes to the child's WidthRequest/HeightRequest.
+   */
+  trackCss(length: GridLength | undefined): string {
+    if (!length) {
+      return 'minmax(0, 1fr)';
+    }
+    switch (length.type) {
+      case GridLengthType.Auto:
+        return 'auto';
+      case GridLengthType.Absolute:
+        return `${Math.max(0, length.value || 0)}px`;
+      case GridLengthType.Star:
+      default:
+        return `minmax(0, ${length.value || 1}fr)`;
+    }
+  }
+
+  templateColumnsCss(grid: MauiElement): string {
+    const columns = (grid.properties.gridDefinition || DEFAULT_GRID_DEFINITION).columns;
+    return columns.map(column => this.trackCss(column.width)).join(' ') || 'minmax(0, 1fr)';
+  }
+
+  templateRowsCss(grid: MauiElement): string {
+    const rows = (grid.properties.gridDefinition || DEFAULT_GRID_DEFINITION).rows;
+    return rows.map(row => this.trackCss(row.height)).join(' ') || 'minmax(0, 1fr)';
+  }
+
+  /**
+   * CSS grid-row / grid-column placement, 1-based, honouring span.
+   * Missing coordinates are treated as 0 so imported XAML without Grid.Row
+   * still occupies the first cell instead of `NaN`.
+   */
+  childPlacement(child: MauiElement): { row: string; column: string } {
+    const definition = child.parent?.properties.gridDefinition || DEFAULT_GRID_DEFINITION;
+    const rowStart = Math.max(0, child.properties.row || 0);
+    const columnStart = Math.max(0, child.properties.column || 0);
+    const rowSpan = this.clampSpan(child.properties.rowSpan || 1, definition.rows.length - rowStart);
+    const columnSpan = this.clampSpan(child.properties.columnSpan || 1, definition.columns.length - columnStart);
+    return {
+      row: `${rowStart + 1} / span ${rowSpan}`,
+      column: `${columnStart + 1} / span ${columnSpan}`
+    };
+  }
+
+  private clampSpan(span: number, remaining: number): number {
+    if (!Number.isFinite(span) || span < 1) {
+      return 1;
+    }
+    return Math.max(1, Math.min(Math.floor(span), Math.max(1, remaining)));
+  }
+
+  /** Maps MAUI LayoutOptions onto CSS justify-self / align-self. */
+  selfAlignment(option: LayoutOptions | undefined): string {
+    switch (option) {
+      case 'Start':
+        return 'start';
+      case 'Center':
+        return 'center';
+      case 'End':
+        return 'end';
+      case 'Fill':
+      default:
+        return 'stretch';
+    }
   }
 }

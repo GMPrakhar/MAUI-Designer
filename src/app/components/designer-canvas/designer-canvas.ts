@@ -4,7 +4,7 @@ import { DragDropModule, CdkDropList, CdkDragDrop, CdkDragEnd, CdkDragMove } fro
 import { ElementService } from '../../services/element';
 import { DragDropService, TOOLBOX_DRAG_MIME } from '../../services/drag-drop';
 import { LayoutDesignerService } from '../../services/layout-designer';
-import { MauiElement, ElementType } from '../../models/maui-element';
+import { MauiElement, ElementType, LayoutOptions } from '../../models/maui-element';
 import { AlignmentService, AlignmentGuide } from '../../services/alignment';
 import { ClipboardService } from '../../services/clipboard';
 import { CustomControlRegistryService } from '../../services/custom-control-registry';
@@ -538,6 +538,36 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
       transform: `translate3d(${props.x}px, ${props.y}px, 0px)`
     };
 
+    // Grid children are placed by CSS grid, not by a translate. Stretching to
+    // the cell is what makes RowSpan/ColumnSpan visible; a leftover 100×30
+    // pixel box would sit in the first cell and look like span was ignored.
+    if (element.parent?.type === ElementType.Grid) {
+      styles.transform = 'none';
+      styles.width = this.fillsAxis(props.horizontalOptions) ? '100%' : (props.width || 0) + 'px';
+      styles.height = this.fillsAxis(props.verticalOptions) ? '100%' : (props.height || 0) + 'px';
+      styles.minWidth = (props.width || 0) + 'px';
+      styles.minHeight = (props.height || 0) + 'px';
+    } else if (this.isStackParent(element.parent)) {
+      styles.transform = 'none';
+      const vertical = element.parent!.type === ElementType.VerticalStackLayout
+        || element.parent!.properties.orientation !== 'Horizontal';
+      if (vertical) {
+        styles.alignSelf = this.layoutDesigner.selfAlignment(props.horizontalOptions);
+        if (!this.fillsAxis(props.horizontalOptions)) {
+          styles.width = (props.width || 0) + 'px';
+        } else {
+          styles.width = '100%';
+        }
+      } else {
+        styles.alignSelf = this.layoutDesigner.selfAlignment(props.verticalOptions);
+        if (!this.fillsAxis(props.verticalOptions)) {
+          styles.height = (props.height || 0) + 'px';
+        } else {
+          styles.height = '100%';
+        }
+      }
+    }
+
     const background = this.themedColor(element, 'BackgroundColor', props.backgroundColor);
     if (background) {
       styles.backgroundColor = background;
@@ -1051,23 +1081,38 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   }
 
   getGridTemplateColumns(element: MauiElement): string {
-    const gridDef = element.properties.gridDefinition;
-    if (!gridDef) return 'repeat(2, 1fr)'; // Default 2 equal columns
-    return gridDef.columns.map(col => 
-      col.width.type === 'Star' ? `${col.width.value}fr` : 
-      col.width.type === 'Auto' ? 'auto' : 
-      `${col.width.value}px`
-    ).join(' ');
+    return this.layoutDesigner.templateColumnsCss(element);
   }
 
   getGridTemplateRows(element: MauiElement): string {
-    const gridDef = element.properties.gridDefinition;
-    if (!gridDef) return 'repeat(2, 1fr)'; // Default 2 equal rows
-    return gridDef.rows.map(row => 
-      row.height.type === 'Star' ? `${row.height.value}fr` : 
-      row.height.type === 'Auto' ? 'auto' : 
-      `${row.height.value}px`
-    ).join(' ');
+    return this.layoutDesigner.templateRowsCss(element);
+  }
+
+  gridChildRow(child: MauiElement): string {
+    return this.layoutDesigner.childPlacement(child).row;
+  }
+
+  gridChildColumn(child: MauiElement): string {
+    return this.layoutDesigner.childPlacement(child).column;
+  }
+
+  gridChildJustify(child: MauiElement): string {
+    return this.layoutDesigner.selfAlignment(child.properties.horizontalOptions);
+  }
+
+  gridChildAlign(child: MauiElement): string {
+    return this.layoutDesigner.selfAlignment(child.properties.verticalOptions);
+  }
+
+  private fillsAxis(option: LayoutOptions | undefined): boolean {
+    return !option || option === 'Fill';
+  }
+
+  private isStackParent(parent?: MauiElement): boolean {
+    return !!parent && (
+      parent.type === ElementType.StackLayout ||
+      parent.type === ElementType.VerticalStackLayout
+    );
   }
 
   getGridRowPosition(index: number, element: MauiElement): string {

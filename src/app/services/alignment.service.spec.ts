@@ -62,25 +62,49 @@ describe('AlignmentService', () => {
     expect(a.properties.y! + 30).toBe(140);
   });
 
-  it('ignores single elements', () => {
+  it('aligns a single element to the matching edge of its parent', () => {
+    const root = elements.getRootElement();
+    elements.updateElementProperties(root, { width: 800, height: 600 });
     const a = add(ElementType.Label, 50, 10, 100, 30);
 
+    expect(service.canAlign([a])).toBeTrue();
     service.align([a], 'left');
+    expect(a.properties.x).toBe(0);
 
-    expect(a.properties.x).toBe(50);
-    expect(service.canAlign([a])).toBeFalse();
+    service.align([a], 'center');
+    expect(a.properties.x).toBe(350);
+
+    service.align([a], 'right');
+    expect(a.properties.x).toBe(700);
   });
 
-  it('only aligns children of an absolute layout', () => {
-    const stack = elements.createElement(ElementType.VerticalStackLayout);
-    elements.addElement(stack, elements.getRootElement());
+  it('sets HorizontalOptions on a grid child instead of moving x', () => {
+    const grid = elements.createElement(ElementType.Grid);
+    elements.addElement(grid, elements.getRootElement());
     const child = elements.createElement(ElementType.Label);
-    elements.addElement(child, stack);
-    elements.updateElementProperties(child, { x: 40 });
+    elements.addElement(child, grid);
+    elements.updateElementProperties(child, { x: 40, column: 0, row: 0 });
 
-    expect(service.canAlign([child, stack])).toBeFalse();
-    service.align([child, stack], 'left');
+    expect(service.canAlign([child])).toBeTrue();
+    service.align([child], 'center');
+
     expect(child.properties.x).toBe(40);
+    expect(child.properties.horizontalOptions).toBe('Center');
+  });
+
+  it('centres a single element vertically in its parent', () => {
+    const root = elements.getRootElement();
+    elements.updateElementProperties(root, { width: 800, height: 600 });
+    const a = add(ElementType.Label, 50, 10, 100, 30);
+
+    service.align([a], 'middle');
+
+    expect(a.properties.y).toBe(285);
+  });
+
+  it('does nothing when nothing is selected', () => {
+    expect(service.canAlign([])).toBeFalse();
+    service.align([], 'center');
   });
 
   it('distributes three elements with equal gaps', () => {

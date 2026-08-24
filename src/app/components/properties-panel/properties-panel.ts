@@ -354,7 +354,10 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
 
   updateRowType(element: MauiElement, index: number, type: string) {
     const current = this.gridRows(element)[index].height;
-    this.elementService.updateGridRow(element, index, { value: current.value, type: type as GridLengthType });
+    this.elementService.updateGridRow(element, index, {
+      value: this.defaultLengthValue(type as GridLengthType, current),
+      type: type as GridLengthType
+    });
   }
 
   updateRowValue(element: MauiElement, index: number, value: number) {
@@ -364,7 +367,28 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
 
   updateColumnType(element: MauiElement, index: number, type: string) {
     const current = this.gridColumns(element)[index].width;
-    this.elementService.updateGridColumn(element, index, { value: current.value, type: type as GridLengthType });
+    this.elementService.updateGridColumn(element, index, {
+      value: this.defaultLengthValue(type as GridLengthType, current),
+      type: type as GridLengthType
+    });
+  }
+
+  /**
+   * Switching Star → Absolute used to keep `value: 1`, which is a 1px track
+   * and looks exactly like "Absolute does nothing". Pick a visible default
+   * when the type actually changes.
+   */
+  private defaultLengthValue(type: GridLengthType, current: GridLength): number {
+    if (type === current.type) {
+      return current.value;
+    }
+    if (type === GridLengthType.Absolute) {
+      return 80;
+    }
+    if (type === GridLengthType.Star) {
+      return 1;
+    }
+    return current.value;
   }
 
   updateColumnValue(element: MauiElement, index: number, value: number) {
