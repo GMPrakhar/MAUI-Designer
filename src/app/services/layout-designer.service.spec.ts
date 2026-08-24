@@ -157,3 +157,80 @@ describe('LayoutDesignerService grid hit-testing', () => {
     expect(service.calculateDropPosition(element, event, container)).toEqual({ x: 1, y: 1 });
   });
 });
+
+describe('LayoutDesignerService grid tracks', () => {
+  let service: LayoutDesignerService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(LayoutDesignerService);
+  });
+
+  it('emits distinct CSS for Auto, Star and Absolute tracks', () => {
+    expect(service.trackCss({ value: 1, type: 'Auto' as any })).toBe('auto');
+    expect(service.trackCss({ value: 2, type: 'Star' as any })).toBe('minmax(0, 2fr)');
+    expect(service.trackCss({ value: 80, type: 'Absolute' as any })).toBe('80px');
+  });
+
+  it('builds a template string from the grid definition, not a uniform repeat', () => {
+    const grid = {
+      id: 'grid',
+      type: ElementType.Grid,
+      properties: {
+        gridDefinition: {
+          columns: [
+            { width: { value: 40, type: 'Absolute' } },
+            { width: { value: 1, type: 'Star' } },
+            { width: { value: 1, type: 'Auto' } }
+          ],
+          rows: [{ height: { value: 1, type: 'Star' } }]
+        }
+      },
+      children: []
+    } as unknown as MauiElement;
+
+    expect(service.templateColumnsCss(grid)).toBe('40px minmax(0, 1fr) auto');
+  });
+
+  it('places a child across the rows and columns it spans', () => {
+    const grid = {
+      id: 'grid',
+      type: ElementType.Grid,
+      properties: {
+        gridDefinition: {
+          rows: [{ height: { value: 1, type: 'Star' } }, { height: { value: 1, type: 'Star' } }],
+          columns: [{ width: { value: 1, type: 'Star' } }, { width: { value: 1, type: 'Star' } }]
+        }
+      },
+      children: []
+    } as unknown as MauiElement;
+    const child = {
+      id: 'c',
+      type: ElementType.Label,
+      parent: grid,
+      properties: { row: 0, column: 0, rowSpan: 2, columnSpan: 2 },
+      children: []
+    } as unknown as MauiElement;
+
+    expect(service.childPlacement(child)).toEqual({ row: '1 / span 2', column: '1 / span 2' });
+  });
+
+  it('treats a missing row or column as the first cell instead of NaN', () => {
+    const child = {
+      id: 'c',
+      type: ElementType.Label,
+      properties: {},
+      children: []
+    } as unknown as MauiElement;
+
+    expect(service.childPlacement(child)).toEqual({ row: '1 / span 1', column: '1 / span 1' });
+  });
+
+  it('maps LayoutOptions onto CSS self-alignment', () => {
+    expect(service.selfAlignment('Start')).toBe('start');
+    expect(service.selfAlignment('Center')).toBe('center');
+    expect(service.selfAlignment('End')).toBe('end');
+    expect(service.selfAlignment(undefined)).toBe('stretch');
+  });
+});

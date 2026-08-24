@@ -218,6 +218,7 @@
       <div *ngSwitchCase="'StackLayout'" class="element-stack-layout"
            #layoutDiv
            cdkDropList
+           [attr.data-orientation]="element.properties.orientation || 'Vertical'"
            [cdkDropListData]="element.children"
            (cdkDropListDropped)="onElementDroppedOnLayout(element, $event)"
            (mouseenter)="setElementRef(element, layoutDiv)">
@@ -262,11 +263,12 @@
         
         <!-- Grid children -->
         <ng-container *ngFor="let child of element.children">
-          <div class="grid-child" 
-               [style.grid-row-start]="child.properties.row + 1" 
-               [style.grid-row-end]="child.properties.row + 1 + (child.properties.rowSpan || 1)"
-               [style.grid-column-start]="child.properties.column + 1"
-               [style.grid-column-end]="child.properties.column + 1 + (child.properties.columnSpan || 1)">
+          <div class="grid-child"
+               [attr.data-testid]="'grid-child-' + child.id"
+               [style.grid-row]="gridChildRow(child)"
+               [style.grid-column]="gridChildColumn(child)"
+               [style.justify-self]="gridChildJustify(child)"
+               [style.align-self]="gridChildAlign(child)">
             <ng-container *ngTemplateOutlet="elementTemplate; context: { $implicit: child }"></ng-container>
           </div>
         </ng-container>

@@ -305,18 +305,16 @@
 
     .grid-child {
       position: relative;
-      width: 100%;
-      height: 100%;
-      display: flex;
       min-width: 0;
       min-height: 0;
+      display: flex;
 
       > .canvas-element {
         position: relative !important;
         transform: none !important;
         margin: 0;
-        width: 100%;
-        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
       }
     }
   }
@@ -331,15 +329,21 @@
     }
   }
 
+  .element-stack-layout,
   .element-vertical-stack-layout {
     display: flex;
     flex-direction: column;
-    gap: 4px; // Add some default spacing between children
+    gap: 4px;
 
     >.canvas-element {
-      position: relative !important; // Override absolute positioning for children
+      position: relative !important;
+      transform: none !important;
       flex-shrink: 0;
     }
+  }
+
+  .element-stack-layout[data-orientation='Horizontal'] {
+    flex-direction: row;
   }
 
   .element-default {
