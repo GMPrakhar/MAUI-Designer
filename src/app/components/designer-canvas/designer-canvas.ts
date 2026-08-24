@@ -813,6 +813,14 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
   onResizeStart(event: MouseEvent, direction: ResizeDirection, element: MauiElement) {
     event.preventDefault();
     event.stopPropagation();
+
+    // The second mousedown of a double-click fits the parent instead of
+    // starting another drag. The first click is a no-op resize that ends
+    // on mouseup with no movement.
+    if (event.detail >= 2) {
+      this.fitElementToParent(element, direction);
+      return;
+    }
     
     this.isResizing = true;
     this.elementService.beginBatch();
@@ -834,6 +842,20 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     // Set cursor
     document.body.style.cursor = this.getResizeCursor(direction);
     document.body.style.userSelect = 'none';
+  }
+
+  /** Double-clicking an edge fits that axis; a corner fits both. */
+  private fitElementToParent(element: MauiElement, direction: ResizeDirection): void {
+    const axis = (direction === 'e' || direction === 'w')
+      ? 'width'
+      : (direction === 'n' || direction === 's')
+        ? 'height'
+        : 'both';
+    const patch = this.layoutDesigner.fitToParent(element, axis);
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+    this.elementService.updateElementProperties(element, patch);
   }
 
   @HostListener('document:mousemove', ['$event'])

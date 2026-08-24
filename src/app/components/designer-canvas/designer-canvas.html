@@ -365,24 +365,39 @@
     <!-- Selection handles -->
     <div class="selection-handles" *ngIf="isPrimarySelection(element) && element.id !== 'root'">
       <!-- Corner handles (blue) -->
-      <div class="handle handle-corner handle-nw" 
+      <div class="handle handle-corner handle-nw"
+           data-testid="resize-handle-nw"
+           title="Double-click to fit parent"
            (mousedown)="onResizeStart($event, 'nw', element)"></div>
-      <div class="handle handle-corner handle-ne" 
+      <div class="handle handle-corner handle-ne"
+           data-testid="resize-handle-ne"
+           title="Double-click to fit parent"
            (mousedown)="onResizeStart($event, 'ne', element)"></div>
-      <div class="handle handle-corner handle-sw" 
+      <div class="handle handle-corner handle-sw"
+           data-testid="resize-handle-sw"
+           title="Double-click to fit parent"
            (mousedown)="onResizeStart($event, 'sw', element)"></div>
       <div class="handle handle-corner handle-se" 
            data-testid="resize-handle-se"
+           title="Double-click to fit parent"
            (mousedown)="onResizeStart($event, 'se', element)"></div>
       
       <!-- Edge handles (green) -->
-      <div class="handle handle-edge handle-n" 
+      <div class="handle handle-edge handle-n"
+           data-testid="resize-handle-n"
+           title="Double-click to fit parent height"
            (mousedown)="onResizeStart($event, 'n', element)"></div>
-      <div class="handle handle-edge handle-s" 
+      <div class="handle handle-edge handle-s"
+           data-testid="resize-handle-s"
+           title="Double-click to fit parent height"
            (mousedown)="onResizeStart($event, 's', element)"></div>
-      <div class="handle handle-edge handle-w" 
+      <div class="handle handle-edge handle-w"
+           data-testid="resize-handle-w"
+           title="Double-click to fit parent width"
            (mousedown)="onResizeStart($event, 'w', element)"></div>
-      <div class="handle handle-edge handle-e" 
+      <div class="handle handle-edge handle-e"
+           data-testid="resize-handle-e"
+           title="Double-click to fit parent width"
            (mousedown)="onResizeStart($event, 'e', element)"></div>
     </div>
   </div>

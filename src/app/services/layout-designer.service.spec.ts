@@ -234,3 +234,69 @@ describe('LayoutDesignerService grid tracks', () => {
     expect(service.selfAlignment(undefined)).toBe('stretch');
   });
 });
+
+describe('LayoutDesignerService fit and clamp', () => {
+  let service: LayoutDesignerService;
+
+  beforeEach(() => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(LayoutDesignerService);
+  });
+
+  function absolute(width: number, height: number): MauiElement {
+    return {
+      id: 'parent',
+      type: ElementType.AbsoluteLayout,
+      properties: { width, height },
+      children: []
+    } as unknown as MauiElement;
+  }
+
+  function child(parent: MauiElement, properties: MauiElement['properties']): MauiElement {
+    const element = {
+      id: 'child',
+      type: ElementType.Button,
+      parent,
+      properties,
+      children: []
+    } as unknown as MauiElement;
+    parent.children.push(element);
+    return element;
+  }
+
+  it('fits an AbsoluteLayout child to the parent and snaps it to the origin', () => {
+    const parent = absolute(800, 600);
+    const button = child(parent, { x: 40, y: 20, width: 100, height: 30 });
+
+    expect(service.fitToParent(button, 'width')).toEqual({ width: 800, x: 0 });
+    expect(service.fitToParent(button, 'height')).toEqual({ height: 600, y: 0 });
+    expect(service.fitToParent(button, 'both')).toEqual({ width: 800, x: 0, height: 600, y: 0 });
+  });
+
+  it('clamps a dropped child so it cannot overflow the remaining parent space', () => {
+    const parent = absolute(80, 200);
+    const button = child(parent, { x: 20, y: 0, width: 120, height: 40 });
+
+    expect(service.clampToParent(button)).toEqual({ width: 60 });
+  });
+
+  it('clamps a grid child to the cells it spans', () => {
+    const grid = {
+      id: 'grid',
+      type: ElementType.Grid,
+      properties: {
+        width: 200,
+        height: 100,
+        gridDefinition: {
+          columns: [{ width: { value: 80, type: 'Absolute' } }, { width: { value: 1, type: 'Star' } }],
+          rows: [{ height: { value: 1, type: 'Star' } }]
+        }
+      },
+      children: []
+    } as unknown as MauiElement;
+    const button = child(grid, { column: 0, row: 0, width: 160, height: 200 });
+
+    expect(service.clampToParent(button)).toEqual({ width: 80, height: 100 });
+  });
+});

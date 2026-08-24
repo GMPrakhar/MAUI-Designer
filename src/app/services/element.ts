@@ -672,6 +672,66 @@ export class ElementService {
     this.elementsSubject.next(this.rootElement);
   }
 
+  /**
+   * Reorders a child among its siblings.
+   *
+   * `toIndex` is the destination index after the move (CDK `moveItemInArray`
+   * / drop-list `currentIndex`).
+   */
+  reorderChild(parent: MauiElement, fromIndex: number, toIndex: number): boolean {
+    const children = parent.children;
+    if (fromIndex === toIndex) {
+      return false;
+    }
+    if (fromIndex < 0 || toIndex < 0 || fromIndex >= children.length || toIndex >= children.length) {
+      return false;
+    }
+
+    this.pushHistory();
+    const [item] = children.splice(fromIndex, 1);
+    children.splice(toIndex, 0, item);
+    this.elementsSubject.next(this.rootElement);
+    return true;
+  }
+
+  /** Moves an element one slot among its siblings. */
+  moveSibling(element: MauiElement, delta: -1 | 1): boolean {
+    const live = this.findElementById(element.id) ?? element;
+    if (live === this.rootElement) {
+      return false;
+    }
+    const parent = this.findOwningParent(live);
+    if (!parent) {
+      return false;
+    }
+    const from = parent.children.indexOf(live);
+    const to = from + delta;
+    if (from < 0 || to < 0 || to >= parent.children.length) {
+      return false;
+    }
+    return this.reorderChild(parent, from, to);
+  }
+
+  /** The parent whose `children` array actually contains the element. */
+  private findOwningParent(element: MauiElement): MauiElement | null {
+    if (element.parent?.children.includes(element)) {
+      return element.parent;
+    }
+    const walk = (node: MauiElement): MauiElement | null => {
+      if (node.children.includes(element)) {
+        return node;
+      }
+      for (const child of node.children) {
+        const found = walk(child);
+        if (found) {
+          return found;
+        }
+      }
+      return null;
+    };
+    return walk(this.rootElement);
+  }
+
   getRootElement(): MauiElement {
     return this.rootElement;
   }
