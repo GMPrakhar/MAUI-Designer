@@ -10,6 +10,7 @@ import {
   GridLengthType,
   Orientation,
   FontAttributes,
+  LAYOUT_OPTIONS,
   BINDABLE_PROPERTIES,
   COMMON_BINDABLE_PROPERTIES
 } from '../../models/maui-element';
@@ -110,6 +111,13 @@ export class PropertiesPanelComponent implements OnInit, OnDestroy {
     const currentPadding = element.properties.padding || { left: 0, top: 0, right: 0, bottom: 0 };
     const newPadding = { ...currentPadding, [side]: value };
     this.elementService.updateElementProperties(element, { padding: newPadding });
+  }
+
+  readonly layoutOptions = LAYOUT_OPTIONS;
+
+  updateLayoutOptions(element: MauiElement, axis: 'horizontalOptions' | 'verticalOptions', value: string) {
+    const option = LAYOUT_OPTIONS.find(candidate => candidate === value);
+    this.elementService.updateElementProperties(element, { [axis]: option });
   }
 
   // --- Capability helpers -----------------------------------------------------

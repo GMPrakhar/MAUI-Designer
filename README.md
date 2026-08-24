@@ -17,6 +17,8 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **Toolbox Search**: Filter the control list as you type
 - **Undo/Redo**: Full history for every design change (`Ctrl+Z` / `Ctrl+Y`)
 - **Keyboard Shortcuts**: `Delete` to remove, `Ctrl+D` to duplicate, arrow keys to nudge, `Esc` to deselect
+- **Layout Alignment**: `HorizontalOptions` and `VerticalOptions` on every control
+- **Lossless XAML Round Trip**: Attributes the designer does not model are preserved instead of dropped
 - **Local Persistence**: Save and restore your design in the browser
 
 ### Multi-Selection

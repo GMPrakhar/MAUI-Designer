@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA, AppThemeColor } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA, AppThemeColor, LayoutOptions, LAYOUT_OPTIONS } from '../models/maui-element';
 import { CustomControlRegistryService } from './custom-control-registry';
 
 /** Attributes the designer models itself, so they never end up in rawAttributes. */
@@ -492,6 +492,14 @@ export class XamlParserService {
       this.parseCustomControl(xmlElement, properties);
     }
 
+    // Every attribute the designer understands is read through getAttr, so whatever
+    // is left over at the end of this method is something we do not model yet.
+    const consumed = new Set<string>();
+    const getAttr = (name: string): string | null => {
+      consumed.add(name.toLowerCase());
+      return xmlElement.getAttribute(name);
+    };
+
     // Bindings are captured separately so they survive a round trip
     const bindings = this.parseBindings(xmlElement);
     if (Object.keys(bindings).length > 0) {
@@ -499,7 +507,7 @@ export class XamlParserService {
     }
 
     const literal = (name: string): string | null => {
-      const value = xmlElement.getAttribute(name);
+      const value = getAttr(name);
       return value === null || this.isBindingExpression(value) ? null : value;
     };
 
@@ -509,7 +517,7 @@ export class XamlParserService {
      * light value is the fallback so a design opened in light mode looks right.
      */
     const color = (name: string): string | null => {
-      const value = xmlElement.getAttribute(name);
+      const value = getAttr(name);
       if (value === null || this.isBindingExpression(value)) {
         return null;
       }
@@ -573,7 +581,7 @@ export class XamlParserService {
       if (borderWidth) properties.borderWidth = parseFloat(borderWidth);
     }
 
-    const pathData = xmlElement.getAttribute('Data');
+    const pathData = getAttr('Data');
     if (pathData) properties.pathData = pathData;
 
     const fill = color('Fill');
@@ -582,13 +590,13 @@ export class XamlParserService {
     const stroke = color('Stroke');
     if (stroke) properties.strokeColor = stroke;
 
-    const strokeThickness = xmlElement.getAttribute('StrokeThickness');
+    const strokeThickness = getAttr('StrokeThickness');
     if (strokeThickness) properties.strokeThickness = parseFloat(strokeThickness);
 
-    const widthRequest = xmlElement.getAttribute('WidthRequest');
+    const widthRequest = getAttr('WidthRequest');
     if (widthRequest) properties.width = parseFloat(widthRequest);
 
-    const heightRequest = xmlElement.getAttribute('HeightRequest');
+    const heightRequest = getAttr('HeightRequest');
     if (heightRequest) properties.height = parseFloat(heightRequest);
 
     const backgroundColor = color('BackgroundColor');
@@ -597,9 +605,10 @@ export class XamlParserService {
     const textColor = color('TextColor');
     if (textColor) properties.textColor = textColor;
 
-    const fontSize = xmlElement.getAttribute('FontSize');
+    const fontSize = getAttr('FontSize');
     if (fontSize) properties.fontSize = parseFloat(fontSize);
-    const fontFamily = xmlElement.getAttribute('FontFamily');
+
+    const fontFamily = getAttr('FontFamily');
     if (fontFamily) properties.fontFamily = fontFamily;
 
     const semanticDescription = literal('SemanticProperties.Description');
@@ -611,24 +620,38 @@ export class XamlParserService {
     const semanticHeadingLevel = literal('SemanticProperties.HeadingLevel');
     if (semanticHeadingLevel) properties.semanticHeadingLevel = semanticHeadingLevel;
 
-    const fontAttributes = xmlElement.getAttribute('FontAttributes');
+    const fontAttributes = getAttr('FontAttributes');
     if (fontAttributes) properties.fontAttributes = fontAttributes as any;
 
-    const margin = xmlElement.getAttribute('Margin');
+    const margin = getAttr('Margin');
     if (margin) properties.margin = this.parseThickness(margin);
 
-    const padding = xmlElement.getAttribute('Padding');
+    const padding = getAttr('Padding');
     if (padding) properties.padding = this.parseThickness(padding);
 
-    const isVisible = xmlElement.getAttribute('IsVisible');
+    const horizontalOptions = literal('HorizontalOptions');
+    if (horizontalOptions) {
+      const parsed = XamlParserService.parseLayoutOptions(horizontalOptions);
+      if (parsed) properties.horizontalOptions = parsed;
+      else consumed.delete('horizontaloptions');
+    }
+
+    const verticalOptions = literal('VerticalOptions');
+    if (verticalOptions) {
+      const parsed = XamlParserService.parseLayoutOptions(verticalOptions);
+      if (parsed) properties.verticalOptions = parsed;
+      else consumed.delete('verticaloptions');
+    }
+
+    const isVisible = getAttr('IsVisible');
     if (isVisible) properties.isVisible = isVisible.toLowerCase() === 'true';
 
-    const isEnabled = xmlElement.getAttribute('IsEnabled');
+    const isEnabled = getAttr('IsEnabled');
     if (isEnabled) properties.isEnabled = isEnabled.toLowerCase() === 'true';
 
     // Parse layout-specific properties
     if (parent?.type === ElementType.AbsoluteLayout) {
-      const layoutBounds = xmlElement.getAttribute('AbsoluteLayout.LayoutBounds');
+      const layoutBounds = getAttr('AbsoluteLayout.LayoutBounds');
       if (layoutBounds) {
         const bounds = layoutBounds.split(',').map(v => parseFloat(v.trim()));
         if (bounds.length >= 4) {
@@ -641,25 +664,25 @@ export class XamlParserService {
     }
 
     if (parent?.type === ElementType.Grid) {
-      const row = xmlElement.getAttribute('Grid.Row');
+      const row = getAttr('Grid.Row');
       if (row) properties.row = parseInt(row);
 
-      const column = xmlElement.getAttribute('Grid.Column');
+      const column = getAttr('Grid.Column');
       if (column) properties.column = parseInt(column);
 
-      const rowSpan = xmlElement.getAttribute('Grid.RowSpan');
+      const rowSpan = getAttr('Grid.RowSpan');
       if (rowSpan) properties.rowSpan = parseInt(rowSpan);
 
-      const columnSpan = xmlElement.getAttribute('Grid.ColumnSpan');
+      const columnSpan = getAttr('Grid.ColumnSpan');
       if (columnSpan) properties.columnSpan = parseInt(columnSpan);
     }
 
     if (elementType === ElementType.StackLayout) {
-      const spacing = xmlElement.getAttribute('Spacing');
+      const spacing = getAttr('Spacing');
       if (spacing) properties.spacing = parseFloat(spacing);
 
       // An explicit Orientation attribute wins over the tag name
-      const orientation = xmlElement.getAttribute('Orientation');
+      const orientation = getAttr('Orientation');
       if (orientation) {
         properties.orientation = orientation.toLowerCase() === 'horizontal'
           ? Orientation.Horizontal
@@ -672,18 +695,60 @@ export class XamlParserService {
     }
 
     if (elementType === ElementType.VerticalStackLayout) {
-      const spacing = xmlElement.getAttribute('Spacing');
+      const spacing = getAttr('Spacing');
       if (spacing) properties.spacing = parseFloat(spacing);
     }
 
     // Set default values if not specified
+    if (elementType !== ElementType.Custom) {
+      properties.rawAttributes = this.collectUnmodelledAttributes(xmlElement, consumed, properties);
+    }
+
     this.setDefaultValues(properties, elementType);
 
     return properties;
   }
 
-  private isBindingExpression(value: string): boolean {
-    return /^\s*\{\s*Binding\b/i.test(value);
+  /**
+   * Attributes the designer never read are kept verbatim so importing XAML the tool
+   * does not fully understand cannot silently delete markup on the next export.
+   */
+  private collectUnmodelledAttributes(
+    xmlElement: Element,
+    consumed: Set<string>,
+    properties: ElementProperties
+  ): Record<string, string> | undefined {
+    const raw: Record<string, string> = {};
+    const bound = new Set(Object.keys(properties.bindings || {}).map(name => name.toLowerCase()));
+
+    for (let i = 0; i < xmlElement.attributes.length; i++) {
+      const attribute = xmlElement.attributes[i];
+      const name = attribute.name;
+      const key = name.toLowerCase();
+      if (consumed.has(key) || bound.has(key) || RESERVED_ATTRIBUTES.has(key)) {
+        continue;
+      }
+      // Namespace declarations belong to the document, not to the element.
+      if (key === 'xmlns' || key.startsWith('xmlns:')) {
+        continue;
+      }
+      raw[name] = attribute.value;
+    }
+
+    return Object.keys(raw).length > 0 ? raw : undefined;
+  }
+
+  /**
+   * MAUI accepts `Center`, `CenterAndExpand` (legacy Forms) and `LayoutOptions.Center`.
+   * Anything unrecognised is left alone so it falls through to rawAttributes.
+   */
+  static parseLayoutOptions(value: string): LayoutOptions | null {
+    const cleaned = value.trim().replace(/^LayoutOptions\./i, '').replace(/AndExpand$/i, '');
+    const match = LAYOUT_OPTIONS.find(option => option.toLowerCase() === cleaned.toLowerCase());
+    return match || null;
+  }
+
+  private isBindingExpression(value: string): boolean {    return /^\s*\{\s*Binding\b/i.test(value);
   }
 
   /** Collects every attribute written as `{Binding Path}` into a map. */
