@@ -1,5 +1,10 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, GridDefinition, GridLength, GridLengthType, LayoutOptions } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, GridDefinition, GridLength, GridLengthType, LayoutOptions } from '../models/maui-element';
+
+/** Smallest width or height a control may shrink to when fitting or clamping. */
+export const MIN_ELEMENT_SIZE = 20;
+
+export type FitAxis = 'width' | 'height' | 'both';
 
 export interface LayoutInfo {
   canHaveChildren: boolean;
@@ -422,6 +427,126 @@ export class LayoutDesignerService {
       return 1;
     }
     return Math.max(1, Math.min(Math.floor(span), Math.max(1, remaining)));
+  }
+
+  /**
+   * How much room a child may occupy inside its parent.
+   *
+   * Grid children are capped to the cells they span. Absolute and stack
+   * children are capped to the parent's WidthRequest/HeightRequest. Zero
+   * means the parent has no usable size (do not clamp that axis).
+   */
+  getAvailableSize(parent: MauiElement, child: MauiElement): { width: number; height: number } {
+    if (this.getLayoutInfo(parent.type).supportsGridPositioning) {
+      if (parent.domElement) {
+        const spanned = this.getGridChildMaxDimensions(child, parent, parent.domElement);
+        if (spanned) {
+          return { width: spanned.maxWidth, height: spanned.maxHeight };
+        }
+      }
+      const definition = parent.properties.gridDefinition || DEFAULT_GRID_DEFINITION;
+      const parentWidth = parent.properties.width || 0;
+      const parentHeight = parent.properties.height || 0;
+      const columnWidths = this.calculateGridSizes(definition.columns.map(column => column.width), parentWidth);
+      const rowHeights = this.calculateGridSizes(definition.rows.map(row => row.height), parentHeight);
+      const column = child.properties.column || 0;
+      const row = child.properties.row || 0;
+      const columnSpan = child.properties.columnSpan || 1;
+      const rowSpan = child.properties.rowSpan || 1;
+      let width = 0;
+      let height = 0;
+      for (let i = column; i < Math.min(column + columnSpan, columnWidths.length); i++) {
+        width += columnWidths[i];
+      }
+      for (let i = row; i < Math.min(row + rowSpan, rowHeights.length); i++) {
+        height += rowHeights[i];
+      }
+      return { width, height };
+    }
+
+    return {
+      width: parent.properties.width || 0,
+      height: parent.properties.height || 0
+    };
+  }
+
+  /**
+   * Stretches a child to its parent on the requested axis.
+   *
+   * AbsoluteLayout children also snap to the origin on that axis so the
+   * control actually fills the layout instead of overflowing past it.
+   * Grid and stack children pick Fill so CSS can stretch them too.
+   */
+  fitToParent(element: MauiElement, axis: FitAxis): Partial<ElementProperties> {
+    const parent = element.parent;
+    if (!parent) {
+      return {};
+    }
+
+    const size = this.getAvailableSize(parent, element);
+    const patch: Partial<ElementProperties> = {};
+    const fitWidth = axis === 'width' || axis === 'both';
+    const fitHeight = axis === 'height' || axis === 'both';
+    const absolute = this.getLayoutInfo(parent.type).supportsAbsolutePositioning;
+    const flow = parent.type === ElementType.Grid
+      || parent.type === ElementType.StackLayout
+      || parent.type === ElementType.VerticalStackLayout;
+
+    if (fitWidth && size.width > 0) {
+      patch.width = Math.max(MIN_ELEMENT_SIZE, Math.round(size.width));
+      if (absolute) {
+        patch.x = 0;
+      }
+      if (flow) {
+        patch.horizontalOptions = 'Fill';
+      }
+    }
+    if (fitHeight && size.height > 0) {
+      patch.height = Math.max(MIN_ELEMENT_SIZE, Math.round(size.height));
+      if (absolute) {
+        patch.y = 0;
+      }
+      if (flow) {
+        patch.verticalOptions = 'Fill';
+      }
+    }
+    return patch;
+  }
+
+  /**
+   * Caps a child's width/height so it cannot overflow its parent.
+   *
+   * In AbsoluteLayout the remaining space after x/y is what counts, so a
+   * 100-wide button dropped at x=40 into an 80-wide panel becomes 40 wide.
+   */
+  clampToParent(element: MauiElement): Partial<ElementProperties> {
+    const parent = element.parent;
+    if (!parent) {
+      return {};
+    }
+
+    const size = this.getAvailableSize(parent, element);
+    let maxWidth = size.width;
+    let maxHeight = size.height;
+    if (this.getLayoutInfo(parent.type).supportsAbsolutePositioning) {
+      if (size.width > 0) {
+        maxWidth = Math.max(MIN_ELEMENT_SIZE, size.width - (element.properties.x || 0));
+      }
+      if (size.height > 0) {
+        maxHeight = Math.max(MIN_ELEMENT_SIZE, size.height - (element.properties.y || 0));
+      }
+    }
+
+    const patch: Partial<ElementProperties> = {};
+    const width = element.properties.width ?? 0;
+    const height = element.properties.height ?? 0;
+    if (maxWidth > 0 && width > maxWidth) {
+      patch.width = Math.round(maxWidth);
+    }
+    if (maxHeight > 0 && height > maxHeight) {
+      patch.height = Math.round(maxHeight);
+    }
+    return patch;
   }
 
   /** Maps MAUI LayoutOptions onto CSS justify-self / align-self. */

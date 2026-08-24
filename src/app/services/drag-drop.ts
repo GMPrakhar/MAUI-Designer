@@ -76,8 +76,21 @@ export class DragDropService {
       this.resolveLocalPosition(targetLayout, dropX, dropY, canvasElement)
     );
     this.elementService.updateElementProperties(newElement, position, { recordHistory: false });
+    this.constrainToParent(newElement);
     this.elementService.selectElement(newElement);
     return newElement;
+  }
+
+  /**
+   * Shrinks an element so it cannot overflow its parent. Used after a drop
+   * or a toolbox click that targets a smaller layout.
+   */
+  constrainToParent(element: MauiElement): void {
+    const patch = this.layoutDesigner.clampToParent(element);
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+    this.elementService.updateElementProperties(element, patch, { recordHistory: false });
   }
 
   /**
@@ -149,6 +162,8 @@ export class DragDropService {
       // Just update position if same parent
       this.elementService.updateElementProperties(element, { x: position.x, y: position.y });
     }
+
+    this.constrainToParent(element);
   }
 
   showDragPreview(x: number, y: number): void {

@@ -58,6 +58,7 @@ export class ToolboxComponent {
       this.registry.defaultProperties({ manifest, definition: control })
     );
     this.elementService.addElement(element, parent);
+    this.dragDropService.constrainToParent(element);
     this.elementService.selectElement(element);
   }
 
@@ -160,6 +161,7 @@ export class ToolboxComponent {
     const parent = this.resolveTargetParent();
     const newElement = this.elementService.createElement(item.type as ElementType, { x: 0, y: 0 });
     this.elementService.addElement(newElement, parent);
+    this.dragDropService.constrainToParent(newElement);
     this.elementService.selectElement(newElement);
   }
 

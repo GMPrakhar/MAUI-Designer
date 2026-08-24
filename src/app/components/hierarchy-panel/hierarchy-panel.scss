@@ -9,12 +9,19 @@
 }
 
 .hierarchy-node {
+  .node-row {
+    display: flex;
+    align-items: center;
+  }
+
   .node-content {
     display: flex;
     align-items: center;
     padding: 6px 8px;
     border-radius: 4px;
     cursor: pointer;
+    flex: 1;
+    min-width: 0;
     transition: background-color 0.2s ease;
     
     &:hover {
@@ -72,17 +79,26 @@
       justify-content: center;
       
       &:hover {
-        background-color: #fed7d7;
+        background-color: #e2e8f0;
       }
-      
+
       .material-icons {
         font-size: 16px;
+        color: #4a5568;
+      }
+    }
+
+    .delete-button:hover {
+      background-color: #fed7d7;
+
+      .material-icons {
         color: #e53e3e;
       }
     }
   }
   
-  .node-content:hover .node-actions {
+  .node-row:hover .node-actions,
+  .node-content.selected + .node-actions {
     opacity: 1;
   }
 }
@@ -90,6 +106,26 @@
 .node-children {
   border-left: 1px solid #e2e8f0;
   margin-left: 12px;
+  min-height: 8px;
+}
+
+.cdk-drag-preview {
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+
+.cdk-drag-animating {
+  transition: transform 150ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.node-content {
+  cursor: grab;
 }
 
 .empty-state {
