@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ElementService } from './element';
-import { MauiElement, ElementType } from '../models/maui-element';
+import { MauiElement, ElementType, LayoutOptions } from '../models/maui-element';
 
 export type AlignMode = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
 export type DistributeMode = 'horizontal' | 'vertical';
@@ -30,48 +30,115 @@ export class AlignmentService {
 
   constructor(private elementService: ElementService) {}
 
-  /** Only absolutely positioned elements can be aligned. */
+  /**
+   * Align is offered whenever something can actually move: one or more
+   * absolutely positioned children, or any child of a Grid/Stack (those use
+   * HorizontalOptions / VerticalOptions instead of x/y).
+   */
   canAlign(elements: MauiElement[]): boolean {
-    return this.positionable(elements).length > 1;
+    return this.positionable(elements).length > 0 || this.flowChildren(elements).length > 0;
   }
 
   align(elements: MauiElement[], mode: AlignMode): void {
     const boxes = this.toBoxes(this.positionable(elements));
-    if (boxes.length < 2) {
+    const flow = this.flowChildren(elements);
+    if (boxes.length === 0 && flow.length === 0) {
       return;
     }
 
+    this.elementService.runAsSingleChange(() => {
+      if (boxes.length === 1) {
+        this.alignToParent(boxes[0], mode);
+      } else if (boxes.length > 1) {
+        this.alignToSelection(boxes, mode);
+      }
+
+      for (const element of flow) {
+        this.applyLayoutOptions(element, mode);
+      }
+    });
+  }
+
+  /** One selected control snaps to the edges / centre of its parent. */
+  private alignToParent(box: Box, mode: AlignMode): void {
+    const parent = box.element.parent;
+    const parentWidth = parent?.properties.width || 0;
+    const parentHeight = parent?.properties.height || 0;
+    this.elementService.updateElementProperties(
+      box.element,
+      this.patchForMode(mode, 0, parentWidth, 0, parentHeight, box),
+      { recordHistory: false }
+    );
+  }
+
+  private alignToSelection(boxes: Box[], mode: AlignMode): void {
     const left = Math.min(...boxes.map(box => box.x));
     const right = Math.max(...boxes.map(box => box.x + box.width));
     const top = Math.min(...boxes.map(box => box.y));
     const bottom = Math.max(...boxes.map(box => box.y + box.height));
 
-    this.elementService.runAsSingleChange(() => {
-      for (const box of boxes) {
-        const patch: { x?: number; y?: number } = {};
-        switch (mode) {
-          case 'left':
-            patch.x = left;
-            break;
-          case 'right':
-            patch.x = right - box.width;
-            break;
-          case 'center':
-            patch.x = Math.round((left + right) / 2 - box.width / 2);
-            break;
-          case 'top':
-            patch.y = top;
-            break;
-          case 'bottom':
-            patch.y = bottom - box.height;
-            break;
-          case 'middle':
-            patch.y = Math.round((top + bottom) / 2 - box.height / 2);
-            break;
-        }
-        this.elementService.updateElementProperties(box.element, patch, { recordHistory: false });
-      }
-    });
+    for (const box of boxes) {
+      this.elementService.updateElementProperties(
+        box.element,
+        this.patchForMode(mode, left, right, top, bottom, box),
+        { recordHistory: false }
+      );
+    }
+  }
+
+  private patchForMode(
+    mode: AlignMode,
+    left: number,
+    right: number,
+    top: number,
+    bottom: number,
+    box: Box
+  ): { x?: number; y?: number } {
+    switch (mode) {
+      case 'left':
+        return { x: left };
+      case 'right':
+        return { x: right - box.width };
+      case 'center':
+        return { x: Math.round((left + right) / 2 - box.width / 2) };
+      case 'top':
+        return { y: top };
+      case 'bottom':
+        return { y: bottom - box.height };
+      case 'middle':
+        return { y: Math.round((top + bottom) / 2 - box.height / 2) };
+    }
+  }
+
+  /**
+   * Grid and stack children have no pixel position of their own. Left/centre/right
+   * become HorizontalOptions; top/middle/bottom become VerticalOptions.
+   */
+  private applyLayoutOptions(element: MauiElement, mode: AlignMode): void {
+    const horizontal: Record<string, LayoutOptions> = {
+      left: 'Start',
+      center: 'Center',
+      right: 'End'
+    };
+    const vertical: Record<string, LayoutOptions> = {
+      top: 'Start',
+      middle: 'Center',
+      bottom: 'End'
+    };
+    if (horizontal[mode]) {
+      this.elementService.updateElementProperties(
+        element,
+        { horizontalOptions: horizontal[mode] },
+        { recordHistory: false }
+      );
+    }
+    if (vertical[mode]) {
+      this.elementService.updateElementProperties(
+        element,
+        { verticalOptions: vertical[mode] },
+        { recordHistory: false }
+      );
+    }
   }
 
   /** Spreads elements so the gaps between them are equal. */
@@ -183,6 +250,18 @@ export class AlignmentService {
 
   private positionable(elements: MauiElement[]): MauiElement[] {
     return elements.filter(element => element.parent?.type === ElementType.AbsoluteLayout);
+  }
+
+  private flowChildren(elements: MauiElement[]): MauiElement[] {
+    const flowParents = new Set<ElementType>([
+      ElementType.Grid,
+      ElementType.StackLayout,
+      ElementType.VerticalStackLayout,
+      ElementType.Frame,
+      ElementType.Border,
+      ElementType.ScrollView
+    ]);
+    return elements.filter(element => !!element.parent && flowParents.has(element.parent.type));
   }
 
   private toBoxes(elements: MauiElement[]): Box[] {

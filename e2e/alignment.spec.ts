@@ -42,11 +42,19 @@ test.describe('Alignment and layout tools', () => {
     await designer.expectProperty('y', 30);
   });
 
-  test('align buttons are disabled without a multi selection', async ({ page }) => {
-    await addAt(designer, 'Label', 60, 40);
-
+  test('align buttons are disabled with nothing selected', async ({ page }) => {
     await expect(designer.alignButton('left')).toBeDisabled();
     await expect(page.getByTestId('distribute-horizontal')).toBeDisabled();
+  });
+
+  test('align centre on a single element snaps it to the parent centre', async () => {
+    await addAt(designer, 'Label', 60, 40);
+    await designer.selectFirst('Label');
+
+    await expect(designer.alignButton('center')).toBeEnabled();
+    await designer.alignButton('center').click();
+
+    await designer.expectProperty('x', 350);
   });
 
   test('distribute horizontally spaces three elements evenly', async ({ page }) => {

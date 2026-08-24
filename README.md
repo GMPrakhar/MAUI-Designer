@@ -65,7 +65,7 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 - **XAML Parsing**: Import existing XAML files to recreate visual designs
 - **Copy & Download**: Easy sharing and saving of generated XAML
 - **File Import**: Load a `.xaml` file, or convert an `.svg` icon into MAUI `Path` elements
-- **Grid Definitions**: Row/column definitions (`Auto`, `*`, absolute) round-trip through XAML
+- **Grid Definitions**: Row/column definitions (`Auto`, `*`, absolute) size the canvas tracks and round-trip through XAML. `RowSpan` / `ColumnSpan` stretch the child across those tracks.
 
 ### Supported MAUI Elements
 
