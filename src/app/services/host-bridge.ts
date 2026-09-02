@@ -24,9 +24,14 @@ interface VsCodeApi {
   postMessage(message: unknown): void;
 }
 
+interface VisualStudioWebView {
+  postMessage(message: unknown): void;
+  addEventListener(type: 'message', listener: (event: MessageEvent) => void): void;
+}
+
 declare global {
   interface Window {
-    chrome?: { webview?: { postMessage(message: unknown): void } };
+    chrome?: { webview?: VisualStudioWebView };
     acquireVsCodeApi?: () => VsCodeApi;
   }
 }
@@ -47,6 +52,7 @@ export class HostBridgeService {
   private readonly messageSubject = new Subject<HostInboundMessage>();
   private readonly fileNameSubject = new BehaviorSubject<string | null>(null);
   private vsCodeApi: VsCodeApi | null = null;
+  private started = false;
 
   /** The host the designer is currently running in. */
   readonly host$: Observable<HostKind>;
@@ -59,9 +65,10 @@ export class HostBridgeService {
     this.hostSubject = new BehaviorSubject<HostKind>(this.detectHost());
     this.host$ = this.hostSubject.asObservable();
 
-    if (this.isHosted) {
+    if (this.host === 'visual-studio') {
+      window.chrome!.webview!.addEventListener('message', this.onWindowMessage);
+    } else if (this.host === 'vscode') {
       window.addEventListener('message', this.onWindowMessage);
-      this.send({ type: 'designer.ready' });
     }
   }
 
@@ -76,6 +83,16 @@ export class HostBridgeService {
 
   get fileName(): string | null {
     return this.fileNameSubject.value;
+  }
+
+  /** Starts the host handshake after consumers have subscribed to inbound messages. */
+  start(): void {
+    if (this.started || !this.isHosted) {
+      return;
+    }
+
+    this.started = true;
+    this.send({ type: 'designer.ready' });
   }
 
   /** Sends a message to the host. Does nothing in a plain browser. */
@@ -111,7 +128,7 @@ export class HostBridgeService {
     this.send({ type: 'designer.error', message });
   }
 
-  /** Entry point used by the hosts: both post a message event onto the window. */
+  /** Entry point for host messages from WebView2 or VS Code. */
   private readonly onWindowMessage = (event: MessageEvent) => {
     const message = this.parse(event.data);
     if (!message) {

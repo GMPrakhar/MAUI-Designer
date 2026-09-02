@@ -121,11 +121,14 @@
   </div>
   
   <!-- Bottom Resize Handle -->
-  <div class="resize-handle vertical" 
+  <div *ngIf="!isHosted"
+       class="resize-handle vertical"
        (mousedown)="onResizeStart($event, 'bottom')"></div>
   
   <!-- Bottom Panel -->
-  <div class="bottom-panel" [style.height.px]="bottomPanelHeight">
+  <div *ngIf="!isHosted"
+       class="bottom-panel"
+       [style.height.px]="bottomPanelHeight">
     <div class="panel-tabs">
       <button 
         class="tab-button" 

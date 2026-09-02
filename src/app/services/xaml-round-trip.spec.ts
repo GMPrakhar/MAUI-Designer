@@ -143,5 +143,164 @@ describe('XAML round trip fidelity', () => {
       expect(reparsed.properties.horizontalOptions).toBe('Center');
       expect(reparsed.properties.verticalOptions).toBe('Fill');
     });
+
+    describe('real-world custom pages', () => {
+      // Adapted from dotnet/maui EntryPage.xaml at d2edf1972d09f6689a4621ba9ff42346ced6f1b1.
+      // The source is MIT licensed by the .NET Foundation and Contributors.
+      const entryPageExcerpt = `<views:BasePage
+      xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+      xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+      xmlns:controls="clr-namespace:Maui.Controls.Sample.Pages"
+      xmlns:views="clr-namespace:Maui.Controls.Sample.Pages.Base"
+      xmlns:viewmodels="clr-namespace:Maui.Controls.Sample.ViewModels"
+      x:Class="Maui.Controls.Sample.Pages.EntryPage"
+      Title="Entry">
+    <views:BasePage.Resources>
+      <ResourceDictionary>
+        <Style x:Key="EntryVisualStatesStyle" TargetType="Entry">
+          <Setter Property="VisualStateManager.VisualStateGroups">
+            <VisualStateGroupList>
+              <VisualStateGroup x:Name="CommonStates">
+                <VisualState x:Name="Focused">
+                  <VisualState.Setters>
+                    <Setter Property="BackgroundColor" Value="Yellow" />
+                  </VisualState.Setters>
+                </VisualState>
+              </VisualStateGroup>
+            </VisualStateGroupList>
+          </Setter>
+        </Style>
+      </ResourceDictionary>
+    </views:BasePage.Resources>
+    <views:BasePage.BindingContext>
+      <viewmodels:EntryViewModel />
+    </views:BasePage.BindingContext>
+    <views:BasePage.Content>
+      <ScrollView>
+        <VerticalStackLayout Padding="12">
+          <Label Text="Password" Style="{StaticResource Headline}" />
+          <HorizontalStackLayout>
+            <CheckBox x:Name="chkIsPassword" IsChecked="true" />
+            <Label Text="Is Password" VerticalOptions="Center" />
+          </HorizontalStackLayout>
+          <Entry IsPassword="{Binding IsChecked, Source={Reference chkIsPassword}}" />
+          <Entry Text="Background">
+            <Entry.Background>
+              <LinearGradientBrush EndPoint="1,0">
+                <GradientStop Color="Yellow" Offset="0.1" />
+                <GradientStop Color="Green" Offset="1.0" />
+              </LinearGradientBrush>
+            </Entry.Background>
+          </Entry>
+          <controls:TransparentEntry />
+          <HorizontalStackLayout>
+            <Label Text="CursorPosition = 4" />
+            <Slider x:Name="sldCursorPosition" WidthRequest="100" />
+          </HorizontalStackLayout>
+        </VerticalStackLayout>
+      </ScrollView>
+    </views:BasePage.Content>
+  </views:BasePage>`;
+
+      it('finds the visual content inside a custom page Content property', () => {
+        const root = parser.parseXaml(entryPageExcerpt);
+
+        expect(root.type).toBe(ElementType.ScrollView);
+        expect(root.children[0].type).toBe(ElementType.VerticalStackLayout);
+        expect(root.children[0].children.map(child => child.type)).toEqual([
+          ElementType.Label,
+          ElementType.StackLayout,
+          ElementType.Entry,
+          ElementType.Entry,
+          ElementType.Custom,
+          ElementType.StackLayout
+        ]);
+      });
+
+      it('preserves page resources, binding context, namespaces, and the custom page root', () => {
+        const generated = generator.generateXaml(parser.parseXaml(entryPageExcerpt));
+
+        expect(generated).toContain('<views:BasePage');
+        expect(generated).toContain('xmlns:views="clr-namespace:Maui.Controls.Sample.Pages.Base"');
+        expect(generated).toContain('x:Class="Maui.Controls.Sample.Pages.EntryPage"');
+        expect(generated).toContain('Title="Entry"');
+        expect(generated).toContain('<views:BasePage.Resources>');
+        expect(generated).toContain('<VisualState x:Name="Focused">');
+        expect(generated).toContain('<views:BasePage.BindingContext>');
+        expect(generated).toContain('<viewmodels:EntryViewModel');
+        expect(generated).toContain('<views:BasePage.Content>');
+        expect(generated).toContain('</views:BasePage>');
+      });
+
+      it('round trips nested reference bindings and built-in property elements', () => {
+        const root = parser.parseXaml(entryPageExcerpt);
+        const generated = generator.generateXaml(root);
+        const gradientEntry = root.children[0].children[3];
+
+        expect(generated).toContain('IsPassword="{Binding IsChecked, Source={Reference chkIsPassword}}"');
+        expect(generated).toContain('<Entry.Background>');
+        expect(generated).toContain('<LinearGradientBrush EndPoint="1,0">');
+        expect(generated).toContain('<GradientStop Color="Green" Offset="1.0"');
+        expect(gradientEntry.properties.backgroundGradient)
+          .toBe('linear-gradient(90deg, Yellow 10%, Green 100%)');
+      });
+
+      it('renders a gradient from its StartPoint to its EndPoint', () => {
+        const xaml = entryPageExcerpt
+          .replace('EndPoint="1,0"', 'StartPoint="1,0" EndPoint="0,0"');
+        const gradientEntry = parser.parseXaml(xaml).children[0].children[3];
+
+        expect(gradientEntry.properties.backgroundGradient)
+          .toBe('linear-gradient(270deg, Yellow 10%, Green 100%)');
+      });
+
+      it('retains namespaces used only by visual-tree attributes and property elements', () => {
+        const xaml = entryPageExcerpt
+          .replace(
+            'xmlns:controls="clr-namespace:Maui.Controls.Sample.Pages"',
+            'xmlns:controls="clr-namespace:Maui.Controls.Sample.Pages"\n      xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"'
+          )
+          .replace(
+            '<Label Text="Password" Style="{StaticResource Headline}" />',
+            `<Label Text="Password" toolkit:SemanticOrderView.Order="1">
+              <Label.Behaviors>
+                <toolkit:TouchBehavior />
+              </Label.Behaviors>
+            </Label>`
+          );
+
+        const generated = generator.generateXaml(parser.parseXaml(xaml));
+
+        expect(generated).toContain(
+          'xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"'
+        );
+        expect(generated).toContain('toolkit:SemanticOrderView.Order="1"');
+        expect(generated).toContain('<toolkit:TouchBehavior');
+      });
+
+      it('preserves namespace declarations shadowed inside retained markup', () => {
+        const xaml = entryPageExcerpt
+          .replace(
+            'xmlns:controls="clr-namespace:Maui.Controls.Sample.Pages"',
+            'xmlns:controls="clr-namespace:Maui.Controls.Sample.Pages"\n      xmlns:local="clr-namespace:Root"'
+          )
+          .replace(
+            '<Label Text="Password" Style="{StaticResource Headline}" />',
+            `<Label Text="Password">
+              <Label.Behaviors xmlns:local="clr-namespace:Nested">
+                <local:NestedBehavior />
+              </Label.Behaviors>
+            </Label>`
+          );
+
+        const generated = generator.generateXaml(parser.parseXaml(xaml));
+
+        expect(generated).toContain('xmlns:local="clr-namespace:Root"');
+        expect(generated).toContain(
+          '<Label.Behaviors xmlns:local="clr-namespace:Nested">'
+        );
+        expect(generated).toContain('<local:NestedBehavior');
+      });
+    });
   });
 });

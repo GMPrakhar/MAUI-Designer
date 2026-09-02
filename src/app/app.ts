@@ -56,6 +56,7 @@ export class App implements OnInit, OnDestroy {
 
   private toastTimeout: any;
   private subscription = new Subscription();
+  private hostDocumentLoaded = false;
 
   // Resize state
   private isResizing = false;
@@ -116,16 +117,21 @@ export class App implements OnInit, OnDestroy {
     // Every change flows back so the host can keep the document in sync
     this.subscription.add(
       this.elementService.elements$.subscribe(root => {
-        this.hostBridge.notifyChanged(this.xamlGenerator.generateXaml(root));
+        if (this.hostDocumentLoaded) {
+          this.hostBridge.notifyChanged(this.xamlGenerator.generateXaml(root));
+        }
       })
     );
 
     this.subscription.add(this.hostBridge.fileName$.subscribe(name => (this.hostFileName = name)));
+    this.hostBridge.start();
   }
 
   private loadFromHost(xaml: string) {
+    this.hostDocumentLoaded = false;
     try {
       this.elementService.setRootElement(this.xamlParser.parseXaml(xaml));
+      this.hostDocumentLoaded = true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.hostBridge.reportError(message);

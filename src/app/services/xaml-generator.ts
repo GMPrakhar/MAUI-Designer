@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridLength, GridLengthType, Orientation } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridLength, GridLengthType, Orientation, XamlDocumentMetadata } from '../models/maui-element';
 
 @Injectable({
   providedIn: 'root'
@@ -10,35 +10,87 @@ export class XamlGeneratorService {
 
   generateXaml(rootElement: MauiElement): string {
     const xamlContent = this.generateElementXaml(rootElement, 0);
-    const namespaces = this.collectNamespaceDeclarations(rootElement);
+    const document = rootElement.properties.document;
+    const rootTag = document?.rootTag || 'ContentPage';
+    const defaultNamespace = document?.defaultNamespace || 'http://schemas.microsoft.com/dotnet/2021/maui';
+    const namespaces = this.collectNamespaceDeclarations(rootElement, document);
+    const rootAttributes = document
+      ? Object.entries(document.attributes)
+          .map(([name, value]) => `\n             ${name}="${this.escapeXml(value)}"`)
+          .join('')
+      : '\n             x:Class="YourApp.MainPage"';
+    const before = this.generateRawDocumentContent(document?.rawBeforeContent || []);
+    const after = this.generateRawDocumentContent(document?.rawAfterContent || []);
+    const content = document?.contentPropertyTag
+      ? `    <${document.contentPropertyTag}>\n${this.indent(xamlContent)}\n    </${document.contentPropertyTag}>`
+      : xamlContent;
 
     return `<?xml version="1.0" encoding="utf-8" ?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"${namespaces}
-             x:Class="YourApp.MainPage">
-${xamlContent}
-</ContentPage>`;
+<${rootTag} xmlns="${defaultNamespace}"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"${namespaces}${rootAttributes}>
+${before}${content}${after}
+</${rootTag}>`;
   }
 
-  /**
-   * Only the namespaces actually used by custom controls in the tree are
-   * declared, so the generated page stays clean.
-   */
-  private collectNamespaceDeclarations(rootElement: MauiElement): string {
-    const used = new Map<string, string>();
+  /** Only namespaces still referenced by retained markup are declared. */
+  private collectNamespaceDeclarations(rootElement: MauiElement, document?: XamlDocumentMetadata): string {
+    const elementNamespaces = new Map<string, string>();
+    const references = document
+      ? [
+        document.rootTag,
+        document.contentPropertyTag || '',
+        ...Object.keys(document.attributes),
+        ...Object.values(document.attributes),
+        ...document.rawBeforeContent,
+        ...document.rawAfterContent
+      ]
+      : [];
 
     const walk = (element: MauiElement) => {
-      const { customPrefix, customNamespace } = element.properties;
-      if (element.type === ElementType.Custom && customPrefix && customNamespace) {
-        used.set(customPrefix, customNamespace);
+      const {
+        customPrefix,
+        customNamespace,
+        rawAttributes,
+        customValues,
+        bindings,
+        rawContentXml
+      } = element.properties;
+      if (customPrefix && customNamespace) {
+        elementNamespaces.set(customPrefix, customNamespace);
       }
+      references.push(
+        customPrefix ? `${customPrefix}:` : '',
+        ...Object.keys(rawAttributes || {}),
+        ...Object.values(rawAttributes || {}),
+        ...Object.keys(customValues || {}),
+        ...Object.values(customValues || {}),
+        ...Object.keys(bindings || {}),
+        ...Object.values(bindings || {}),
+        ...(rawContentXml || [])
+      );
       element.children.forEach(walk);
     };
     walk(rootElement);
 
+    const retainedMarkup = references.join(' ');
+    const used = new Map<string, string>(
+      Object.entries(document?.namespaces || {}).filter(([prefix]) =>
+        prefix !== 'x' && retainedMarkup.includes(`${prefix}:`)
+      )
+    );
+    elementNamespaces.forEach((uri, prefix) => used.set(prefix, uri));
+
     return [...used.entries()]
       .map(([prefix, uri]) => `\n             xmlns:${prefix}="${uri}"`)
       .join('');
+  }
+
+  private generateRawDocumentContent(elements: string[]): string {
+    return elements.length ? elements.map(element => `    ${element}\n`).join('') : '';
+  }
+
+  private indent(xaml: string): string {
+    return xaml.split('\n').map(line => `    ${line}`).join('\n');
   }
 
   private generateElementXaml(element: MauiElement, indentLevel: number): string {
@@ -61,7 +113,7 @@ ${xamlContent}
       xaml += this.generateGridDefinitions(element, indentLevel + 1);
     }
 
-    // Property elements of custom controls are re-emitted verbatim
+    // Unmodelled property elements are re-emitted verbatim
     for (const raw of rawContent) {
       xaml += `\n${'    '.repeat(indentLevel + 2)}${raw}`;
     }

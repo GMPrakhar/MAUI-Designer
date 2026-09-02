@@ -320,12 +320,13 @@
   }
 
   .element-scroll-view {
-    .element-stack-layout,
-    .element-vertical-stack-layout,
-    .element-grid,
-    .element-absolute-layout,
-    .element-scroll-view {
-      overflow: auto !important;
+    overflow: auto;
+
+    > .element-stack-layout,
+    > .element-vertical-stack-layout,
+    > .element-grid,
+    > .element-absolute-layout {
+      overflow: visible !important;
     }
   }
 
@@ -581,6 +582,18 @@
 // --- Additional control previews ---------------------------------------------
 
 .canvas-element {
+  &.element-disabled {
+    opacity: 0.55;
+    filter: grayscale(0.35);
+  }
+
+  // Hidden controls remain selectable on a design surface, but are ghosted so
+  // the preview still communicates their runtime visibility.
+  &.element-not-visible {
+    opacity: 0.25;
+    outline: 1px dashed #64748b;
+  }
+
   .element-search-bar,
   .element-date-picker {
     display: flex;

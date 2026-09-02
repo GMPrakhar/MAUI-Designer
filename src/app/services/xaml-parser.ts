@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA, AppThemeColor, LayoutOptions, LAYOUT_OPTIONS } from '../models/maui-element';
+import { MauiElement, ElementType, ElementProperties, Thickness, GridDefinition, GridRowDefinition, GridColumnDefinition, GridLength, GridLengthType, Orientation, DEFAULT_ICON_PATH_DATA, AppThemeColor, LayoutOptions, LAYOUT_OPTIONS, XamlDocumentMetadata } from '../models/maui-element';
 import { CustomControlRegistryService } from './custom-control-registry';
 
 /** Attributes the designer models itself, so they never end up in rawAttributes. */
@@ -64,7 +64,12 @@ export class XamlParserService {
         throw new Error('No valid layout element found. Please ensure your XAML contains a layout like AbsoluteLayout, Grid, or StackLayout.');
       }
       
-      return this.parseElement(rootLayoutElement, null);
+      const root = this.parseElement(rootLayoutElement, null);
+      root.id = 'root';
+      if (rootLayoutElement !== contentPage) {
+        root.properties.document = this.parseDocumentMetadata(contentPage, rootLayoutElement);
+      }
+      return root;
     } catch (error: any) {
       console.error('XAML parsing error:', error);
       throw error;
@@ -86,7 +91,58 @@ export class XamlParserService {
         return child;
       }
     }
+
+    // Custom ContentPage subclasses commonly wrap their visual tree in a
+    // `<prefix:Page.Content>` property element.
+    for (let i = 0; i < contentPage.children.length; i++) {
+      const child = contentPage.children[i];
+      if (child.tagName.toLowerCase().endsWith('.content')) {
+        const content = this.findRootLayoutElement(child);
+        if (content) {
+          return content;
+        }
+      }
+    }
     return null;
+  }
+
+  private parseDocumentMetadata(contentPage: Element, rootLayout: Element): XamlDocumentMetadata {
+    const attributes: Record<string, string> = {};
+    for (let i = 0; i < contentPage.attributes.length; i++) {
+      const attribute = contentPage.attributes[i];
+      if (attribute.name !== 'xmlns' && !attribute.name.startsWith('xmlns:')) {
+        attributes[attribute.name] = attribute.value;
+      }
+    }
+
+    let contentContainer = rootLayout;
+    while (contentContainer.parentElement && contentContainer.parentElement !== contentPage) {
+      contentContainer = contentContainer.parentElement;
+    }
+
+    const before: string[] = [];
+    const after: string[] = [];
+    let foundContent = false;
+    for (let i = 0; i < contentPage.children.length; i++) {
+      const child = contentPage.children[i];
+      if (child === contentContainer) {
+        foundContent = true;
+        continue;
+      }
+      (foundContent ? after : before).push(this.serializeRetainedElement(child));
+    }
+
+    return {
+      rootTag: contentPage.tagName,
+      defaultNamespace: contentPage.getAttribute('xmlns') || undefined,
+      namespaces: this.collectNamespaces(contentPage),
+      attributes,
+      contentPropertyTag: contentContainer.tagName.includes('.') ? contentContainer.tagName : undefined,
+      contentWidthExplicit: rootLayout.hasAttribute('WidthRequest'),
+      contentHeightExplicit: rootLayout.hasAttribute('HeightRequest'),
+      rawBeforeContent: before,
+      rawAfterContent: after
+    };
   }
 
   private isLayoutType(type: ElementType | null): boolean {
@@ -116,12 +172,11 @@ export class XamlParserService {
       parent: parent || undefined
     };
 
-    // Property elements of a custom control cannot be modelled, so keep the XML
-    if (elementType === ElementType.Custom) {
-      const rawContent = this.collectRawPropertyElements(xmlElement);
-      if (rawContent.length) {
-        element.properties.rawContentXml = rawContent;
-      }
+    // Keep property elements the designer does not model so importing a brush,
+    // gesture recognizer, or third-party property cannot make the XAML lossy.
+    const rawContent = this.collectRawPropertyElements(xmlElement);
+    if (rawContent.length) {
+      element.properties.rawContentXml = rawContent;
     }
 
     // Parse child elements: unknown tags become custom elements, never dropped
@@ -408,18 +463,33 @@ export class XamlParserService {
 
   /** Serialises property elements such as `<toolkit:Expander.Header>` verbatim. */
   private collectRawPropertyElements(xmlElement: Element): string[] {
-    const serializer = new XMLSerializer();
     const raw: string[] = [];
 
     for (let i = 0; i < xmlElement.children.length; i++) {
       const child = xmlElement.children[i];
-      if (child.tagName.includes('.')) {
-        // The serializer repeats every namespace: they are declared on the page
-        raw.push(serializer.serializeToString(child).replace(/\s+xmlns(:[\w.-]+)?="[^"]*"/g, ''));
+      if (
+        child.tagName.includes('.') &&
+        !child.tagName.includes('.RowDefinitions') &&
+        !child.tagName.includes('.ColumnDefinitions') &&
+        !child.tagName.includes('.ItemTemplate')
+      ) {
+        raw.push(this.serializeRetainedElement(child));
       }
     }
 
     return raw;
+  }
+
+  private serializeRetainedElement(element: Element): string {
+    return new XMLSerializer()
+      .serializeToString(element)
+      .replace(
+        /\s+xmlns(?::([\w.-]+))?="([^"]*)"/g,
+        (declaration, prefix: string | undefined, uri: string) => {
+          const rootUri = element.ownerDocument.documentElement.lookupNamespaceURI(prefix || null);
+          return rootUri === uri ? '' : declaration;
+        }
+      );
   }
 
   /** Reads `xmlns:prefix="uri"` declarations from the document root. */
@@ -445,7 +515,7 @@ export class XamlParserService {
 
     const prefix = rawPrefix;
     const tag = rawTag;
-    const uri = this.namespaces[prefix] || '';
+    const uri = xmlElement.lookupNamespaceURI(prefix || null) || this.namespaces[prefix] || '';
 
     const attributes: Record<string, string> = {};
     for (let i = 0; i < xmlElement.attributes.length; i++) {
@@ -601,6 +671,7 @@ export class XamlParserService {
 
     const backgroundColor = color('BackgroundColor');
     if (backgroundColor) properties.backgroundColor = backgroundColor;
+    properties.backgroundGradient = this.parseLinearGradient(xmlElement) || undefined;
 
     const textColor = color('TextColor');
     if (textColor) properties.textColor = textColor;
@@ -709,6 +780,37 @@ export class XamlParserService {
     return properties;
   }
 
+  private parseLinearGradient(xmlElement: Element): string | null {
+    const propertyElement = Array.from(xmlElement.children)
+      .find(child => child.tagName.endsWith('.Background'));
+    const brush = propertyElement?.querySelector('LinearGradientBrush');
+    if (!brush) {
+      return null;
+    }
+
+    const [startX, startY] = (brush.getAttribute('StartPoint') || '0,0')
+      .split(',')
+      .map(value => parseFloat(value.trim()));
+    const [endX, endY] = (brush.getAttribute('EndPoint') || '1,1')
+      .split(',')
+      .map(value => parseFloat(value.trim()));
+    const angle = [startX, startY, endX, endY].every(Number.isFinite)
+      ? Math.round(Math.atan2(endY - startY, endX - startX) * 180 / Math.PI + 90)
+      : 135;
+    const stops = Array.from(brush.querySelectorAll('GradientStop'))
+      .map(stop => {
+        const color = stop.getAttribute('Color');
+        const offset = parseFloat(stop.getAttribute('Offset') || '');
+        if (!color) {
+          return null;
+        }
+        return Number.isFinite(offset) ? `${color} ${offset * 100}%` : color;
+      })
+      .filter((stop): stop is string => stop !== null);
+
+    return stops.length ? `linear-gradient(${angle}deg, ${stops.join(', ')})` : null;
+  }
+
   /**
    * Attributes the designer never read are kept verbatim so importing XAML the tool
    * does not fully understand cannot silently delete markup on the next export.
@@ -759,9 +861,9 @@ export class XamlParserService {
       if (!this.isBindingExpression(attribute.value)) {
         continue;
       }
-      const match = /\{\s*Binding\s+([^},]*)/i.exec(attribute.value);
-      const path = (match?.[1] || '').trim();
-      bindings[attribute.name] = path.replace(/^Path\s*=\s*/i, '');
+      const match = /^\s*\{\s*Binding(?:\s+([\s\S]*?))?\s*\}\s*$/i.exec(attribute.value);
+      const expression = (match?.[1] || '.').trim();
+      bindings[attribute.name] = expression.replace(/^Path\s*=\s*/i, '');
     }
     return bindings;
   }

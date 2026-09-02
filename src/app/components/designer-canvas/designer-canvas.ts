@@ -104,8 +104,14 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
 
     this.subscription.add(
       this.elementService.elements$.subscribe(root => {
-        this.designWidth = root.properties.width || 800;
-        this.designHeight = root.properties.height || 600;
+        const document = root.properties.document;
+        const device = this.viewportService.getDevice(this.viewport.deviceId);
+        this.designWidth = document && !document.contentWidthExplicit
+          ? device?.width || 800
+          : root.properties.width || 800;
+        this.designHeight = document && !document.contentHeightExplicit
+          ? device?.height || 600
+          : root.properties.height || 600;
         this.rebuildRulers();
       })
     );
@@ -547,6 +553,11 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
       styles.height = this.fillsAxis(props.verticalOptions) ? '100%' : (props.height || 0) + 'px';
       styles.minWidth = (props.width || 0) + 'px';
       styles.minHeight = (props.height || 0) + 'px';
+    } else if (element.parent?.type === ElementType.ScrollView) {
+      styles.transform = 'none';
+      styles.width = '100%';
+      styles.height = 'max-content';
+      styles.minHeight = '100%';
     } else if (this.isStackParent(element.parent)) {
       styles.transform = 'none';
       const vertical = element.parent!.type === ElementType.VerticalStackLayout
@@ -572,6 +583,9 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     if (background) {
       styles.backgroundColor = background;
     }
+    if (props.backgroundGradient) {
+      styles.backgroundImage = props.backgroundGradient;
+    }
 
     const text = this.themedColor(element, 'TextColor', props.textColor);
     if (text) {
@@ -590,6 +604,12 @@ export class DesignerCanvasComponent implements OnInit, OnDestroy {
     if (props.padding) {
       const p = props.padding;
       styles.padding = `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`;
+    }
+
+    if (element.id === 'root') {
+      styles.transform = 'none';
+      styles.width = '100%';
+      styles.height = '100%';
     }
 
     return styles;

@@ -12,14 +12,14 @@ import { DesignerPage } from './helpers/designer-page';
 async function hostAsVisualStudio(page: Page) {
   await page.addInitScript(() => {
     const outbound: unknown[] = [];
-    (window as any).__hostMessages = outbound;
-    (window as any).chrome = {
-      webview: {
-        postMessage: (message: string) => outbound.push(JSON.parse(message))
-      }
+    const webview = new EventTarget() as EventTarget & {
+      postMessage(message: string): void;
     };
+    webview.postMessage = (message: string) => outbound.push(JSON.parse(message));
+    (window as any).__hostMessages = outbound;
+    (window as any).chrome = { webview };
     (window as any).__sendToDesigner = (message: unknown) => {
-      window.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(message) }));
+      webview.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(message) }));
     };
   });
 }
@@ -42,6 +42,9 @@ test.describe('IDE host integration', () => {
     await expect
       .poll(async () => (await outbound(page)).map(m => m.type))
       .toContain('designer.ready');
+
+    await expect(page.getByText('XAML Editor', { exact: true })).toHaveCount(0);
+    expect((await outbound(page)).map(m => m.type)).not.toContain('document.changed');
 
     await sendToDesigner(page, { type: 'host.ready', host: 'visual-studio', fileName: 'MainPage.xaml' });
 
@@ -67,8 +70,8 @@ test.describe('IDE host integration', () => {
 </ContentPage>`
     });
 
-    await designer.expectXamlToContain('Hosted label');
     await expect(designer.canvas.locator('[data-element-type="Label"]')).toHaveCount(1);
+    await expect(designer.canvas.getByText('Hosted label')).toBeVisible();
   });
 
   test('streams every edit back to the host', async ({ page }) => {
@@ -76,6 +79,11 @@ test.describe('IDE host integration', () => {
     const designer = new DesignerPage(page);
     await designer.goto();
 
+    await sendToDesigner(page, {
+      type: 'document.load',
+      fileName: 'MainPage.xaml',
+      xaml: '<ContentPage><AbsoluteLayout /></ContentPage>'
+    });
     await designer.addControl('Button');
 
     await expect

@@ -89,6 +89,51 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Every_registered_editor_name_has_a_managed_string_resource()
+        {
+            var package = _extension.GetType(PackageTypeName, throwOnError: true)!;
+            var factoryRegistration = Attribute(package, "ProvideEditorFactoryAttribute");
+            var extensionRegistration = Attribute(package, "ProvideEditorExtensionAttribute");
+            var projectDirectory = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix");
+            var project = XDocument.Load(Path.Combine(projectDirectory, "MauiDesigner.Vsix.csproj"));
+            var useCodeBase = project.Descendants()
+                .Single(element => element.Name.LocalName == "UseCodeBase")
+                .Value;
+            var resourceItem = project.Descendants()
+                .Single(element => element.Name.LocalName == "EmbeddedResource"
+                                   && element.Attribute("Include")?.Value == "VsPackage.resx");
+
+            Assert.Equal("true", useCodeBase);
+            Assert.Equal(
+                "VSPackage",
+                resourceItem.Elements().Single(element => element.Name.LocalName == "ManifestResourceName").Value);
+            Assert.Equal(
+                "true",
+                resourceItem.Elements().Single(element => element.Name.LocalName == "MergeWithCTO").Value);
+
+            var referencedIds = new[]
+            {
+                Convert.ToInt32(factoryRegistration.ConstructorArguments[1].Value),
+                Convert.ToInt32(extensionRegistration.NamedArguments
+                    .Single(argument => argument.MemberName == "NameResourceID")
+                    .TypedValue.Value)
+            };
+
+            var resources = XDocument.Load(
+                    Path.Combine(projectDirectory, "VsPackage.resx"))
+                .Root!
+                .Elements("data")
+                .Select(element => element.Attribute("name")?.Value)
+                .Where(name => name is not null)
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (var resourceId in referencedIds)
+            {
+                Assert.Contains(resourceId.ToString(), resources);
+            }
+        }
+
+        [Fact]
         public void The_built_in_xaml_editor_keeps_priority()
         {
             var package = _extension.GetType(PackageTypeName, throwOnError: true)!;
@@ -131,6 +176,16 @@ namespace MauiDesigner.Core.Tests
             Assert.Contains(
                 factory.GetInterfaces(),
                 candidate => candidate.FullName == "Microsoft.VisualStudio.Shell.Interop.IVsEditorFactory");
+        }
+
+        [Fact]
+        public void The_designer_pane_tracks_the_shared_text_buffer()
+        {
+            var pane = _extension.GetType("MauiDesigner.Vsix.DesignerPane", throwOnError: true)!;
+
+            Assert.Contains(
+                pane.GetFields(BindingFlags.Instance | BindingFlags.NonPublic),
+                field => field.FieldType.FullName == "Microsoft.VisualStudio.Text.ITextBuffer");
         }
 
         [Fact]
