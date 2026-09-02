@@ -52,4 +52,6 @@ Thumbs.db
 [Oo]bj/
 *.user
 *.vsix
+!extension/src/MauiDesigner.Vsix/
+/extension/src/MauiDesigner.Vsix/LICENSE.txt
 .vs/
