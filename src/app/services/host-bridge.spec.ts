@@ -12,6 +12,11 @@ describe('HostBridgeService', () => {
   });
 
   function create(): HostBridgeService {
+    const webview = (window as any).chrome?.webview;
+    if (webview && typeof webview.addEventListener !== 'function') {
+      webview.addEventListener = window.addEventListener.bind(window);
+    }
+
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
     return TestBed.inject(HostBridgeService);
@@ -49,7 +54,10 @@ describe('HostBridgeService', () => {
 
     expect(service.host).toBe('visual-studio');
     expect(service.isHosted).toBeTrue();
-    // The designer announces itself as soon as it is hosted
+    expect(posted).toEqual([]);
+
+    service.start();
+
     expect(posted).toEqual([JSON.stringify({ type: 'designer.ready' })]);
   });
 
@@ -58,6 +66,7 @@ describe('HostBridgeService', () => {
     (window as any).chrome = { webview: { postMessage: (m: string) => posted.push(m) } };
 
     const service = create();
+    service.start();
     service.save('<ContentPage />');
 
     expect(JSON.parse(posted[1])).toEqual({ type: 'document.save', xaml: '<ContentPage />' });
@@ -69,6 +78,7 @@ describe('HostBridgeService', () => {
     (window as any).acquireVsCodeApi = () => ({ postMessage: (m: unknown) => posted.push(m) });
 
     const service = create();
+    service.start();
     service.notifyChanged('<ContentPage />');
 
     expect(service.host).toBe('vscode');
@@ -92,6 +102,26 @@ describe('HostBridgeService', () => {
 
     expect(calls).toBe(1);
     expect(service.host).toBe('vscode');
+  });
+
+  it('subscribes before starting the host handshake', () => {
+    (window as any).chrome = {
+      webview: {
+        postMessage: (message: string) => {
+          if (JSON.parse(message).type === 'designer.ready') {
+            post({ type: 'document.load', xaml: '<ContentPage><Label /></ContentPage>' });
+          }
+        }
+      }
+    };
+    const service = create();
+    const received: HostInboundMessage[] = [];
+    service.messages$.subscribe(message => received.push(message));
+
+    service.start();
+    service.start();
+
+    expect(received.map(message => message.type)).toEqual(['document.load']);
   });
 
   it('forwards messages received from the host', () => {

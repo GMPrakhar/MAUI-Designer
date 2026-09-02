@@ -55,6 +55,8 @@ export interface ElementProperties {
   
   // Visual properties
   backgroundColor?: string;
+  /** CSS preview generated from a MAUI LinearGradientBrush property element. */
+  backgroundGradient?: string;
   textColor?: string;
   fontSize?: number;
   fontFamily?: string;
@@ -113,6 +115,9 @@ export interface ElementProperties {
   /** Property elements of a custom control (e.g. Expander.Header), kept as XML. */
   rawContentXml?: string[];
 
+  /** Original page wrapper and non-visual property elements retained on import. */
+  document?: XamlDocumentMetadata;
+
   // Other properties
   isVisible?: boolean;
   isEnabled?: boolean;
@@ -136,6 +141,18 @@ export interface ElementProperties {
    * BackgroundColor="{AppThemeBinding Light=#FFFFFF, Dark=#1E1E1E}".
    */
   appTheme?: Record<string, AppThemeColor>;
+}
+
+export interface XamlDocumentMetadata {
+  rootTag: string;
+  defaultNamespace?: string;
+  namespaces: Record<string, string>;
+  attributes: Record<string, string>;
+  contentPropertyTag?: string;
+  contentWidthExplicit: boolean;
+  contentHeightExplicit: boolean;
+  rawBeforeContent: string[];
+  rawAfterContent: string[];
 }
 
 /** Light and dark values for a single colour property. */

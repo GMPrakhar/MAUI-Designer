@@ -195,6 +195,7 @@ jobs:
 
           $expected = @(
             "[`$RootKey`$\Packages\$env:PACKAGE_GUID]",
+            '"CodeBase"="$PackageFolder$\MauiDesigner.Vsix.dll"',
             "[`$RootKey`$\Editors\$env:EDITOR_FACTORY_GUID]",
             "[`$RootKey`$\Editors\$env:EDITOR_FACTORY_GUID\Extensions]",
             '"xaml"=dword:00000010',

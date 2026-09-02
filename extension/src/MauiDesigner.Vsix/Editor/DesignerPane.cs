@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 using MauiDesigner.Core.Manifests;
@@ -8,8 +9,11 @@ using MauiDesigner.Core.Protocol;
 using MauiDesigner.Vsix.Projects;
 
 using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.ComponentModelHost;
+using Microsoft.VisualStudio.Editor;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.TextManager.Interop;
 using Microsoft.VisualStudio.Threading;
 
@@ -26,6 +30,8 @@ namespace MauiDesigner.Vsix
         private readonly IVsHierarchy _hierarchy;
         private readonly DesignerControl _control;
         private readonly DesignerSession _session;
+        private ITextBuffer? _textBuffer;
+        private CancellationTokenSource? _bufferReloadCancellation;
 
         /// <summary>
         /// Taken from the package rather than <see cref="ThreadHelper"/>, whose
@@ -36,6 +42,7 @@ namespace MauiDesigner.Vsix
         private readonly JoinableTaskFactory _joinableTaskFactory;
 
         private bool _applyingDesignerEdit;
+        private bool _disposed;
 
         public DesignerPane(
             AsyncPackage package,
@@ -72,18 +79,58 @@ namespace MauiDesigner.Vsix
         {
             base.Initialize();
 
-            _joinableTaskFactory.RunAsync(() => _control.InitializeAsync(WebAssetLocator.WebRootDirectory))
-                .FileAndForget("vs/mauidesigner/initialize");
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                await _control.InitializeAsync(WebAssetLocator.WebRootDirectory);
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+                if (_disposed)
+                {
+                    return;
+                }
+
+                SubscribeToBufferChanges();
+                _session.OpenDocument(ReadBuffer(), _documentMoniker);
+            }).FileAndForget("vs/mauidesigner/initialize");
 
             ThreadHelper.ThrowIfNotOnUIThread();
             _session.OpenDocument(ReadBuffer(), _documentMoniker);
         }
 
+        private void SubscribeToBufferChanges()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (_textBuffer is not null)
+            {
+                return;
+            }
+
+            var componentModel = GetService(typeof(SComponentModel)) as IComponentModel
+                ?? throw new InvalidOperationException("Visual Studio's component model is unavailable.");
+            var adapters = componentModel.GetService<IVsEditorAdaptersFactoryService>()
+                ?? throw new InvalidOperationException("Visual Studio's editor adapter service is unavailable.");
+
+            _textBuffer = adapters.GetDataBuffer(_textLines)
+                ?? throw new InvalidOperationException("The XAML document has no shared text buffer.");
+            _textBuffer.Changed += OnTextBufferChanged;
+        }
+
         private void OnDesignerEdited(object sender, DocumentChangedEventArgs args)
         {
+            if (Volatile.Read(ref _bufferReloadCancellation) is not null)
+            {
+                return;
+            }
+
             _joinableTaskFactory.RunAsync(async () =>
             {
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
+
+                if (_bufferReloadCancellation is not null)
+                {
+                    return;
+                }
+
                 WriteBuffer(args.Xaml);
             }).FileAndForget("vs/mauidesigner/documentchanged");
         }
@@ -182,6 +229,41 @@ namespace MauiDesigner.Vsix
             }
         }
 
+        private void OnTextBufferChanged(object sender, TextContentChangedEventArgs args)
+        {
+            if (_applyingDesignerEdit || _disposed)
+            {
+                return;
+            }
+
+            var xaml = args.After.GetText();
+            var cancellation = new CancellationTokenSource();
+            var previous = Interlocked.Exchange(ref _bufferReloadCancellation, cancellation);
+            previous?.Cancel();
+
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                try
+                {
+                    await Task.Delay(250, cancellation.Token);
+                    await _joinableTaskFactory.SwitchToMainThreadAsync(cancellation.Token);
+
+                    if (!_applyingDesignerEdit && !_disposed)
+                    {
+                        _session.OpenDocument(xaml, _documentMoniker);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+                {
+                }
+                finally
+                {
+                    Interlocked.CompareExchange(ref _bufferReloadCancellation, null, cancellation);
+                    cancellation.Dispose();
+                }
+            }).FileAndForget("vs/mauidesigner/bufferchanged");
+        }
+
         private void WriteToOutput(string message)
         {
             _joinableTaskFactory.RunAsync(async () =>
@@ -198,8 +280,22 @@ namespace MauiDesigner.Vsix
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
             if (disposing)
             {
+                _disposed = true;
+
+                var cancellation = Interlocked.Exchange(ref _bufferReloadCancellation, null);
+                cancellation?.Cancel();
+                cancellation?.Dispose();
+
+                if (_textBuffer is not null)
+                {
+                    _textBuffer.Changed -= OnTextBufferChanged;
+                    _textBuffer = null;
+                }
+
                 _control.Dispose();
             }
 

@@ -91,12 +91,16 @@
     [class.selected]="isSelected(element)"
     [class.layout-element]="isLayoutElement(element)"
     [class.root-element]="element.id === 'root'"
+    [class.element-disabled]="element.properties.isEnabled === false"
+    [class.element-not-visible]="element.properties.isVisible === false"
     [style]="getElementStyles(element)"
     [attr.data-element-id]="element.id"
     [attr.data-element-type]="element.type"
     [attr.data-element-name]="element.name"
     [attr.data-custom-tag]="element.properties.customTag"
     [attr.data-selected]="isSelected(element)"
+    [attr.data-enabled]="element.properties.isEnabled !== false"
+    [attr.data-visible]="element.properties.isVisible !== false"
     cdkDrag
     [cdkDragDisabled]="!isPrimarySelection(element) || element.id === 'root'"
     (cdkDragStarted)="onDragStarted(element); setElementRef(element, elementDiv)"
@@ -119,7 +123,8 @@
       </span>
       
       <!-- Button -->
-      <button *ngSwitchCase="'Button'" class="element-button" type="button">
+      <button *ngSwitchCase="'Button'" class="element-button" type="button"
+              [disabled]="element.properties.isEnabled === false">
         {{ element.properties.text || 'Button' }}
       </button>
       
@@ -129,6 +134,7 @@
              type="text" 
              [value]="element.properties.text || ''"
              [attr.placeholder]="element.properties.placeholder || 'Enter text'"
+             [disabled]="element.properties.isEnabled === false"
              readonly>
       
       <!-- Editor -->
@@ -136,6 +142,7 @@
                 class="element-textarea"
                 [value]="element.properties.text || ''"
                 [attr.placeholder]="element.properties.placeholder || 'Enter text'"
+                [disabled]="element.properties.isEnabled === false"
                 readonly>
       </textarea>
 
