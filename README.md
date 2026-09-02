@@ -1,14 +1,14 @@
 # MAUI Designer - Angular
 
-**Buy me a coffee!**
-
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.me/gmprakhar)
-
 A powerful web-based visual designer for creating MAUI (Microsoft App UI) layouts with drag-and-drop functionality. This Angular application provides an intuitive interface for designing XAML-based user interfaces with real-time preview capabilities.
 
 **Live demo:** https://gmprakhar.github.io/MAUI-Designer/ (deployed to GitHub Pages from `main`)
 
 ![MAUI Designer](https://img.shields.io/badge/Angular-18.2.0-red) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5.4-blue) ![License](https://img.shields.io/badge/License-GPLv3-blue)
+
+**Buy me a coffee!**
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.me/gmprakhar)
 
 ## 🚀 Features
 
