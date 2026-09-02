@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
-    <Identity Id="MauiDesigner.6e7b4b0d-8f5a-4a63-9f1e-4f2f7b0c6a11" Version="0.1.1" Language="en-US" Publisher="GMPrakhar" />
+    <Identity Id="MauiDesigner.6e7b4b0d-8f5a-4a63-9f1e-4f2f7b0c6a11" Version="1.0.0" Language="en-US" Publisher="GMPrakhar" />
     <DisplayName>MAUI Designer</DisplayName>
     <Description xml:space="preserve">A drag and drop visual designer for .NET MAUI XAML pages, including controls that come from NuGet packages.</Description>
     <MoreInfo>https://github.com/GMPrakhar/MAUI-Designer</MoreInfo>
