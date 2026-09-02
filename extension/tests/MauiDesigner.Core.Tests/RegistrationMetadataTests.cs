@@ -189,6 +189,33 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Designer_edits_are_written_through_the_shared_text_buffer()
+        {
+            var source = File.ReadAllText(Path.Combine(
+                ExtensionDirectory(),
+                "src",
+                "MauiDesigner.Vsix",
+                "Editor",
+                "DesignerPane.cs"));
+
+            Assert.Contains("textBuffer.Replace(new Span(0, snapshot.Length), xaml)", source);
+            Assert.DoesNotContain("_textLines.ReplaceLines", source);
+        }
+
+        [Fact]
+        public void Standalone_designer_buffers_are_sited_before_visual_studio_loads_them()
+        {
+            var source = File.ReadAllText(Path.Combine(
+                ExtensionDirectory(),
+                "src",
+                "MauiDesigner.Vsix",
+                "Editor",
+                "DesignerEditorFactory.cs"));
+
+            Assert.Contains("objectWithSite.SetSite(_oleServiceProvider)", source);
+        }
+
+        [Fact]
         public void The_logical_view_offered_is_one_the_factory_maps()
         {
             var package = _extension.GetType(PackageTypeName, throwOnError: true)!;

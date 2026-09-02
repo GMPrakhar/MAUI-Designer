@@ -24,6 +24,7 @@ namespace MauiDesigner.Vsix
 
         private readonly AsyncPackage _package;
         private ServiceProvider? _serviceProvider;
+        private IServiceProvider? _oleServiceProvider;
 
         public DesignerEditorFactory(AsyncPackage package)
         {
@@ -32,6 +33,7 @@ namespace MauiDesigner.Vsix
 
         public int SetSite(IServiceProvider serviceProvider)
         {
+            _oleServiceProvider = serviceProvider;
             _serviceProvider = new ServiceProvider(serviceProvider);
             return VSConstants.S_OK;
         }
@@ -129,7 +131,13 @@ namespace MauiDesigner.Vsix
 
             try
             {
-                return (IVsTextLines)Marshal.GetObjectForIUnknown(buffer);
+                var textLines = (IVsTextLines)Marshal.GetObjectForIUnknown(buffer);
+                if (textLines is IObjectWithSite objectWithSite && _oleServiceProvider is not null)
+                {
+                    objectWithSite.SetSite(_oleServiceProvider);
+                }
+
+                return textLines;
             }
             finally
             {
@@ -141,6 +149,7 @@ namespace MauiDesigner.Vsix
         {
             _serviceProvider?.Dispose();
             _serviceProvider = null;
+            _oleServiceProvider = null;
         }
     }
 }

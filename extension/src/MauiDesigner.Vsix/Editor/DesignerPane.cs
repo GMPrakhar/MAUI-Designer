@@ -197,7 +197,11 @@ namespace MauiDesigner.Vsix
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            if (_applyingDesignerEdit || ReadBuffer() == xaml)
+            var textBuffer = _textBuffer
+                ?? throw new InvalidOperationException("The XAML document has no shared text buffer.");
+            var snapshot = textBuffer.CurrentSnapshot;
+
+            if (_applyingDesignerEdit || snapshot.GetText() == xaml)
             {
                 return;
             }
@@ -205,23 +209,7 @@ namespace MauiDesigner.Vsix
             _applyingDesignerEdit = true;
             try
             {
-                ErrorHandler.ThrowOnFailure(_textLines.GetLineCount(out var lineCount));
-                ErrorHandler.ThrowOnFailure(_textLines.GetLengthOfLine(lineCount - 1, out var lastLineLength));
-
-                var bytes = System.Text.Encoding.Unicode.GetBytes(xaml);
-                var buffer = System.Runtime.InteropServices.Marshal.AllocCoTaskMem(bytes.Length + 2);
-                try
-                {
-                    System.Runtime.InteropServices.Marshal.Copy(bytes, 0, buffer, bytes.Length);
-                    System.Runtime.InteropServices.Marshal.WriteInt16(buffer, bytes.Length, 0);
-
-                    ErrorHandler.ThrowOnFailure(_textLines.ReplaceLines(
-                        0, 0, lineCount - 1, lastLineLength, buffer, xaml.Length, null));
-                }
-                finally
-                {
-                    System.Runtime.InteropServices.Marshal.FreeCoTaskMem(buffer);
-                }
+                textBuffer.Replace(new Span(0, snapshot.Length), xaml);
             }
             finally
             {
