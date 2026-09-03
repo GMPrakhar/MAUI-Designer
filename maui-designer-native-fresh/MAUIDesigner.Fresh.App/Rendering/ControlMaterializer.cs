@@ -155,13 +155,17 @@ public sealed class ControlMaterializer
             }
         };
         RectD start = node.Bounds ?? new RectD(0, 0, 160, 48);
+        double totalX = 0;
+        double totalY = 0;
         var pan = new PanGestureRecognizer();
         pan.PanUpdated += (_, args) =>
         {
             if (args.StatusType == GestureStatus.Running)
             {
-                chrome.TranslationX = args.TotalX;
-                chrome.TranslationY = args.TotalY;
+                totalX = args.TotalX;
+                totalY = args.TotalY;
+                chrome.TranslationX = totalX;
+                chrome.TranslationY = totalY;
             }
             else if (args.StatusType == GestureStatus.Completed)
             {
@@ -169,9 +173,14 @@ public sealed class ControlMaterializer
                 chrome.TranslationY = 0;
                 _workspace.SetBounds(node.Id, start with
                 {
-                    X = Math.Max(0, start.X + args.TotalX),
-                    Y = Math.Max(0, start.Y + args.TotalY)
+                    X = Math.Max(0, start.X + totalX),
+                    Y = Math.Max(0, start.Y + totalY)
                 });
+            }
+            else if (args.StatusType == GestureStatus.Canceled)
+            {
+                chrome.TranslationX = 0;
+                chrome.TranslationY = 0;
             }
         };
         handle.GestureRecognizers.Add(pan);
@@ -198,19 +207,30 @@ public sealed class ControlMaterializer
             }
         };
         RectD start = node.Bounds ?? new RectD(0, 0, 160, 48);
+        double totalX = 0;
+        double totalY = 0;
         var pan = new PanGestureRecognizer();
         pan.PanUpdated += (_, args) =>
         {
-            double width = Math.Max(24, start.Width + args.TotalX);
-            double height = Math.Max(24, start.Height + args.TotalY);
             if (args.StatusType == GestureStatus.Running)
             {
+                totalX = args.TotalX;
+                totalY = args.TotalY;
+                double width = Math.Max(24, start.Width + totalX);
+                double height = Math.Max(24, start.Height + totalY);
                 chrome.WidthRequest = width;
                 chrome.HeightRequest = height;
             }
             else if (args.StatusType == GestureStatus.Completed)
             {
+                double width = Math.Max(24, start.Width + totalX);
+                double height = Math.Max(24, start.Height + totalY);
                 _workspace.SetBounds(node.Id, start with { Width = width, Height = height });
+            }
+            else if (args.StatusType == GestureStatus.Canceled)
+            {
+                chrome.WidthRequest = start.Width;
+                chrome.HeightRequest = start.Height;
             }
         };
         handle.GestureRecognizers.Add(pan);
@@ -327,6 +347,32 @@ public sealed class ControlMaterializer
         {
             textProperty.SetValue(view, descriptor.DisplayName);
         }
+
+        ApplyPreviewTextContrast(view, descriptor, node);
+    }
+
+    private static void ApplyPreviewTextContrast(
+        View view,
+        ControlDescriptor descriptor,
+        DesignerNode node)
+    {
+        if (node.Properties.ContainsKey("TextColor") ||
+            view.BackgroundColor is Color background && background.Alpha > 0.05f)
+        {
+            return;
+        }
+
+        PropertyDescriptor? textColorDescriptor = descriptor.Properties
+            .FirstOrDefault(property =>
+                property.Name == "TextColor" &&
+                !property.IsReadOnly &&
+                property.ValueType == typeof(Color));
+        PropertyInfo? textColorProperty = textColorDescriptor is null
+            ? null
+            : descriptor.RuntimeType.GetProperty(
+                textColorDescriptor.Name,
+                BindingFlags.Public | BindingFlags.Instance);
+        textColorProperty?.SetValue(view, Colors.Black);
     }
 
     private static void EnsureDesignSize(View view, ControlDescriptor descriptor)

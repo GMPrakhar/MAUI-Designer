@@ -139,10 +139,18 @@ public sealed class DesignerWorkspace
 
     private ElementId ResolveInsertionParent()
     {
-        DesignerNode selected = Session.Current.Find(SelectedId) ?? Session.Current.Root;
-        return CanAcceptChild(selected.Id)
-                ? selected.Id
-                : FindParent(Session.Current.Root, selected.Id)?.Id ?? Session.Current.Root.Id;
+        DesignerNode? candidate = Session.Current.Find(SelectedId) ?? Session.Current.Root;
+        while (candidate is not null)
+        {
+            if (CanAcceptChild(candidate.Id))
+            {
+                return candidate.Id;
+            }
+
+            candidate = FindParent(Session.Current.Root, candidate.Id);
+        }
+
+        throw new InvalidOperationException("The document has no container that can accept another child control.");
     }
 
     public bool CanAcceptChild(ElementId parentId, ElementId? movingId = null)

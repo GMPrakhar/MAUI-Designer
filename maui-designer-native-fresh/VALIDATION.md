@@ -46,3 +46,23 @@ Prediction written before measurement:
 The temporary mutation used for this check is never committed.
 
 Observed failure matched the prediction: the seeded `Label` classification reached `Assert.False(label.AcceptsChildren)` with an actual value of `true`. The implementation was then restored.
+
+## Native manipulation validation
+
+Native DevFlow validation exposed that WinUI reports zero deltas on a pan recognizer's terminal event. Before the fix, resizing from `160 x 48` by `(60, 30)` returned to `160 x 48` after the successful gesture. The move and resize handlers now retain the latest running delta.
+
+After the fix:
+
+1. Resize changed the Label bounds from `(24, 24, 160, 48)` to `(24, 24, 220, 78)`.
+2. Move changed the bounds to `(64, 44, 220, 78)`.
+3. Two undo operations restored first the position and then the size.
+4. Two redo operations restored the final `(64, 44, 220, 78)` bounds.
+
+## Single-content ancestor instrument check
+
+Prediction written before measurement:
+
+1. With a Label selected inside a full `ContentView`, `Insertion_skips_full_single_content_ancestors` will initially fail because insertion stops at the immediate parent and throws instead of continuing to the root `AbsoluteLayout`.
+2. After correcting ancestor resolution, the new control must be inserted at the root while an explicitly requested second `ContentView` child remains rejected.
+
+The initial run failed at the predicted third insertion with `'ContentView' cannot accept another child control.` Ancestor traversal was then corrected to continue until it finds a container with capacity.
