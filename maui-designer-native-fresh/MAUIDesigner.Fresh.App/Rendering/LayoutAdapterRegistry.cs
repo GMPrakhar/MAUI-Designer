@@ -46,16 +46,17 @@ public sealed class LayoutAdapterRegistry
                 48),
                 PropertyUpdates: ClearGridPlacement());
 
-        public void AddDropPreview(View parent, LayoutPlacement placement)
+        public View? AddDropPreview(View parent, LayoutPlacement placement)
         {
             if (parent is not AbsoluteLayout layout || placement.Bounds is not RectD bounds)
             {
-                return;
+                return null;
             }
 
             var preview = CreatePreview();
             AbsoluteLayout.SetLayoutBounds(preview, new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height));
             layout.Children.Add(preview);
+            return preview;
         }
     }
 
@@ -95,19 +96,20 @@ public sealed class LayoutAdapterRegistry
                     .SetItem("Grid.Column", DesignerValue.Literal(cell.Column.ToString(CultureInfo.InvariantCulture))));
         }
 
-        public void AddDropPreview(View parent, LayoutPlacement placement)
+        public View? AddDropPreview(View parent, LayoutPlacement placement)
         {
             if (parent is not Grid grid ||
                 !TryReadPlacement(placement, "Grid.Row", out int row) ||
                 !TryReadPlacement(placement, "Grid.Column", out int column))
             {
-                return;
+                return null;
             }
 
             Border preview = CreatePreview();
             Grid.SetRow(preview, row);
             Grid.SetColumn(preview, column);
             grid.Add(preview);
+            return preview;
         }
 
         private static IReadOnlyList<double> ResolveTrackSizes(
@@ -200,11 +202,11 @@ public sealed class LayoutAdapterRegistry
             return new LayoutPlacement(index, PropertyUpdates: ClearGridPlacement());
         }
 
-        public void AddDropPreview(View parent, LayoutPlacement placement)
+        public View? AddDropPreview(View parent, LayoutPlacement placement)
         {
             if (parent is not Layout layout)
             {
-                return;
+                return null;
             }
 
             var indicator = new BoxView
@@ -216,6 +218,7 @@ public sealed class LayoutAdapterRegistry
             };
             int index = Math.Clamp(placement.DestinationIndex, 0, layout.Children.Count);
             layout.Children.Insert(index, indicator);
+            return indicator;
         }
     }
 
@@ -230,8 +233,9 @@ public sealed class LayoutAdapterRegistry
         public LayoutPlacement ResolveDrop(View parent, DesignerNode parentNode, PointD position) =>
             new(PropertyUpdates: ClearGridPlacement());
 
-        public void AddDropPreview(View parent, LayoutPlacement placement)
+        public View? AddDropPreview(View parent, LayoutPlacement placement)
         {
+            return null;
         }
     }
 
@@ -250,8 +254,9 @@ public sealed class LayoutAdapterRegistry
         public LayoutPlacement ResolveDrop(View parent, DesignerNode parentNode, PointD position) =>
             new(PropertyUpdates: ClearGridPlacement());
 
-        public void AddDropPreview(View parent, LayoutPlacement placement)
+        public View? AddDropPreview(View parent, LayoutPlacement placement)
         {
+            return null;
         }
 
         private static PropertyInfo GetContentProperty(Type type) =>

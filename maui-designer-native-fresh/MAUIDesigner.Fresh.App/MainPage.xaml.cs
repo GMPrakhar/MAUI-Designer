@@ -68,13 +68,16 @@ public partial class MainPage : ContentPage
 
     private void OnToolboxDragStarting(object? sender, DragStartingEventArgs e)
     {
-        if (sender is not DragGestureRecognizer { BindingContext: ControlDescriptor descriptor })
+        if (sender is not DragGestureRecognizer
+            {
+                DragStartingCommandParameter: ControlDescriptor descriptor
+            })
         {
             e.Cancel = true;
             return;
         }
 
-        e.Data.Properties[ControlMaterializer.ToolboxControlPayload] = descriptor;
+        e.Data.Properties[ControlMaterializer.ToolboxControlPayload] = descriptor.Id.Key;
     }
 
     private void OnToolboxItemTapped(object? sender, TappedEventArgs e)
@@ -185,7 +188,7 @@ public partial class MainPage : ContentPage
         MainThread.BeginInvokeOnMainThread(RebuildDesigner);
 
     private void OnInteractionChanged(object? sender, EventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(RebuildDesigner);
+        MainThread.BeginInvokeOnMainThread(_materializer.UpdateInteraction);
 
     private void OnCatalogChanged(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(() => ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty));

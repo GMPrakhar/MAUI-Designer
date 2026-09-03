@@ -13,5 +13,5 @@ public interface ILayoutAdapter
 
     LayoutPlacement ResolveDrop(View parent, DesignerNode parentNode, PointD position);
 
-    void AddDropPreview(View parent, LayoutPlacement placement);
+    View? AddDropPreview(View parent, LayoutPlacement placement);
 }

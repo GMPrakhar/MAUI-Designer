@@ -113,7 +113,10 @@
                                         BindingContext="{Binding .}"
                                         CommandParameter="{Binding .}"
                                         Tapped="OnToolboxItemTapped" />
-                                    <DragGestureRecognizer BindingContext="{Binding .}" DragStarting="OnToolboxDragStarting" />
+                                    <DragGestureRecognizer
+                                        BindingContext="{Binding .}"
+                                        DragStarting="OnToolboxDragStarting"
+                                        DragStartingCommandParameter="{Binding .}" />
                                 </Border.GestureRecognizers>
                                 <Grid ColumnDefinitions="34,*" RowDefinitions="Auto,Auto">
                                     <Border

@@ -11,8 +11,11 @@ public sealed class ControlMaterializer
     private const string ControlPayload = "maui-designer/control";
     private const string ElementPayload = "maui-designer/element";
     private readonly IControlCatalog _catalog;
+    private readonly Dictionary<ElementId, Border> _outlines = [];
+    private readonly Dictionary<ElementId, (View View, ILayoutAdapter Adapter)> _targets = [];
     private readonly LayoutAdapterRegistry _layoutAdapters = new();
     private readonly DesignerWorkspace _workspace;
+    private View? _activeDropPreview;
 
     public ControlMaterializer(IControlCatalog catalog, DesignerWorkspace workspace)
     {
@@ -22,8 +25,31 @@ public sealed class ControlMaterializer
 
     public static string ToolboxControlPayload => ControlPayload;
 
-    public View Materialize(DesignerDocument document) =>
-        Build(document.Root, isRoot: true);
+    public View Materialize(DesignerDocument document)
+    {
+        _outlines.Clear();
+        _targets.Clear();
+        _activeDropPreview = null;
+        return Build(document.Root, isRoot: true);
+    }
+
+    public void UpdateInteraction()
+    {
+        RemoveActiveDropPreview();
+        foreach ((ElementId id, Border outline) in _outlines)
+        {
+            UpdateOutline(outline, id);
+        }
+
+        if (_workspace.DropTargetId is not ElementId targetId ||
+            _workspace.DropPlacement is not LayoutPlacement placement ||
+            !_targets.TryGetValue(targetId, out (View View, ILayoutAdapter Adapter) target))
+        {
+            return;
+        }
+
+        _activeDropPreview = target.Adapter.AddDropPreview(target.View, placement);
+    }
 
     private View Build(DesignerNode node, bool isRoot)
     {
@@ -43,16 +69,11 @@ public sealed class ControlMaterializer
             layoutAdapter!.AddChild(view, Build(childNode, isRoot: false), childNode);
         }
 
-        if (node.Id == _workspace.DropTargetId &&
-            _workspace.DropPlacement is LayoutPlacement placement)
-        {
-            layoutAdapter?.AddDropPreview(view, placement);
-        }
-
         EnsureDesignSize(view, descriptor);
         if (layoutAdapter is not null)
         {
             AttachDropTarget(view, node, layoutAdapter);
+            _targets[node.Id] = (view, layoutAdapter);
         }
 
         if (isRoot)
@@ -73,22 +94,17 @@ public sealed class ControlMaterializer
         };
         chrome.Add(content);
 
-        bool selected = node.Id == _workspace.SelectedId;
-        bool dropTarget = node.Id == _workspace.DropTargetId;
-        chrome.Add(new Border
+        var outline = new Border
         {
             InputTransparent = true,
-            Stroke = dropTarget
-                ? Color.FromArgb("#38BDF8")
-                : selected
-                    ? Color.FromArgb("#7C5CFF")
-                    : Colors.Transparent,
-            StrokeThickness = selected || dropTarget ? (dropTarget ? 3 : 2) : 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
             {
                 CornerRadius = new CornerRadius(4)
             }
-        });
+        };
+        UpdateOutline(outline, node.Id);
+        _outlines[node.Id] = outline;
+        chrome.Add(outline);
 
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => _workspace.Select(node.Id);
@@ -102,7 +118,7 @@ public sealed class ControlMaterializer
         };
         chrome.GestureRecognizers.Add(drag);
 
-        if (selected)
+        if (node.Id == _workspace.SelectedId)
         {
             AddMoveHandle(chrome, node);
             AddResizeHandle(chrome, node);
@@ -231,7 +247,9 @@ public sealed class ControlMaterializer
                         parentNode,
                         new PointD(point?.X ?? 0, point?.Y ?? 0));
             if (args.Data.Properties.TryGetValue(ControlPayload, out object? controlValue) &&
-                controlValue is ControlDescriptor descriptor)
+                controlValue is string controlKey &&
+                _catalog.Controls.FirstOrDefault(candidate => candidate.Id.Key == controlKey) is
+                    ControlDescriptor descriptor)
             {
                 _workspace.Add(descriptor, parentNode.Id, placement);
             }
@@ -253,6 +271,28 @@ public sealed class ControlMaterializer
         properties.TryGetValue(ElementPayload, out object? value) && value is string id
             ? new ElementId(id)
             : null;
+
+    private void UpdateOutline(Border outline, ElementId id)
+    {
+        bool selected = id == _workspace.SelectedId;
+        bool dropTarget = id == _workspace.DropTargetId;
+        outline.Stroke = dropTarget
+            ? Color.FromArgb("#38BDF8")
+            : selected
+                ? Color.FromArgb("#7C5CFF")
+                : Colors.Transparent;
+        outline.StrokeThickness = dropTarget ? 3 : selected ? 2 : 0;
+    }
+
+    private void RemoveActiveDropPreview()
+    {
+        if (_activeDropPreview?.Parent is Layout layout)
+        {
+            layout.Children.Remove(_activeDropPreview);
+        }
+
+        _activeDropPreview = null;
+    }
 
     private static void ApplyProperties(
         View view,
