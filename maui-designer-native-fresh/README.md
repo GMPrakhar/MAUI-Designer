@@ -12,8 +12,8 @@ and keeps edits in an immutable document model that supports undo and redo.
   name do not collide.
 - Renders a searchable toolbox, hierarchy, native design surface, grouped
   property inspector, and transactional XAML drawer.
-- Supports click-to-add and native drag payloads, selection, delete, move,
-  resize, reparenting, and bounded undo/redo.
+- Supports click-to-add, pointer-captured drag/drop with target previews,
+  selection, delete, move, resize, reparenting, and bounded undo/redo.
 - Uses extensible layout adapters for `AbsoluteLayout`, measured Grid cells,
   stack insertion positions, generic layouts, and single-content containers.
 - Preserves resources, namespaces, markup extensions, attached properties,
@@ -38,6 +38,7 @@ From this directory:
 ```powershell
 dotnet restore .\MAUIDesigner.Fresh.slnx
 dotnet test .\MAUIDesigner.Fresh.Core.Tests\MAUIDesigner.Fresh.Core.Tests.csproj -c Release
+dotnet test .\MAUIDesigner.Fresh.App.Tests\MAUIDesigner.Fresh.App.Tests.csproj -c Release -r win-x64 -p:PublishReadyToRun=false
 dotnet build .\MAUIDesigner.Fresh.App\MAUIDesigner.Fresh.App.csproj -c Release
 ```
 

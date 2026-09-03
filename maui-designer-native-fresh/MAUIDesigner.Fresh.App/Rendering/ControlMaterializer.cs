@@ -8,14 +8,13 @@ namespace MAUIDesigner.Fresh.App.Rendering;
 
 public sealed class ControlMaterializer
 {
-    private const string ControlPayload = "maui-designer/control";
-    private const string ElementPayload = "maui-designer/element";
     private readonly IControlCatalog _catalog;
     private readonly Dictionary<ElementId, Border> _outlines = [];
     private readonly Dictionary<ElementId, (View View, ILayoutAdapter Adapter)> _targets = [];
     private readonly LayoutAdapterRegistry _layoutAdapters = new();
     private readonly DesignerWorkspace _workspace;
     private View? _activeDropPreview;
+    private ManualDragState? _manualDrag;
 
     public ControlMaterializer(IControlCatalog catalog, DesignerWorkspace workspace)
     {
@@ -23,13 +22,12 @@ public sealed class ControlMaterializer
         _workspace = workspace;
     }
 
-    public static string ToolboxControlPayload => ControlPayload;
-
     public View Materialize(DesignerDocument document)
     {
         _outlines.Clear();
         _targets.Clear();
         _activeDropPreview = null;
+        _manualDrag = null;
         return Build(document.Root, isRoot: true);
     }
 
@@ -49,6 +47,80 @@ public sealed class ControlMaterializer
         }
 
         _activeDropPreview = target.Adapter.AddDropPreview(target.View, placement);
+    }
+
+    public void BeginManualDrag(View source, ElementId? movingId)
+    {
+        if (!TryGetWindowBounds(source, out RectD sourceBounds))
+        {
+            _manualDrag = null;
+            return;
+        }
+
+        ManualDropTarget[] targets = _targets
+            .Where(target => _workspace.CanAcceptChild(target.Key, movingId))
+            .Select(target => TryGetWindowBounds(target.Value.View, out RectD bounds)
+                ? new ManualDropTarget(
+                    target.Key,
+                    target.Value.View,
+                    target.Value.Adapter,
+                    bounds)
+                : null)
+            .OfType<ManualDropTarget>()
+            .OrderBy(target => target.Bounds.Area)
+            .ToArray();
+        _manualDrag = new ManualDragState(
+            new PointD(
+                sourceBounds.X + sourceBounds.Width / 2,
+                sourceBounds.Y + sourceBounds.Height / 2),
+            targets);
+    }
+
+    public ElementId? UpdateManualDrag(double totalX, double totalY)
+    {
+        if (_manualDrag is not ManualDragState drag)
+        {
+            return null;
+        }
+
+        var pointer = new PointD(drag.Start.X + totalX, drag.Start.Y + totalY);
+        ManualDropTarget? target = drag.Targets.FirstOrDefault(candidate =>
+            candidate.Bounds.Contains(pointer));
+        DesignerNode? parentNode = target is null
+            ? null
+            : _workspace.Session.Current.Find(target.Id);
+        if (target is null || parentNode is null)
+        {
+            _workspace.ClearDropTarget();
+            return null;
+        }
+
+        LayoutPlacement placement = target.Adapter.ResolveDrop(
+            target.View,
+            parentNode,
+            new PointD(
+                pointer.X - target.Bounds.X,
+                pointer.Y - target.Bounds.Y));
+        _workspace.SetDropTarget(target.Id, placement);
+        return target.Id;
+    }
+
+    public void CompleteManualToolboxDrag(ControlDescriptor descriptor)
+    {
+        _manualDrag = null;
+        if (_workspace.DropTargetId is ElementId targetId &&
+            _workspace.DropPlacement is LayoutPlacement placement)
+        {
+            _workspace.Add(descriptor, targetId, placement);
+        }
+
+        _workspace.ClearDropTarget();
+    }
+
+    public void CancelManualDrag()
+    {
+        _manualDrag = null;
+        _workspace.ClearDropTarget();
     }
 
     private View Build(DesignerNode node, bool isRoot)
@@ -72,7 +144,6 @@ public sealed class ControlMaterializer
         EnsureDesignSize(view, descriptor);
         if (layoutAdapter is not null)
         {
-            AttachDropTarget(view, node, layoutAdapter);
             _targets[node.Id] = (view, layoutAdapter);
         }
 
@@ -110,13 +181,36 @@ public sealed class ControlMaterializer
         tap.Tapped += (_, _) => _workspace.Select(node.Id);
         chrome.GestureRecognizers.Add(tap);
 
-        var drag = new DragGestureRecognizer { CanDrag = true };
-        drag.DragStarting += (_, args) =>
+        var reparent = new PanGestureRecognizer();
+        reparent.PanUpdated += (_, args) =>
         {
-            _workspace.Select(node.Id);
-            args.Data.Properties[ElementPayload] = node.Id.Value;
+            if (args.StatusType == GestureStatus.Started)
+            {
+                BeginManualDrag(chrome, node.Id);
+            }
+            else if (args.StatusType == GestureStatus.Running)
+            {
+                _ = UpdateManualDrag(args.TotalX, args.TotalY);
+            }
+            else if (args.StatusType == GestureStatus.Completed)
+            {
+                _manualDrag = null;
+                if (_workspace.DropTargetId is ElementId targetId &&
+                    _workspace.DropPlacement is LayoutPlacement placement)
+                {
+                    _workspace.Reparent(node.Id, targetId, placement);
+                }
+                else
+                {
+                    _workspace.ClearDropTarget();
+                }
+            }
+            else if (args.StatusType == GestureStatus.Canceled)
+            {
+                CancelManualDrag();
+            }
         };
-        chrome.GestureRecognizers.Add(drag);
+        chrome.GestureRecognizers.Add(reparent);
 
         if (node.Id == _workspace.SelectedId)
         {
@@ -237,62 +331,22 @@ public sealed class ControlMaterializer
         chrome.Add(handle);
     }
 
-    private void AttachDropTarget(
-        View view,
-        DesignerNode parentNode,
-        ILayoutAdapter layoutAdapter)
+    private static bool TryGetWindowBounds(View view, out RectD bounds)
     {
-        var drop = new DropGestureRecognizer { AllowDrop = true };
-        drop.DragOver += (_, args) =>
+#if WINDOWS
+        if (view.Handler?.PlatformView is Microsoft.UI.Xaml.FrameworkElement native &&
+            native.XamlRoot is not null)
         {
-            ElementId? movingId = TryGetMovingId(args.Data.Properties);
-            if (HasDesignerPayload(args.Data.Properties) &&
-                _workspace.CanAcceptChild(parentNode.Id, movingId) &&
-                args.GetPosition(view) is Point point)
-            {
-                LayoutPlacement placement = layoutAdapter.ResolveDrop(
-                    view,
-                    parentNode,
-                    new PointD(point.X, point.Y));
-                _workspace.SetDropTarget(parentNode.Id, placement);
-            }
-        };
-        drop.DragLeave += (_, _) => _workspace.ClearDropTarget();
-        drop.Drop += (_, args) =>
-        {
-            Point? point = args.GetPosition(view);
-            LayoutPlacement placement = parentNode.Id == _workspace.DropTargetId &&
-                _workspace.DropPlacement is not null
-                    ? _workspace.DropPlacement
-                    : layoutAdapter.ResolveDrop(
-                        view,
-                        parentNode,
-                        new PointD(point?.X ?? 0, point?.Y ?? 0));
-            if (args.Data.Properties.TryGetValue(ControlPayload, out object? controlValue) &&
-                controlValue is string controlKey &&
-                _catalog.Controls.FirstOrDefault(candidate => candidate.Id.Key == controlKey) is
-                    ControlDescriptor descriptor)
-            {
-                _workspace.Add(descriptor, parentNode.Id, placement);
-            }
-            else if (args.Data.Properties.TryGetValue(ElementPayload, out object? elementValue) &&
-                     elementValue is string id)
-            {
-                _workspace.Reparent(new ElementId(id), parentNode.Id, placement);
-            }
-
-            _workspace.ClearDropTarget();
-        };
-        view.GestureRecognizers.Add(drop);
+            Windows.Foundation.Point origin = native
+                .TransformToVisual(null)
+                .TransformPoint(new Windows.Foundation.Point());
+            bounds = new RectD(origin.X, origin.Y, native.ActualWidth, native.ActualHeight);
+            return bounds.Width > 0 && bounds.Height > 0;
+        }
+#endif
+        bounds = default;
+        return false;
     }
-
-    private static bool HasDesignerPayload(DataPackagePropertySet properties) =>
-        properties.ContainsKey(ControlPayload) || properties.ContainsKey(ElementPayload);
-
-    private static ElementId? TryGetMovingId(DataPackagePropertySet properties) =>
-        properties.TryGetValue(ElementPayload, out object? value) && value is string id
-            ? new ElementId(id)
-            : null;
 
     private void UpdateOutline(Border outline, ElementId id)
     {
@@ -405,4 +459,14 @@ public sealed class ControlMaterializer
 
         public object? GetService(Type serviceType) => null;
     }
+
+    private sealed record ManualDropTarget(
+        ElementId Id,
+        View View,
+        ILayoutAdapter Adapter,
+        RectD Bounds);
+
+    private sealed record ManualDragState(
+        PointD Start,
+        IReadOnlyList<ManualDropTarget> Targets);
 }

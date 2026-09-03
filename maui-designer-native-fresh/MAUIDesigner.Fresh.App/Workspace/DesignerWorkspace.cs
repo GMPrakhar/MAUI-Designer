@@ -163,6 +163,12 @@ public sealed class DesignerWorkspace
             return false;
         }
 
+        if (movingId is ElementId id &&
+            Session.Current.Find(id)?.Find(parentId) is not null)
+        {
+            return false;
+        }
+
         if (typeof(Layout).IsAssignableFrom(descriptor.RuntimeType))
         {
             return true;

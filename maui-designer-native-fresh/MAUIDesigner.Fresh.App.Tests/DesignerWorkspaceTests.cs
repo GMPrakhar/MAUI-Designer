@@ -28,6 +28,19 @@ public sealed class DesignerWorkspaceTests
             workspace.Add(button, contentId));
     }
 
+    [Fact]
+    public void Drop_target_rejects_the_moving_subtree()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        var workspace = new DesignerWorkspace(catalog);
+        ControlDescriptor grid = Find(catalog, typeof(Grid));
+        ElementId outerId = workspace.Add(grid);
+        ElementId innerId = workspace.Add(grid);
+
+        Assert.False(workspace.CanAcceptChild(outerId, outerId));
+        Assert.False(workspace.CanAcceptChild(innerId, outerId));
+    }
+
     private static ReflectionControlCatalog CreateCatalog()
     {
         var catalog = new ReflectionControlCatalog(

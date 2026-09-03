@@ -66,3 +66,23 @@ Prediction written before measurement:
 2. After correcting ancestor resolution, the new control must be inserted at the root while an explicitly requested second `ContentView` child remains rejected.
 
 The initial run failed at the predicted third insertion with `'ContentView' cannot accept another child control.` Ancestor traversal was then corrected to continue until it finds a container with capacity.
+
+## Reparent target instrument check
+
+Prediction written before measurement:
+
+1. If moving-subtree filtering is disabled, `Drop_target_rejects_the_moving_subtree` will fail because the moving Grid and its nested Grid are exposed as valid drop targets.
+2. After restoration, both targets must be rejected before any preview or document command runs.
+
+The seeded run failed at the first `Assert.False` with an actual value of `true`. The moving-subtree guard was restored before final validation.
+
+## Native drag and reparent validation
+
+WinUI pointer input was injected through the actual application window at 125% display scaling:
+
+1. A toolbox Label was dragged with native mouse movement and committed near the pointer at window position `(628, 402)`, rather than the default click insertion position.
+2. A Grid was added at the root and the existing Label was panned into it.
+3. The Label's native parent changed from `designer-root` to `designer-grid-2`.
+4. Undo restored the Label to `designer-root` with its original `(24, 24, 160, 48)` bounds.
+5. While a Button was held over the Grid, the target rendered a cyan cell preview and status identified `grid-2`; release parented `button-4` to `designer-grid-2`.
+6. A Label and Button were added to a `VerticalStackLayout`, then an Entry was dragged between them. Their native Y positions confirmed the resulting Label, Entry, Button order at `0`, `24`, and `68` respectively.

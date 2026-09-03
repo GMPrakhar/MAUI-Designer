@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using MAUIDesigner.Fresh.App.Catalog;
+using MAUIDesigner.Fresh.App.Controls;
 using MAUIDesigner.Fresh.App.PropertyEditing;
 using MAUIDesigner.Fresh.App.Rendering;
 using MAUIDesigner.Fresh.App.Workspace;
@@ -37,7 +38,7 @@ public partial class MainPage : ContentPage
         _propertyEditors = propertyEditors;
         _extensionLoader = extensionLoader;
         _xamlWorkspace = xamlWorkspace;
-        ToolboxList.ItemsSource = _toolboxItems;
+        BindableLayout.SetItemsSource(ToolboxItemsHost, _toolboxItems);
         HierarchyList.ItemsSource = _hierarchyItems;
         _workspace.Session.Changed += OnDocumentChanged;
         _workspace.SelectionChanged += OnSelectionChanged;
@@ -55,34 +56,41 @@ public partial class MainPage : ContentPage
     private void OnPropertySearchChanged(object? sender, TextChangedEventArgs e) =>
         RebuildPropertyPanel();
 
-    private void OnToolboxSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    private void OnToolboxDragUpdated(object? sender, ToolboxDragEventArgs e)
     {
-        if (e.CurrentSelection.FirstOrDefault() is not ControlDescriptor descriptor)
-        {
-            return;
-        }
-
-        _workspace.Add(descriptor);
-        ToolboxList.SelectedItem = null;
-    }
-
-    private void OnToolboxDragStarting(object? sender, DragStartingEventArgs e)
-    {
-        if (sender is not DragGestureRecognizer
+        if (sender is not ToolboxItemView
             {
-                DragStartingCommandParameter: ControlDescriptor descriptor
-            })
+                Descriptor: ControlDescriptor descriptor
+            } source)
         {
-            e.Cancel = true;
             return;
         }
 
-        e.Data.Properties[ControlMaterializer.ToolboxControlPayload] = descriptor.Id.Key;
+        if (e.StatusType == GestureStatus.Started)
+        {
+            SelectionLabel.Text = $"Dragging {descriptor.DisplayName}";
+            _materializer.BeginManualDrag(source, movingId: null);
+        }
+        else if (e.StatusType == GestureStatus.Running)
+        {
+            ElementId? targetId = _materializer.UpdateManualDrag(e.TotalX, e.TotalY);
+            SelectionLabel.Text = targetId is null
+                ? $"No valid drop target for {descriptor.DisplayName}"
+                : $"Drop {descriptor.DisplayName} into {targetId.Value.Value}";
+        }
+        else if (e.StatusType == GestureStatus.Completed)
+        {
+            _materializer.CompleteManualToolboxDrag(descriptor);
+        }
+        else if (e.StatusType == GestureStatus.Canceled)
+        {
+            _materializer.CancelManualDrag();
+        }
     }
 
-    private void OnToolboxItemTapped(object? sender, TappedEventArgs e)
+    private void OnToolboxItemTapped(object? sender, EventArgs e)
     {
-        if (e.Parameter is ControlDescriptor descriptor)
+        if (sender is ToolboxItemView { Descriptor: ControlDescriptor descriptor })
         {
             _workspace.Add(descriptor);
         }

@@ -4,6 +4,7 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:catalog="clr-namespace:MAUIDesigner.Fresh.App.Catalog"
+    xmlns:controls="clr-namespace:MAUIDesigner.Fresh.App.Controls"
     xmlns:workspace="clr-namespace:MAUIDesigner.Fresh.App.Workspace"
     BackgroundColor="#0F1117">
 
@@ -94,62 +95,54 @@
                     HeightRequest="38"
                     Placeholder="Search controls..."
                     TextChanged="OnToolboxSearchChanged" />
-                <CollectionView
+                <ScrollView
                     x:Name="ToolboxList"
-                    Grid.Row="3"
-                    SelectionChanged="OnToolboxSelectionChanged"
-                    SelectionMode="Single">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="catalog:ControlDescriptor">
-                            <Border
-                                AutomationId="{Binding AutomationId}"
-                                Margin="0,0,0,7"
-                                Padding="10,8"
-                                BackgroundColor="#171A23"
-                                Stroke="#292E3D"
-                                StrokeShape="RoundRectangle 8">
-                                <Border.GestureRecognizers>
-                                    <TapGestureRecognizer
-                                        BindingContext="{Binding .}"
-                                        CommandParameter="{Binding .}"
-                                        Tapped="OnToolboxItemTapped" />
-                                    <DragGestureRecognizer
-                                        BindingContext="{Binding .}"
-                                        CanDrag="True"
-                                        DragStarting="OnToolboxDragStarting"
-                                        DragStartingCommandParameter="{Binding .}" />
-                                </Border.GestureRecognizers>
-                                <Grid ColumnDefinitions="34,*" RowDefinitions="Auto,Auto">
-                                    <Border
-                                        Grid.RowSpan="2"
-                                        WidthRequest="28"
-                                        HeightRequest="28"
-                                        BackgroundColor="#242033"
-                                        StrokeThickness="0"
-                                        StrokeShape="RoundRectangle 7">
+                    Grid.Row="3">
+                    <VerticalStackLayout x:Name="ToolboxItemsHost">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="catalog:ControlDescriptor">
+                                <controls:ToolboxItemView
+                                    AutomationId="{Binding AutomationId}"
+                                    Descriptor="{Binding .}"
+                                    ItemDragUpdated="OnToolboxDragUpdated"
+                                    ItemTapped="OnToolboxItemTapped"
+                                    Margin="0,0,0,7"
+                                    Padding="10,8"
+                                    BackgroundColor="#171A23"
+                                    Stroke="#292E3D"
+                                    StrokeShape="RoundRectangle 8">
+                                    <Grid ColumnDefinitions="34,*" RowDefinitions="Auto,Auto">
+                                        <Border
+                                            Grid.RowSpan="2"
+                                            WidthRequest="28"
+                                            HeightRequest="28"
+                                            BackgroundColor="#242033"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 7">
+                                            <Label
+                                                HorizontalOptions="Center"
+                                                VerticalOptions="Center"
+                                                FontAttributes="Bold"
+                                                Text="+"
+                                                TextColor="#A994FF" />
+                                        </Border>
                                         <Label
-                                            HorizontalOptions="Center"
-                                            VerticalOptions="Center"
-                                            FontAttributes="Bold"
-                                            Text="+"
-                                            TextColor="#A994FF" />
-                                    </Border>
-                                    <Label
-                                        Grid.Column="1"
-                                        FontSize="12"
-                                        Text="{Binding DisplayName}"
-                                        TextColor="#E7EAF4" />
-                                    <Label
-                                        Grid.Row="1"
-                                        Grid.Column="1"
-                                        FontSize="9"
-                                        Text="{Binding Category}"
-                                        TextColor="#747D92" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
+                                            Grid.Column="1"
+                                            FontSize="12"
+                                            Text="{Binding DisplayName}"
+                                            TextColor="#E7EAF4" />
+                                        <Label
+                                            Grid.Row="1"
+                                            Grid.Column="1"
+                                            FontSize="9"
+                                            Text="{Binding Category}"
+                                            TextColor="#747D92" />
+                                    </Grid>
+                                </controls:ToolboxItemView>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </ScrollView>
                 <CollectionView
                     x:Name="HierarchyList"
                     Grid.Row="2"
