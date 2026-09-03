@@ -1,0 +1,43 @@
+name: Native Fresh Designer
+
+on:
+  push:
+    branches:
+      - main
+      - feat/maui-designer-native-fresh
+    paths:
+      - maui-designer-native-fresh/**
+      - .github/workflows/native-fresh.yml
+  pull_request:
+    paths:
+      - maui-designer-native-fresh/**
+      - .github/workflows/native-fresh.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: maui-designer-native-fresh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Restore
+        run: dotnet restore .\MAUIDesigner.Fresh.slnx
+
+      - name: Test core
+        run: dotnet test .\MAUIDesigner.Fresh.Core.Tests\MAUIDesigner.Fresh.Core.Tests.csproj -c Release --no-restore --nologo
+
+      - name: Build Windows app
+        run: dotnet build .\MAUIDesigner.Fresh.App\MAUIDesigner.Fresh.App.csproj -c Release --no-restore --nologo
