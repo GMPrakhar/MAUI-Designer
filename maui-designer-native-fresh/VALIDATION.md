@@ -24,3 +24,14 @@ Predictions written before the recorded measurement:
 The temporary mutations used for these checks are never committed.
 
 Observed failures matched all three predictions: resource removal lost `ContentPage.Resources`, disabled XML handling surfaced the expected `XmlException`, and the generic unresolved-control message lost `Mystery`. The implementations were then restored.
+
+## Atomic placement instrument check
+
+Prediction written before measurement:
+
+1. If `PlaceElementCommand` reparents a node but skips its layout property updates, `Placement_updates_parent_bounds_and_attached_properties_atomically` will fail because `Grid.Row` remains `0` instead of `2`.
+2. After restoring the temporary mutation, all eleven core tests must pass.
+
+The temporary mutation used for this check is never committed.
+
+Observed failure matched the prediction: the moved node retained `Grid.Row="0"` instead of receiving row `2`. The implementation was then restored.

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MAUIDesigner.Fresh.Core.Documents;
 using MAUIDesigner.Fresh.Core.Geometry;
 
@@ -86,5 +87,39 @@ public sealed class DocumentSessionTests
         Assert.Throws<InvalidOperationException>(() =>
             session.Execute(new AddElementCommand(new ElementId("root"), new DesignerNode(id, LabelType))));
         Assert.Same(before, session.Current);
+    }
+
+    [Fact]
+    public void Placement_updates_parent_bounds_and_attached_properties_atomically()
+    {
+        var session = new DocumentSession(DesignerDocument.Create(GridType));
+        var sourceId = new ElementId("source");
+        var destinationId = new ElementId("destination");
+        var labelId = new ElementId("label");
+        session.Execute(new AddElementCommand(new ElementId("root"), new DesignerNode(sourceId, GridType)));
+        session.Execute(new AddElementCommand(new ElementId("root"), new DesignerNode(destinationId, GridType)));
+        session.Execute(new AddElementCommand(sourceId, new DesignerNode(
+            labelId,
+            LabelType,
+            ImmutableDictionary<string, DesignerValue>.Empty.Add("Grid.Row", DesignerValue.Literal("0")))));
+
+        session.Execute(new PlaceElementCommand(
+            labelId,
+            destinationId,
+            Bounds: new RectD(4, 8, 100, 32),
+            PropertyUpdates: ImmutableDictionary<string, DesignerValue?>.Empty
+                .Add("Grid.Row", DesignerValue.Literal("2"))
+                .Add("Grid.Column", DesignerValue.Literal("1"))));
+
+        DesignerNode placed = Assert.IsType<DesignerNode>(session.Current.Find(destinationId)!.Find(labelId));
+        Assert.Equal(new RectD(4, 8, 100, 32), placed.Bounds);
+        Assert.Equal("2", placed.Properties["Grid.Row"].Text);
+        Assert.Equal("1", placed.Properties["Grid.Column"].Text);
+
+        Assert.True(session.Undo());
+        DesignerNode restored = Assert.IsType<DesignerNode>(session.Current.Find(sourceId)!.Find(labelId));
+        Assert.Null(restored.Bounds);
+        Assert.Equal("0", restored.Properties["Grid.Row"].Text);
+        Assert.False(restored.Properties.ContainsKey("Grid.Column"));
     }
 }

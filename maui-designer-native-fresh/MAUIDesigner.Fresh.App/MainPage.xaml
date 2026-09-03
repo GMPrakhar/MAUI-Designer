@@ -102,14 +102,18 @@
                     <CollectionView.ItemTemplate>
                         <DataTemplate x:DataType="catalog:ControlDescriptor">
                             <Border
-                                AutomationId="{Binding Id.XamlName, StringFormat='toolbox-{0}'}"
+                                AutomationId="{Binding AutomationId}"
                                 Margin="0,0,0,7"
                                 Padding="10,8"
                                 BackgroundColor="#171A23"
                                 Stroke="#292E3D"
                                 StrokeShape="RoundRectangle 8">
                                 <Border.GestureRecognizers>
-                                    <DragGestureRecognizer DragStarting="OnToolboxDragStarting" />
+                                    <TapGestureRecognizer
+                                        BindingContext="{Binding .}"
+                                        CommandParameter="{Binding .}"
+                                        Tapped="OnToolboxItemTapped" />
+                                    <DragGestureRecognizer BindingContext="{Binding .}" DragStarting="OnToolboxDragStarting" />
                                 </Border.GestureRecognizers>
                                 <Grid ColumnDefinitions="34,*" RowDefinitions="Auto,Auto">
                                     <Border
@@ -207,7 +211,7 @@
 
             <BoxView Grid.Column="3" BackgroundColor="#292E3D" />
 
-            <Grid Grid.Column="4" Padding="14" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+            <Grid Grid.Column="4" Padding="14" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
                 <VerticalStackLayout>
                     <Label FontAttributes="Bold" FontSize="14" Text="Properties" TextColor="#F5F7FF" />
                     <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="11" TextColor="#798196" />
@@ -220,7 +224,14 @@
                     StrokeShape="RoundRectangle 8">
                     <Label FontSize="10" Text="Changes commit when an editor loses focus or Enter is pressed." TextColor="#858DA2" />
                 </Border>
-                <ScrollView Grid.Row="2">
+                <SearchBar
+                    x:Name="PropertySearch"
+                    Grid.Row="2"
+                    AutomationId="property-search"
+                    HeightRequest="38"
+                    Placeholder="Search properties..."
+                    TextChanged="OnPropertySearchChanged" />
+                <ScrollView Grid.Row="3">
                     <VerticalStackLayout x:Name="PropertyPanel" Spacing="8" />
                 </ScrollView>
             </Grid>

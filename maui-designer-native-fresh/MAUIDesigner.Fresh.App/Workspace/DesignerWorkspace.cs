@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.Core.Documents;
 using MAUIDesigner.Fresh.Core.Geometry;
@@ -27,6 +28,8 @@ public sealed class DesignerWorkspace
 
     public ElementId? DropTargetId { get; private set; }
 
+    public LayoutPlacement? DropPlacement { get; private set; }
+
     public void Select(ElementId id)
     {
         if (Session.Current.Find(id) is null)
@@ -43,36 +46,57 @@ public sealed class DesignerWorkspace
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    public ElementId Add(ControlDescriptor descriptor, ElementId? requestedParentId = null, PointD? position = null)
+    public ElementId Add(
+        ControlDescriptor descriptor,
+        ElementId? requestedParentId = null,
+        LayoutPlacement? placement = null)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
         ElementId parentId = requestedParentId ?? ResolveInsertionParent();
         EnsureValidParent(parentId);
         var id = new ElementId($"{descriptor.Id.XamlName.ToLowerInvariant()}-{Interlocked.Increment(ref _nextId)}");
-        RectD? bounds = CreateInitialBounds(descriptor, parentId, position);
-        Session.Execute(new AddElementCommand(parentId, new DesignerNode(id, descriptor.Id, bounds: bounds)));
+        RectD? bounds = CreateInitialBounds(descriptor, parentId, placement?.Bounds);
+        ImmutableDictionary<string, DesignerValue> properties = placement?.PropertyUpdates?
+            .Where(update => update.Value is not null)
+            .ToImmutableDictionary(update => update.Key, update => update.Value!, StringComparer.Ordinal)
+            ?? ImmutableDictionary<string, DesignerValue>.Empty;
+        Session.Execute(new AddElementCommand(
+            parentId,
+            new DesignerNode(id, descriptor.Id, properties, bounds: bounds),
+            placement?.DestinationIndex ?? -1));
         Select(id);
         return id;
     }
 
-    public void Reparent(ElementId elementId, ElementId parentId, PointD? position = null)
+    public void Reparent(
+        ElementId elementId,
+        ElementId parentId,
+        LayoutPlacement? placement = null)
     {
-        EnsureValidParent(parentId);
+        EnsureValidParent(parentId, elementId);
         DesignerNode node = Session.Current.Find(elementId)
             ?? throw new KeyNotFoundException($"Element '{elementId}' was not found.");
-        RectD? bounds = node.Bounds;
-        if (IsAbsoluteLayout(parentId))
+        RectD? bounds = placement?.Bounds;
+        if (bounds is not null && node.Bounds is RectD existing)
         {
-            double x = position?.X ?? bounds?.X ?? 24;
-            double y = position?.Y ?? bounds?.Y ?? 24;
-            bounds = new RectD(x, y, bounds?.Width ?? 160, bounds?.Height ?? 48);
+            bounds = bounds.Value with { Width = existing.Width, Height = existing.Height };
         }
-        else
+        else if (bounds is not null &&
+                 _catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor))
         {
-            bounds = null;
+            bounds = bounds.Value with
+            {
+                Width = descriptor!.AcceptsChildren ? 280 : 160,
+                Height = descriptor.AcceptsChildren ? 180 : 48
+            };
         }
 
-        Session.Execute(new ReparentElementCommand(elementId, parentId, Bounds: bounds));
+        Session.Execute(new PlaceElementCommand(
+            elementId,
+            parentId,
+            placement?.DestinationIndex ?? -1,
+            bounds,
+            placement?.PropertyUpdates));
         Select(elementId);
         ClearDropTarget();
     }
@@ -80,14 +104,15 @@ public sealed class DesignerWorkspace
     public void SetBounds(ElementId elementId, RectD bounds) =>
         Session.Execute(new SetBoundsCommand(elementId, bounds));
 
-    public void SetDropTarget(ElementId? id)
+    public void SetDropTarget(ElementId? id, LayoutPlacement? placement = null)
     {
-        if (DropTargetId == id)
+        if (DropTargetId == id && DropPlacement == placement)
         {
             return;
         }
 
         DropTargetId = id;
+        DropPlacement = placement;
         InteractionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -115,27 +140,46 @@ public sealed class DesignerWorkspace
     private ElementId ResolveInsertionParent()
     {
         DesignerNode selected = Session.Current.Find(SelectedId) ?? Session.Current.Root;
-        return _catalog.TryGet(selected.ControlType, out ControlDescriptor? descriptor) &&
-            descriptor?.AcceptsChildren == true
+        return CanAcceptChild(selected.Id)
                 ? selected.Id
                 : FindParent(Session.Current.Root, selected.Id)?.Id ?? Session.Current.Root.Id;
     }
 
-    private void EnsureValidParent(ElementId parentId)
+    public bool CanAcceptChild(ElementId parentId, ElementId? movingId = null)
+    {
+        DesignerNode? parent = Session.Current.Find(parentId);
+        if (parent is null ||
+            !_catalog.TryGet(parent.ControlType, out ControlDescriptor? descriptor) ||
+            descriptor?.AcceptsChildren != true)
+        {
+            return false;
+        }
+
+        if (typeof(Layout).IsAssignableFrom(descriptor.RuntimeType))
+        {
+            return true;
+        }
+
+        return parent.Children.Length == 0 ||
+            movingId is not null &&
+            parent.Children.Any(child => child.Id == movingId.Value);
+    }
+
+    private void EnsureValidParent(ElementId parentId, ElementId? movingId = null)
     {
         DesignerNode parent = Session.Current.Find(parentId)
             ?? throw new KeyNotFoundException($"Element '{parentId}' was not found.");
-        if (!_catalog.TryGet(parent.ControlType, out ControlDescriptor? descriptor) ||
-            descriptor?.AcceptsChildren != true)
+        if (!CanAcceptChild(parentId, movingId))
         {
-            throw new InvalidOperationException($"'{parent.ControlType.XamlName}' cannot contain child controls.");
+            throw new InvalidOperationException(
+                $"'{parent.ControlType.XamlName}' cannot accept another child control.");
         }
     }
 
     private RectD? CreateInitialBounds(
         ControlDescriptor descriptor,
         ElementId parentId,
-        PointD? position)
+        RectD? requestedBounds)
     {
         if (!IsAbsoluteLayout(parentId))
         {
@@ -144,8 +188,8 @@ public sealed class DesignerWorkspace
 
         double offset = 24 + ((_nextId - 1) % 8) * 14;
         return new RectD(
-            position?.X ?? offset,
-            position?.Y ?? offset,
+            requestedBounds?.X ?? offset,
+            requestedBounds?.Y ?? offset,
             descriptor.AcceptsChildren ? 280 : 160,
             descriptor.AcceptsChildren ? 180 : 48);
     }

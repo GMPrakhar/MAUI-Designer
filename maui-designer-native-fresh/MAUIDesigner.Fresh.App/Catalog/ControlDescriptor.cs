@@ -10,7 +10,10 @@ public sealed record ControlDescriptor(
     string Category,
     bool AcceptsChildren,
     Func<IServiceProvider, View> Factory,
-    ImmutableArray<PropertyDescriptor> Properties);
+    ImmutableArray<PropertyDescriptor> Properties)
+{
+    public string AutomationId => $"toolbox-{Id.FullName}";
+}
 
 public sealed record PropertyDescriptor(
     string Name,

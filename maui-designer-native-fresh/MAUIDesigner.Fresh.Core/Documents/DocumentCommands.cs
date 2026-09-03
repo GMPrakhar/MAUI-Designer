@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MAUIDesigner.Fresh.Core.Geometry;
 
 namespace MAUIDesigner.Fresh.Core.Documents;
@@ -47,6 +48,37 @@ public sealed record ReparentElementCommand(
 
     public DesignerDocument Apply(DesignerDocument document) =>
         DocumentEditor.Reparent(document, ElementId, DestinationParentId, DestinationIndex, Bounds);
+}
+
+public sealed record PlaceElementCommand(
+    ElementId ElementId,
+    ElementId DestinationParentId,
+    int DestinationIndex = -1,
+    RectD? Bounds = null,
+    ImmutableDictionary<string, DesignerValue?>? PropertyUpdates = null) : IDocumentCommand
+{
+    public string Description => $"Place {ElementId}";
+
+    public DesignerDocument Apply(DesignerDocument document)
+    {
+        DesignerDocument result = DocumentEditor.Reparent(
+            document,
+            ElementId,
+            DestinationParentId,
+            DestinationIndex,
+            Bounds);
+        if (PropertyUpdates is null)
+        {
+            return result;
+        }
+
+        foreach ((string propertyName, DesignerValue? value) in PropertyUpdates)
+        {
+            result = DocumentEditor.SetProperty(result, ElementId, propertyName, value);
+        }
+
+        return result;
+    }
 }
 
 public sealed record SetPropertyCommand(

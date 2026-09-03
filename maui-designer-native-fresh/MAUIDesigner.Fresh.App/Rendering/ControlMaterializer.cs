@@ -11,6 +11,7 @@ public sealed class ControlMaterializer
     private const string ControlPayload = "maui-designer/control";
     private const string ElementPayload = "maui-designer/element";
     private readonly IControlCatalog _catalog;
+    private readonly LayoutAdapterRegistry _layoutAdapters = new();
     private readonly DesignerWorkspace _workspace;
 
     public ControlMaterializer(IControlCatalog catalog, DesignerWorkspace workspace)
@@ -34,15 +35,24 @@ public sealed class ControlMaterializer
         View view = descriptor.Factory(EmptyServiceProvider.Instance);
         view.AutomationId = $"designer-{node.Id.Value}";
         ApplyProperties(view, descriptor, node);
+        ILayoutAdapter? layoutAdapter = descriptor.AcceptsChildren
+            ? _layoutAdapters.Resolve(descriptor)
+            : null;
         foreach (DesignerNode childNode in node.Children)
         {
-            AddChild(view, Build(childNode, isRoot: false), childNode);
+            layoutAdapter!.AddChild(view, Build(childNode, isRoot: false), childNode);
+        }
+
+        if (node.Id == _workspace.DropTargetId &&
+            _workspace.DropPlacement is LayoutPlacement placement)
+        {
+            layoutAdapter?.AddDropPreview(view, placement);
         }
 
         EnsureDesignSize(view, descriptor);
-        if (descriptor.AcceptsChildren)
+        if (layoutAdapter is not null)
         {
-            AttachDropTarget(view, node.Id);
+            AttachDropTarget(view, node, layoutAdapter);
         }
 
         if (isRoot)
@@ -189,30 +199,46 @@ public sealed class ControlMaterializer
         chrome.Add(handle);
     }
 
-    private void AttachDropTarget(View view, ElementId parentId)
+    private void AttachDropTarget(
+        View view,
+        DesignerNode parentNode,
+        ILayoutAdapter layoutAdapter)
     {
         var drop = new DropGestureRecognizer { AllowDrop = true };
         drop.DragOver += (_, args) =>
         {
-            if (HasDesignerPayload(args.Data.Properties))
+            ElementId? movingId = TryGetMovingId(args.Data.Properties);
+            if (HasDesignerPayload(args.Data.Properties) &&
+                _workspace.CanAcceptChild(parentNode.Id, movingId) &&
+                args.GetPosition(view) is Point point)
             {
-                _workspace.SetDropTarget(parentId);
+                LayoutPlacement placement = layoutAdapter.ResolveDrop(
+                    view,
+                    parentNode,
+                    new PointD(point.X, point.Y));
+                _workspace.SetDropTarget(parentNode.Id, placement);
             }
         };
         drop.DragLeave += (_, _) => _workspace.ClearDropTarget();
         drop.Drop += (_, args) =>
         {
             Point? point = args.GetPosition(view);
-            PointD? position = point is null ? null : new PointD(point.Value.X, point.Value.Y);
+            LayoutPlacement placement = parentNode.Id == _workspace.DropTargetId &&
+                _workspace.DropPlacement is not null
+                    ? _workspace.DropPlacement
+                    : layoutAdapter.ResolveDrop(
+                        view,
+                        parentNode,
+                        new PointD(point?.X ?? 0, point?.Y ?? 0));
             if (args.Data.Properties.TryGetValue(ControlPayload, out object? controlValue) &&
                 controlValue is ControlDescriptor descriptor)
             {
-                _workspace.Add(descriptor, parentId, position);
+                _workspace.Add(descriptor, parentNode.Id, placement);
             }
             else if (args.Data.Properties.TryGetValue(ElementPayload, out object? elementValue) &&
                      elementValue is string id)
             {
-                _workspace.Reparent(new ElementId(id), parentId, position);
+                _workspace.Reparent(new ElementId(id), parentNode.Id, placement);
             }
 
             _workspace.ClearDropTarget();
@@ -222,6 +248,11 @@ public sealed class ControlMaterializer
 
     private static bool HasDesignerPayload(DataPackagePropertySet properties) =>
         properties.ContainsKey(ControlPayload) || properties.ContainsKey(ElementPayload);
+
+    private static ElementId? TryGetMovingId(DataPackagePropertySet properties) =>
+        properties.TryGetValue(ElementPayload, out object? value) && value is string id
+            ? new ElementId(id)
+            : null;
 
     private static void ApplyProperties(
         View view,
@@ -254,75 +285,6 @@ public sealed class ControlMaterializer
         {
             textProperty.SetValue(view, descriptor.DisplayName);
         }
-    }
-
-    private static void AddChild(View parent, View child, DesignerNode childNode)
-    {
-        if (parent is AbsoluteLayout absoluteLayout)
-        {
-            RectD bounds = childNode.Bounds ?? new RectD(24, 24, 160, 48);
-            AbsoluteLayout.SetLayoutBounds(child, new Rect(bounds.X, bounds.Y, bounds.Width, bounds.Height));
-            AbsoluteLayout.SetLayoutFlags(child, Microsoft.Maui.Layouts.AbsoluteLayoutFlags.None);
-            absoluteLayout.Children.Add(child);
-            return;
-        }
-
-        if (parent is Grid grid)
-        {
-            grid.Add(child);
-            ApplyGridPlacement(child, childNode);
-            return;
-        }
-
-        if (parent is Layout layout)
-        {
-            layout.Children.Add(child);
-            return;
-        }
-
-        PropertyInfo? contentProperty = parent.GetType().GetProperty(
-            "Content",
-            BindingFlags.Public | BindingFlags.Instance);
-        if (contentProperty?.CanWrite == true &&
-            (contentProperty.PropertyType.IsInstanceOfType(child) ||
-             contentProperty.PropertyType == typeof(object)))
-        {
-            contentProperty.SetValue(parent, child);
-        }
-    }
-
-    private static void ApplyGridPlacement(View child, DesignerNode node)
-    {
-        if (TryReadInt(node, "Grid.Row", out int row))
-        {
-            Grid.SetRow(child, row);
-        }
-
-        if (TryReadInt(node, "Grid.Column", out int column))
-        {
-            Grid.SetColumn(child, column);
-        }
-
-        if (TryReadInt(node, "Grid.RowSpan", out int rowSpan))
-        {
-            Grid.SetRowSpan(child, Math.Max(1, rowSpan));
-        }
-
-        if (TryReadInt(node, "Grid.ColumnSpan", out int columnSpan))
-        {
-            Grid.SetColumnSpan(child, Math.Max(1, columnSpan));
-        }
-    }
-
-    private static bool TryReadInt(DesignerNode node, string name, out int value)
-    {
-        value = 0;
-        return node.Properties.TryGetValue(name, out DesignerValue? property) &&
-            int.TryParse(
-                property.Text,
-                System.Globalization.NumberStyles.Integer,
-                System.Globalization.CultureInfo.InvariantCulture,
-                out value);
     }
 
     private static void EnsureDesignSize(View view, ControlDescriptor descriptor)

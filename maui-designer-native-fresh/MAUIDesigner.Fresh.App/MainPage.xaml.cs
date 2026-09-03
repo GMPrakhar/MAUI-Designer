@@ -52,6 +52,9 @@ public partial class MainPage : ContentPage
     private void OnToolboxSearchChanged(object? sender, TextChangedEventArgs e) =>
         ApplyToolboxFilter(e.NewTextValue ?? string.Empty);
 
+    private void OnPropertySearchChanged(object? sender, TextChangedEventArgs e) =>
+        RebuildPropertyPanel();
+
     private void OnToolboxSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (e.CurrentSelection.FirstOrDefault() is not ControlDescriptor descriptor)
@@ -72,6 +75,14 @@ public partial class MainPage : ContentPage
         }
 
         e.Data.Properties[ControlMaterializer.ToolboxControlPayload] = descriptor;
+    }
+
+    private void OnToolboxItemTapped(object? sender, TappedEventArgs e)
+    {
+        if (e.Parameter is ControlDescriptor descriptor)
+        {
+            _workspace.Add(descriptor);
+        }
     }
 
     private void OnToolboxTabClicked(object? sender, EventArgs e) => ShowToolbox(show: true);
@@ -264,35 +275,56 @@ public partial class MainPage : ContentPage
         }
 
         SelectionLabel.Text = $"{descriptor.DisplayName}  /  {selected.Id}";
-        foreach (PropertyDescriptor property in descriptor.Properties.Where(IsEditableProperty).Take(80))
+        string filter = PropertySearch.Text?.Trim() ?? string.Empty;
+        IEnumerable<IGrouping<string, PropertyDescriptor>> groups = descriptor.Properties
+            .Where(IsEditableProperty)
+            .Where(property =>
+                filter.Length == 0 ||
+                property.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(PropertyPriority)
+            .ThenBy(property => property.Name, StringComparer.Ordinal)
+            .Take(80)
+            .GroupBy(PropertyGroup);
+        foreach (IGrouping<string, PropertyDescriptor> group in groups)
         {
-            string? value = selected.Properties.TryGetValue(property.Name, out DesignerValue? designerValue)
-                ? designerValue.Text
-                : null;
-            var context = new PropertyEditorContext(
-                property,
-                value,
-                newValue => CommitProperty(property, newValue),
-                ShowPropertyError);
-            if (!_propertyEditors.TryCreate(context, out View? editor) || editor is null)
+            PropertyPanel.Add(new Label
             {
-                continue;
-            }
-
-            PropertyPanel.Add(new VerticalStackLayout
-            {
-                Spacing = 3,
-                Children =
-                {
-                    new Label
-                    {
-                        Text = property.Name,
-                        FontSize = 10,
-                        TextColor = Color.FromArgb("#AEB5C7")
-                    },
-                    editor
-                }
+                Text = group.Key.ToUpperInvariant(),
+                FontSize = 9,
+                FontAttributes = FontAttributes.Bold,
+                TextColor = Color.FromArgb("#7C5CFF"),
+                Margin = new Thickness(0, 6, 0, 0)
             });
+            foreach (PropertyDescriptor property in group)
+            {
+                string? value = selected.Properties.TryGetValue(property.Name, out DesignerValue? designerValue)
+                    ? designerValue.Text
+                    : null;
+                var context = new PropertyEditorContext(
+                    property,
+                    value,
+                    newValue => CommitProperty(property, newValue),
+                    ShowPropertyError);
+                if (!_propertyEditors.TryCreate(context, out View? editor) || editor is null)
+                {
+                    continue;
+                }
+
+                PropertyPanel.Add(new VerticalStackLayout
+                {
+                    Spacing = 3,
+                    Children =
+                    {
+                        new Label
+                        {
+                            Text = property.Name,
+                            FontSize = 10,
+                            TextColor = Color.FromArgb("#AEB5C7")
+                        },
+                        editor
+                    }
+                });
+            }
         }
     }
 
@@ -335,6 +367,8 @@ public partial class MainPage : ContentPage
         return !property.IsReadOnly &&
             (type == typeof(string) ||
              type == typeof(bool) ||
+             type == typeof(RowDefinitionCollection) ||
+             type == typeof(ColumnDefinitionCollection) ||
              type.IsEnum ||
              type.IsPrimitive ||
              type == typeof(decimal) ||
@@ -343,4 +377,29 @@ public partial class MainPage : ContentPage
 
     private static bool TypeDescriptorSupportsString(Type type) =>
         System.ComponentModel.TypeDescriptor.GetConverter(type).CanConvertFrom(typeof(string));
+
+    private static int PropertyPriority(PropertyDescriptor property) =>
+        property.Name switch
+        {
+            "Text" or "Content" or "Source" or "ItemsSource" => 0,
+            "WidthRequest" or "HeightRequest" or "Margin" or "Padding" => 10,
+            "HorizontalOptions" or "VerticalOptions" or "RowDefinitions" or "ColumnDefinitions" => 20,
+            "Background" or "BackgroundColor" or "TextColor" or "FontSize" or "FontAttributes" => 30,
+            "IsVisible" or "IsEnabled" or "Opacity" => 40,
+            _ => 100
+        };
+
+    private static string PropertyGroup(PropertyDescriptor property) =>
+        property.Name switch
+        {
+            "Text" or "Content" or "Source" or "ItemsSource" or "Placeholder" => "Content",
+            "WidthRequest" or "HeightRequest" or "MinimumWidthRequest" or "MinimumHeightRequest" or
+                "MaximumWidthRequest" or "MaximumHeightRequest" or "Margin" or "Padding" or
+                "HorizontalOptions" or "VerticalOptions" or "RowDefinitions" or "ColumnDefinitions" or
+                "RowSpacing" or "ColumnSpacing" or "Spacing" => "Layout",
+            "Background" or "BackgroundColor" or "TextColor" or "FontSize" or "FontFamily" or
+                "FontAttributes" or "Opacity" or "CornerRadius" or "BorderColor" => "Appearance",
+            "IsVisible" or "IsEnabled" or "InputTransparent" or "CascadeInputTransparent" => "Behavior",
+            _ => "Advanced"
+        };
 }
