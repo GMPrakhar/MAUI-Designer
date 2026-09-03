@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="MAUIDesigner.Fresh.App.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:catalog="clr-namespace:MAUIDesigner.Fresh.App.Catalog"
+    BackgroundColor="#0F1117">
+
+    <Grid RowDefinitions="56,*">
+        <Border
+            Grid.Row="0"
+            Padding="20,0"
+            BackgroundColor="#171A23"
+            Stroke="#292E3D"
+            StrokeThickness="1">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+                <HorizontalStackLayout VerticalOptions="Center" Spacing="10">
+                    <Border
+                        WidthRequest="30"
+                        HeightRequest="30"
+                        BackgroundColor="#7C5CFF"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 8">
+                        <Label
+                            HorizontalOptions="Center"
+                            VerticalOptions="Center"
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Text="M"
+                            TextColor="White" />
+                    </Border>
+                    <VerticalStackLayout Spacing="-2" VerticalOptions="Center">
+                        <Label FontAttributes="Bold" FontSize="15" Text="MAUI Designer" TextColor="#F5F7FF" />
+                        <Label FontSize="10" Text="NATIVE PREVIEW" TextColor="#8D94A8" />
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+                <HorizontalStackLayout
+                    Grid.Column="2"
+                    VerticalOptions="Center"
+                    Spacing="8">
+                    <Button x:Name="UndoButton" AutomationId="toolbar-undo" Clicked="OnUndoClicked" Style="{StaticResource ToolbarButton}" Text="Undo" />
+                    <Button x:Name="RedoButton" AutomationId="toolbar-redo" Clicked="OnRedoClicked" Style="{StaticResource ToolbarButton}" Text="Redo" />
+                    <Button AutomationId="toolbar-delete" Clicked="OnDeleteClicked" Style="{StaticResource ToolbarButton}" Text="Delete" />
+                </HorizontalStackLayout>
+            </Grid>
+        </Border>
+
+        <Grid
+            Grid.Row="1"
+            ColumnDefinitions="260,1,*,1,320"
+            BackgroundColor="#0F1117">
+            <Grid Grid.Column="0" Padding="14" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout>
+                        <Label FontAttributes="Bold" FontSize="14" Text="Toolbox" TextColor="#F5F7FF" />
+                        <Label FontSize="11" Text="Reflected from loaded assemblies" TextColor="#798196" />
+                    </VerticalStackLayout>
+                    <Border
+                        Grid.Column="1"
+                        Padding="7,3"
+                        BackgroundColor="#242033"
+                        Stroke="#5946A3"
+                        StrokeShape="RoundRectangle 8">
+                        <Label x:Name="ControlCountLabel" FontSize="10" TextColor="#BFAFFF" />
+                    </Border>
+                </Grid>
+                <SearchBar
+                    x:Name="ToolboxSearch"
+                    Grid.Row="1"
+                    AutomationId="toolbox-search"
+                    HeightRequest="38"
+                    Placeholder="Search controls..."
+                    TextChanged="OnToolboxSearchChanged" />
+                <CollectionView
+                    x:Name="ToolboxList"
+                    Grid.Row="2"
+                    SelectionChanged="OnToolboxSelectionChanged"
+                    SelectionMode="Single">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="catalog:ControlDescriptor">
+                            <Border
+                                AutomationId="{Binding Id.XamlName, StringFormat='toolbox-{0}'}"
+                                Margin="0,0,0,7"
+                                Padding="10,8"
+                                BackgroundColor="#171A23"
+                                Stroke="#292E3D"
+                                StrokeShape="RoundRectangle 8">
+                                <Border.GestureRecognizers>
+                                    <DragGestureRecognizer DragStarting="OnToolboxDragStarting" />
+                                </Border.GestureRecognizers>
+                                <Grid ColumnDefinitions="34,*" RowDefinitions="Auto,Auto">
+                                    <Border
+                                        Grid.RowSpan="2"
+                                        WidthRequest="28"
+                                        HeightRequest="28"
+                                        BackgroundColor="#242033"
+                                        StrokeThickness="0"
+                                        StrokeShape="RoundRectangle 7">
+                                        <Label
+                                            HorizontalOptions="Center"
+                                            VerticalOptions="Center"
+                                            FontAttributes="Bold"
+                                            Text="+"
+                                            TextColor="#A994FF" />
+                                    </Border>
+                                    <Label
+                                        Grid.Column="1"
+                                        FontSize="12"
+                                        Text="{Binding DisplayName}"
+                                        TextColor="#E7EAF4" />
+                                    <Label
+                                        Grid.Row="1"
+                                        Grid.Column="1"
+                                        FontSize="9"
+                                        Text="{Binding Category}"
+                                        TextColor="#747D92" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+
+            <BoxView Grid.Column="1" BackgroundColor="#292E3D" />
+
+            <Grid Grid.Column="2" RowDefinitions="44,*">
+                <Border
+                    Padding="14,0"
+                    BackgroundColor="#131620"
+                    Stroke="#292E3D"
+                    StrokeThickness="1">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <Label VerticalOptions="Center" FontSize="11" Text="DESIGN SURFACE" TextColor="#8D94A8" />
+                        <HorizontalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="8">
+                            <Border Padding="9,4" BackgroundColor="#1D2130" Stroke="#343A4E" StrokeShape="RoundRectangle 7">
+                                <Label FontSize="10" Text="Desktop  1024 x 720" TextColor="#B9C0D3" />
+                            </Border>
+                            <Border Padding="9,4" BackgroundColor="#1D2130" Stroke="#343A4E" StrokeShape="RoundRectangle 7">
+                                <Label FontSize="10" Text="100%" TextColor="#B9C0D3" />
+                            </Border>
+                        </HorizontalStackLayout>
+                    </Grid>
+                </Border>
+                <ScrollView Grid.Row="1" BackgroundColor="#0B0D12">
+                    <Grid Padding="44">
+                        <Border
+                            WidthRequest="1024"
+                            HeightRequest="720"
+                            HorizontalOptions="Center"
+                            VerticalOptions="Start"
+                            BackgroundColor="White"
+                            Stroke="#343A4E"
+                            StrokeShape="RoundRectangle 12"
+                            Shadow="{Shadow Brush=Black, Opacity=0.4, Radius=24, Offset='0,10'}">
+                            <ContentView x:Name="CanvasHost" AutomationId="designer-canvas" Padding="20" />
+                        </Border>
+                    </Grid>
+                </ScrollView>
+            </Grid>
+
+            <BoxView Grid.Column="3" BackgroundColor="#292E3D" />
+
+            <Grid Grid.Column="4" Padding="14" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+                <VerticalStackLayout>
+                    <Label FontAttributes="Bold" FontSize="14" Text="Properties" TextColor="#F5F7FF" />
+                    <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="11" TextColor="#798196" />
+                </VerticalStackLayout>
+                <Border
+                    Grid.Row="1"
+                    Padding="10,7"
+                    BackgroundColor="#171A23"
+                    Stroke="#292E3D"
+                    StrokeShape="RoundRectangle 8">
+                    <Label FontSize="10" Text="Changes commit when an editor loses focus or Enter is pressed." TextColor="#858DA2" />
+                </Border>
+                <ScrollView Grid.Row="2">
+                    <VerticalStackLayout x:Name="PropertyPanel" Spacing="8" />
+                </ScrollView>
+            </Grid>
+        </Grid>
+    </Grid>
+</ContentPage>
