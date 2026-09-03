@@ -133,7 +133,7 @@ public sealed class ReflectionControlCatalog : IControlCatalog
 
     private static ImmutableArray<PropertyDescriptor> DiscoverProperties(Type type)
     {
-        string? contentProperty = GetContentPropertyName(type);
+        string? contentProperty = VisualContentProperty.Find(type)?.Name;
 
         var bindableNames = type
             .GetFields(BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy)
@@ -165,8 +165,7 @@ public sealed class ReflectionControlCatalog : IControlCatalog
 
     private static bool AcceptsChildren(Type type) =>
         typeof(Layout).IsAssignableFrom(type) ||
-        typeof(Microsoft.Maui.IContentView).IsAssignableFrom(type) ||
-        GetContentPropertyName(type) is not null;
+        VisualContentProperty.Find(type) is not null;
 
     private static string GetCategory(Type type)
     {
@@ -208,17 +207,6 @@ public sealed class ReflectionControlCatalog : IControlCatalog
         }
     }
 
-    private static IEnumerable<CustomAttributeData> EnumerateTypeAttributes(Type type)
-    {
-        for (Type? current = type; current is not null; current = current.BaseType)
-        {
-            foreach (CustomAttributeData attribute in current.CustomAttributes)
-            {
-                yield return attribute;
-            }
-        }
-    }
-
     private static string? ResolveAssemblyXamlNamespace(Type type)
     {
         string? typeNamespace = type.Namespace;
@@ -243,19 +231,6 @@ public sealed class ReflectionControlCatalog : IControlCatalog
             .OrderByDescending(mapping => mapping.ClrNamespace!.Length)
             .Select(mapping => mapping.XmlNamespace)
             .FirstOrDefault();
-    }
-
-    private static string? GetContentPropertyName(Type type)
-    {
-        CustomAttributeData? contentAttribute = EnumerateTypeAttributes(type)
-            .FirstOrDefault(attribute => attribute.AttributeType.Name == "ContentPropertyAttribute");
-        string? name = contentAttribute?.NamedArguments
-            .FirstOrDefault(argument => argument.MemberName == "Name")
-            .TypedValue.Value as string;
-        return name ??
-            (contentAttribute?.ConstructorArguments.Count > 0
-                ? contentAttribute.ConstructorArguments[0].Value as string
-                : null);
     }
 
     private static string SplitPascalCase(string value)

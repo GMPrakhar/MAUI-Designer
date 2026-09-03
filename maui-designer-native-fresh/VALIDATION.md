@@ -35,3 +35,14 @@ Prediction written before measurement:
 The temporary mutation used for this check is never committed.
 
 Observed failure matched the prediction: the moved node retained `Grid.Row="0"` instead of receiving row `2`. The implementation was then restored.
+
+## Visual-content catalog instrument check
+
+Prediction written before measurement:
+
+1. If `Label` is deliberately classified as a child-bearing control, `Only_visual_content_properties_accept_designer_children` will fail at `Assert.False(label.AcceptsChildren)`.
+2. After restoring the temporary mutation, the Windows catalog test and all core tests must pass.
+
+The temporary mutation used for this check is never committed.
+
+Observed failure matched the prediction: the seeded `Label` classification reached `Assert.False(label.AcceptsChildren)` with an actual value of `true`. The implementation was then restored.

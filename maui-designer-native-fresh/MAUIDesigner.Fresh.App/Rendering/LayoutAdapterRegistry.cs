@@ -242,12 +242,13 @@ public sealed class LayoutAdapterRegistry
     private sealed class ContentLayoutAdapter : ILayoutAdapter
     {
         public bool CanHandle(ControlDescriptor descriptor) =>
-            typeof(Microsoft.Maui.IContentView).IsAssignableFrom(descriptor.RuntimeType) ||
-            descriptor.Properties.Any(property => property.IsContent);
+            VisualContentProperty.Find(descriptor.RuntimeType) is not null;
 
         public void AddChild(View parent, View child, DesignerNode childNode)
         {
-            PropertyInfo property = GetContentProperty(parent.GetType());
+            PropertyInfo property = VisualContentProperty.Find(parent.GetType())
+                ?? throw new InvalidOperationException(
+                    $"Visual content property for '{parent.GetType().FullName}' is unavailable.");
             property.SetValue(parent, child);
         }
 
@@ -258,16 +259,6 @@ public sealed class LayoutAdapterRegistry
         {
             return null;
         }
-
-        private static PropertyInfo GetContentProperty(Type type) =>
-            type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .FirstOrDefault(property =>
-                    property.CanWrite &&
-                    property.Name == "Content" &&
-                    (typeof(View).IsAssignableFrom(property.PropertyType) ||
-                     property.PropertyType == typeof(object)))
-            ?? throw new InvalidOperationException(
-                $"Content property for '{type.FullName}' is unavailable.");
     }
 
     private static Border CreatePreview() =>

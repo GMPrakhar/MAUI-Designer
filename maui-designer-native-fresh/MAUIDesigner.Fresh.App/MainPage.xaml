@@ -115,6 +115,7 @@
                                         Tapped="OnToolboxItemTapped" />
                                     <DragGestureRecognizer
                                         BindingContext="{Binding .}"
+                                        CanDrag="True"
                                         DragStarting="OnToolboxDragStarting"
                                         DragStartingCommandParameter="{Binding .}" />
                                 </Border.GestureRecognizers>

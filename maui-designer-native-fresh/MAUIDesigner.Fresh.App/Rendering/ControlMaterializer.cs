@@ -110,7 +110,7 @@ public sealed class ControlMaterializer
         tap.Tapped += (_, _) => _workspace.Select(node.Id);
         chrome.GestureRecognizers.Add(tap);
 
-        var drag = new DragGestureRecognizer();
+        var drag = new DragGestureRecognizer { CanDrag = true };
         drag.DragStarting += (_, args) =>
         {
             _workspace.Select(node.Id);
@@ -131,6 +131,7 @@ public sealed class ControlMaterializer
     {
         var handle = new Border
         {
+            AutomationId = $"move-{node.Id.Value}",
             WidthRequest = 28,
             HeightRequest = 14,
             HorizontalOptions = LayoutOptions.Start,
@@ -181,6 +182,7 @@ public sealed class ControlMaterializer
     {
         var handle = new Border
         {
+            AutomationId = $"resize-{node.Id.Value}",
             WidthRequest = 12,
             HeightRequest = 12,
             HorizontalOptions = LayoutOptions.End,
