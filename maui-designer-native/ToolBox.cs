@@ -235,10 +235,10 @@ namespace MAUIDesigner
                 {
                     if(value == null) value = new Color();
                     ((Color)value).ToRgba(out var r, out var g, out var b, out var a);
-                    red.Text = ((int)Math.Round(r * 255)).ToString();
-                    green.Text = ((int)Math.Round(g * 255)).ToString();
-                    blue.Text = ((int)Math.Round(b * 255)).ToString();
-                    alpha.Text = ((int)Math.Round(a * 255)).ToString();
+                    red.Text = ((int)Math.Round((double)r * 255)).ToString();
+                    green.Text = ((int)Math.Round((double)g * 255)).ToString();
+                    blue.Text = ((int)Math.Round((double)b * 255)).ToString();
+                    alpha.Text = ((int)Math.Round((double)a * 255)).ToString();
                 }
                 else
                 {

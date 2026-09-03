@@ -46,8 +46,8 @@ namespace MAUIDesigner.LayoutDesigners
         private void UpdateColumnAndRowForView(ElementDesignerView elementDesigner, Point location)
         {
             var (column, row) = ComputeColumnAndRowForPoint(location);
-            Grid.SetColumn(elementDesigner, column);
-            Grid.SetRow(elementDesigner, row);
+            Grid.SetColumn((BindableObject)elementDesigner, column);
+            Grid.SetRow((BindableObject)elementDesigner, row);
             elementDesigner.EncapsulatingViewProperty.Margin = 0;
         }
 
@@ -71,8 +71,8 @@ namespace MAUIDesigner.LayoutDesigners
             }
 
             var (column, row) = ComputeColumnAndRowForPoint(location);
-            Grid.SetColumn(highlighter, column);
-            Grid.SetRow(highlighter, row);
+            Grid.SetColumn((BindableObject)highlighter, column);
+            Grid.SetRow((BindableObject)highlighter, row);
             highlighter.IsVisible = true;
         }
 
