@@ -6,6 +6,8 @@ namespace MAUIDesigner.Fresh.App.Catalog;
 
 public interface IControlCatalog
 {
+    event EventHandler? Changed;
+
     ImmutableArray<ControlDescriptor> Controls { get; }
 
     void RegisterAssembly(Assembly assembly);

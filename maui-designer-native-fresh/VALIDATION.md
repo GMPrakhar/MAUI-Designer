@@ -11,3 +11,16 @@ Predictions written before measurement:
 The temporary mutations used for these checks are never committed.
 
 Observed failures matched both predictions: the equal-cell mutation returned `(0,0)`, and the append-only mutation retained `a,b,c`. After restoration, the complete seven-test core suite passed.
+
+## XAML instrument check
+
+Predictions written before the recorded measurement:
+
+1. If wrapper fragments are discarded while writing, `Page_resources_bindings_attached_properties_and_custom_controls_survive` will fail because `ContentPage.Resources` is absent.
+2. If malformed XML escapes the reader instead of becoming a diagnostic, `Invalid_xml_returns_diagnostic_without_a_document` will fail with `XmlException`.
+3. If unresolved-control diagnostics omit the element name, `Unknown_control_is_rejected_with_its_source_location` will fail because the message does not contain `Mystery`.
+4. After restoring each temporary mutation, the complete ten-test suite must pass.
+
+The temporary mutations used for these checks are never committed.
+
+Observed failures matched all three predictions: resource removal lost `ContentPage.Resources`, disabled XML handling surfaced the expected `XmlException`, and the generic unresolved-control message lost `Mystery`. The implementations were then restored.

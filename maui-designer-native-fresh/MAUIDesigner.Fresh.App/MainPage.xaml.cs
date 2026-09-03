@@ -1,8 +1,11 @@
 using System.Collections.ObjectModel;
 using MAUIDesigner.Fresh.App.Catalog;
+using MAUIDesigner.Fresh.App.PropertyEditing;
 using MAUIDesigner.Fresh.App.Rendering;
 using MAUIDesigner.Fresh.App.Workspace;
+using MAUIDesigner.Fresh.App.Xaml;
 using MAUIDesigner.Fresh.Core.Documents;
+using MAUIDesigner.Fresh.Core.Xaml;
 
 namespace MAUIDesigner.Fresh.App;
 
@@ -11,23 +14,39 @@ public partial class MainPage : ContentPage
     private readonly IControlCatalog _catalog;
     private readonly DesignerWorkspace _workspace;
     private readonly ControlMaterializer _materializer;
+    private readonly PropertyEditorRegistry _propertyEditors;
+    private readonly AssemblyExtensionLoader _extensionLoader;
+    private readonly XamlWorkspace _xamlWorkspace;
     private readonly ObservableCollection<ControlDescriptor> _toolboxItems = [];
+    private readonly ObservableCollection<HierarchyItem> _hierarchyItems = [];
+    private bool _updatingXaml;
+    private bool _xamlDirty;
 
     public MainPage(
         IControlCatalog catalog,
         DesignerWorkspace workspace,
-        ControlMaterializer materializer)
+        ControlMaterializer materializer,
+        PropertyEditorRegistry propertyEditors,
+        AssemblyExtensionLoader extensionLoader,
+        XamlWorkspace xamlWorkspace)
     {
         InitializeComponent();
         _catalog = catalog;
         _workspace = workspace;
         _materializer = materializer;
+        _propertyEditors = propertyEditors;
+        _extensionLoader = extensionLoader;
+        _xamlWorkspace = xamlWorkspace;
         ToolboxList.ItemsSource = _toolboxItems;
+        HierarchyList.ItemsSource = _hierarchyItems;
         _workspace.Session.Changed += OnDocumentChanged;
         _workspace.SelectionChanged += OnSelectionChanged;
         _workspace.InteractionChanged += OnInteractionChanged;
+        _catalog.Changed += OnCatalogChanged;
         ApplyToolboxFilter(string.Empty);
+        ShowToolbox(show: true);
         RebuildDesigner();
+        RefreshXaml();
     }
 
     private void OnToolboxSearchChanged(object? sender, TextChangedEventArgs e) =>
@@ -55,11 +74,98 @@ public partial class MainPage : ContentPage
         e.Data.Properties[ControlMaterializer.ToolboxControlPayload] = descriptor;
     }
 
+    private void OnToolboxTabClicked(object? sender, EventArgs e) => ShowToolbox(show: true);
+
+    private void OnHierarchyTabClicked(object? sender, EventArgs e) => ShowToolbox(show: false);
+
+    private void OnHierarchySelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is HierarchyItem item)
+        {
+            _workspace.Select(item.ElementId);
+        }
+
+        HierarchyList.SelectedItem = null;
+    }
+
     private void OnUndoClicked(object? sender, EventArgs e) => _workspace.Session.Undo();
 
     private void OnRedoClicked(object? sender, EventArgs e) => _workspace.Session.Redo();
 
     private void OnDeleteClicked(object? sender, EventArgs e) => _workspace.DeleteSelection();
+
+    private void OnToggleXamlClicked(object? sender, EventArgs e)
+    {
+        bool opening = !XamlPanel.IsVisible;
+        XamlPanel.IsVisible = opening;
+        DesignerBody.InputTransparent = opening;
+        if (opening && !_xamlDirty)
+        {
+            RefreshXaml();
+        }
+    }
+
+    private void OnRefreshXamlClicked(object? sender, EventArgs e) => RefreshXaml();
+
+    private void OnApplyXamlClicked(object? sender, EventArgs e)
+    {
+        XamlReadResult result = _xamlWorkspace.Parse(XamlEditor.Text ?? string.Empty);
+        if (!result.Success || result.Document is null)
+        {
+            XamlDiagnostic diagnostic = result.Diagnostics.First();
+            XamlStatusLabel.Text = diagnostic.Line is null
+                ? diagnostic.Message
+                : $"Line {diagnostic.Line}, column {diagnostic.Column}: {diagnostic.Message}";
+            XamlStatusLabel.TextColor = Color.FromArgb("#F87171");
+            return;
+        }
+
+        _workspace.ReplaceDocument(result.Document);
+        _xamlDirty = false;
+        XamlStatusLabel.Text = "Applied";
+        XamlStatusLabel.TextColor = Color.FromArgb("#86EFAC");
+    }
+
+    private void OnXamlTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (!_updatingXaml)
+        {
+            _xamlDirty = true;
+            XamlStatusLabel.Text = "Modified";
+            XamlStatusLabel.TextColor = Color.FromArgb("#FDE68A");
+        }
+    }
+
+    private async void OnLoadControlsClicked(object? sender, EventArgs e)
+    {
+        FileResult? result = await FilePicker.Default.PickAsync(new PickOptions
+        {
+            PickerTitle = "Select a MAUI control assembly"
+        });
+        if (result is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ExtensionLoadResult loaded = _extensionLoader.Load(result.FullPath);
+            SelectionLabel.Text = $"{loaded.AssemblyName}: {loaded.ControlsAdded} controls added";
+            SelectionLabel.TextColor = Color.FromArgb("#86EFAC");
+        }
+        catch (FileNotFoundException exception)
+        {
+            ShowPropertyError(exception.Message);
+        }
+        catch (BadImageFormatException exception)
+        {
+            ShowPropertyError(exception.Message);
+        }
+        catch (FileLoadException exception)
+        {
+            ShowPropertyError(exception.Message);
+        }
+    }
 
     private void OnDocumentChanged(object? sender, DocumentChangedEventArgs e) =>
         MainThread.BeginInvokeOnMainThread(RebuildDesigner);
@@ -69,6 +175,9 @@ public partial class MainPage : ContentPage
 
     private void OnInteractionChanged(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(RebuildDesigner);
+
+    private void OnCatalogChanged(object? sender, EventArgs e) =>
+        MainThread.BeginInvokeOnMainThread(() => ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty));
 
     private void ApplyToolboxFilter(string search)
     {
@@ -94,7 +203,54 @@ public partial class MainPage : ContentPage
         CanvasHost.Content = _materializer.Materialize(_workspace.Session.Current);
         UndoButton.IsEnabled = _workspace.Session.CanUndo;
         RedoButton.IsEnabled = _workspace.Session.CanRedo;
+        RebuildHierarchy();
         RebuildPropertyPanel();
+        if (!_xamlDirty)
+        {
+            RefreshXaml();
+        }
+    }
+
+    private void RefreshXaml()
+    {
+        _updatingXaml = true;
+        XamlEditor.Text = _xamlWorkspace.Write(_workspace.Session.Current);
+        _updatingXaml = false;
+        _xamlDirty = false;
+        XamlStatusLabel.Text = "Synchronized";
+        XamlStatusLabel.TextColor = Color.FromArgb("#858DA2");
+    }
+
+    private void RebuildHierarchy()
+    {
+        _hierarchyItems.Clear();
+        AddHierarchyNode(_workspace.Session.Current.Root, 0);
+    }
+
+    private void AddHierarchyNode(DesignerNode node, int depth)
+    {
+        string displayName = _catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor)
+            ? descriptor?.DisplayName ?? node.ControlType.XamlName
+            : node.ControlType.XamlName;
+        _hierarchyItems.Add(new HierarchyItem(
+            node.Id,
+            displayName,
+            node.Id.Value,
+            new Thickness(depth * 14, 0, 0, 6),
+            node.Id == _workspace.SelectedId));
+        foreach (DesignerNode child in node.Children)
+        {
+            AddHierarchyNode(child, depth + 1);
+        }
+    }
+
+    private void ShowToolbox(bool show)
+    {
+        ToolboxSearch.IsVisible = show;
+        ToolboxList.IsVisible = show;
+        HierarchyList.IsVisible = !show;
+        ToolboxTabButton.BackgroundColor = show ? Color.FromArgb("#7C5CFF") : Color.FromArgb("#202431");
+        HierarchyTabButton.BackgroundColor = show ? Color.FromArgb("#202431") : Color.FromArgb("#7C5CFF");
     }
 
     private void RebuildPropertyPanel()
@@ -110,16 +266,18 @@ public partial class MainPage : ContentPage
         SelectionLabel.Text = $"{descriptor.DisplayName}  /  {selected.Id}";
         foreach (PropertyDescriptor property in descriptor.Properties.Where(IsEditableProperty).Take(80))
         {
-            var editor = new Entry
+            string? value = selected.Properties.TryGetValue(property.Name, out DesignerValue? designerValue)
+                ? designerValue.Text
+                : null;
+            var context = new PropertyEditorContext(
+                property,
+                value,
+                newValue => CommitProperty(property, newValue),
+                ShowPropertyError);
+            if (!_propertyEditors.TryCreate(context, out View? editor) || editor is null)
             {
-                AutomationId = $"property-{property.Name}",
-                FontSize = 11,
-                HeightRequest = 34,
-                Placeholder = property.ValueType.Name,
-                Text = selected.Properties.TryGetValue(property.Name, out DesignerValue? value) ? value.Text : string.Empty
-            };
-            editor.Completed += (_, _) => CommitProperty(property, editor.Text);
-            editor.Unfocused += (_, _) => CommitProperty(property, editor.Text);
+                continue;
+            }
 
             PropertyPanel.Add(new VerticalStackLayout
             {
@@ -136,6 +294,12 @@ public partial class MainPage : ContentPage
                 }
             });
         }
+    }
+
+    private void ShowPropertyError(string message)
+    {
+        SelectionLabel.Text = message;
+        SelectionLabel.TextColor = Color.FromArgb("#F87171");
     }
 
     private void CommitProperty(PropertyDescriptor property, string? text)

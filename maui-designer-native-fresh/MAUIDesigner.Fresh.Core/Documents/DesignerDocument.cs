@@ -4,7 +4,8 @@ namespace MAUIDesigner.Fresh.Core.Documents;
 
 public sealed record DesignerDocument(
     DesignerNode Root,
-    ImmutableDictionary<string, string> Namespaces)
+    ImmutableDictionary<string, string> Namespaces,
+    XamlDocumentMetadata? XamlMetadata = null)
 {
     public static DesignerDocument Create(ControlTypeId rootType) =>
         new(

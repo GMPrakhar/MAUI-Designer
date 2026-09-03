@@ -9,6 +9,18 @@ public interface IDocumentCommand
     DesignerDocument Apply(DesignerDocument document);
 }
 
+public sealed record ReplaceDocumentCommand(
+    DesignerDocument Replacement,
+    string Description = "Apply XAML") : IDocumentCommand
+{
+    public DesignerDocument Apply(DesignerDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(Replacement);
+        Replacement.Validate();
+        return Replacement;
+    }
+}
+
 public sealed record AddElementCommand(ElementId ParentId, DesignerNode Node, int Index = -1) : IDocumentCommand
 {
     public string Description => $"Add {Node.ControlType.XamlName}";

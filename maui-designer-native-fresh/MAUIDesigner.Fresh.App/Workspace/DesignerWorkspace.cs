@@ -104,6 +104,14 @@ public sealed class DesignerWorkspace
         Select(Session.Current.Root.Id);
     }
 
+    public void ReplaceDocument(DesignerDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        Session.Execute(new ReplaceDocumentCommand(document));
+        Select(document.Root.Id);
+        ClearDropTarget();
+    }
+
     private ElementId ResolveInsertionParent()
     {
         DesignerNode selected = Session.Current.Find(SelectedId) ?? Session.Current.Root;

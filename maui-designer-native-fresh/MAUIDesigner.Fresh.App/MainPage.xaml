@@ -4,9 +4,10 @@
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:catalog="clr-namespace:MAUIDesigner.Fresh.App.Catalog"
+    xmlns:workspace="clr-namespace:MAUIDesigner.Fresh.App.Workspace"
     BackgroundColor="#0F1117">
 
-    <Grid RowDefinitions="56,*">
+    <Grid x:Name="ApplicationGrid" RowDefinitions="56,*,Auto">
         <Border
             Grid.Row="0"
             Padding="20,0"
@@ -41,16 +42,20 @@
                     Spacing="8">
                     <Button x:Name="UndoButton" AutomationId="toolbar-undo" Clicked="OnUndoClicked" Style="{StaticResource ToolbarButton}" Text="Undo" />
                     <Button x:Name="RedoButton" AutomationId="toolbar-redo" Clicked="OnRedoClicked" Style="{StaticResource ToolbarButton}" Text="Redo" />
+                    <Button AutomationId="toolbar-load-controls" Clicked="OnLoadControlsClicked" Style="{StaticResource ToolbarButton}" Text="Load controls" />
+                    <Button AutomationId="toolbar-xaml" Clicked="OnToggleXamlClicked" Style="{StaticResource ToolbarButton}" Text="XAML" />
                     <Button AutomationId="toolbar-delete" Clicked="OnDeleteClicked" Style="{StaticResource ToolbarButton}" Text="Delete" />
                 </HorizontalStackLayout>
             </Grid>
         </Border>
 
         <Grid
+            x:Name="DesignerBody"
             Grid.Row="1"
             ColumnDefinitions="260,1,*,1,320"
-            BackgroundColor="#0F1117">
-            <Grid Grid.Column="0" Padding="14" RowDefinitions="Auto,Auto,*" RowSpacing="12">
+            BackgroundColor="#0F1117"
+            IsClippedToBounds="True">
+            <Grid Grid.Column="0" Padding="14" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
                 <Grid ColumnDefinitions="*,Auto">
                     <VerticalStackLayout>
                         <Label FontAttributes="Bold" FontSize="14" Text="Toolbox" TextColor="#F5F7FF" />
@@ -65,16 +70,33 @@
                         <Label x:Name="ControlCountLabel" FontSize="10" TextColor="#BFAFFF" />
                     </Border>
                 </Grid>
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button
+                        x:Name="ToolboxTabButton"
+                        AutomationId="tab-toolbox"
+                        Clicked="OnToolboxTabClicked"
+                        FontSize="11"
+                        HeightRequest="32"
+                        Text="Toolbox" />
+                    <Button
+                        x:Name="HierarchyTabButton"
+                        Grid.Column="1"
+                        AutomationId="tab-hierarchy"
+                        Clicked="OnHierarchyTabClicked"
+                        FontSize="11"
+                        HeightRequest="32"
+                        Text="Hierarchy" />
+                </Grid>
                 <SearchBar
                     x:Name="ToolboxSearch"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     AutomationId="toolbox-search"
                     HeightRequest="38"
                     Placeholder="Search controls..."
                     TextChanged="OnToolboxSearchChanged" />
                 <CollectionView
                     x:Name="ToolboxList"
-                    Grid.Row="2"
+                    Grid.Row="3"
                     SelectionChanged="OnToolboxSelectionChanged"
                     SelectionMode="Single">
                     <CollectionView.ItemTemplate>
@@ -116,6 +138,30 @@
                                         Text="{Binding Category}"
                                         TextColor="#747D92" />
                                 </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+                <CollectionView
+                    x:Name="HierarchyList"
+                    Grid.Row="2"
+                    Grid.RowSpan="2"
+                    AutomationId="hierarchy-list"
+                    IsVisible="False"
+                    SelectionChanged="OnHierarchySelectionChanged"
+                    SelectionMode="Single">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="workspace:HierarchyItem">
+                            <Border
+                                Margin="{Binding Indent}"
+                                Padding="10,8"
+                                BackgroundColor="#171A23"
+                                Stroke="#292E3D"
+                                StrokeShape="RoundRectangle 7">
+                                <VerticalStackLayout Spacing="1">
+                                    <Label FontSize="11" Text="{Binding DisplayName}" TextColor="#E7EAF4" />
+                                    <Label FontSize="9" Text="{Binding Identity}" TextColor="#747D92" />
+                                </VerticalStackLayout>
                             </Border>
                         </DataTemplate>
                     </CollectionView.ItemTemplate>
@@ -179,5 +225,35 @@
                 </ScrollView>
             </Grid>
         </Grid>
+
+        <Border
+            x:Name="XamlPanel"
+            Grid.Row="2"
+            HeightRequest="220"
+            IsVisible="False"
+            Padding="14,10"
+            BackgroundColor="#131620"
+            Stroke="#292E3D"
+            StrokeThickness="1">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,*" ColumnSpacing="10" RowSpacing="8">
+                <HorizontalStackLayout Spacing="10">
+                    <Label FontAttributes="Bold" FontSize="12" Text="XAML" TextColor="#F5F7FF" />
+                    <Label x:Name="XamlStatusLabel" FontSize="10" TextColor="#858DA2" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Grid.Column="1" Spacing="7">
+                    <Button AutomationId="xaml-refresh" Clicked="OnRefreshXamlClicked" Style="{StaticResource ToolbarButton}" Text="Refresh" />
+                    <Button AutomationId="xaml-apply" Clicked="OnApplyXamlClicked" Style="{StaticResource ToolbarButton}" Text="Apply" />
+                </HorizontalStackLayout>
+                <Editor
+                    x:Name="XamlEditor"
+                    Grid.Row="1"
+                    Grid.ColumnSpan="2"
+                    AutomationId="xaml-editor"
+                    BackgroundColor="#0B0D12"
+                    FontSize="11"
+                    TextChanged="OnXamlTextChanged"
+                    TextColor="#DCE2F2" />
+            </Grid>
+        </Border>
     </Grid>
 </ContentPage>

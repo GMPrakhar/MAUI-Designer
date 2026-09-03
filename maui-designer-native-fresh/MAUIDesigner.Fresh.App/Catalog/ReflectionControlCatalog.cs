@@ -18,6 +18,8 @@ public sealed class ReflectionControlCatalog : IControlCatalog
         _services = services;
     }
 
+    public event EventHandler? Changed;
+
     public ImmutableArray<ControlDescriptor> Controls =>
         _byId.Values
             .OrderBy(descriptor => descriptor.Category, StringComparer.Ordinal)
@@ -50,6 +52,8 @@ public sealed class ReflectionControlCatalog : IControlCatalog
 
             _byId = next.ToImmutable();
         }
+
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public void RegisterFactory<TView>(Func<IServiceProvider, TView> factory)
@@ -62,6 +66,8 @@ public sealed class ReflectionControlCatalog : IControlCatalog
             ControlDescriptor descriptor = CreateDescriptor(typeof(TView), _factories[typeof(TView)]);
             _byId = _byId.SetItem(descriptor.Id.Key, descriptor);
         }
+
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     public bool TryGet(ControlTypeId id, out ControlDescriptor? descriptor)
@@ -108,7 +114,8 @@ public sealed class ReflectionControlCatalog : IControlCatalog
             type.Namespace?.StartsWith("Microsoft.Maui.Controls", StringComparison.Ordinal) == true;
         string xamlNamespace = isMaui
             ? MauiXamlNamespace
-            : $"clr-namespace:{type.Namespace};assembly={assemblyName}";
+            : ResolveAssemblyXamlNamespace(type) ??
+              $"clr-namespace:{type.Namespace};assembly={assemblyName}";
         var id = new ControlTypeId(assemblyName, type.FullName!, xamlNamespace, type.Name);
         string category = GetCategory(type);
         bool acceptsChildren = AcceptsChildren(type);
@@ -210,6 +217,32 @@ public sealed class ReflectionControlCatalog : IControlCatalog
                 yield return attribute;
             }
         }
+    }
+
+    private static string? ResolveAssemblyXamlNamespace(Type type)
+    {
+        string? typeNamespace = type.Namespace;
+        if (typeNamespace is null)
+        {
+            return null;
+        }
+
+        return type.Assembly.CustomAttributes
+            .Where(attribute => attribute.AttributeType.Name == "XmlnsDefinitionAttribute")
+            .Where(attribute => attribute.ConstructorArguments.Count >= 2)
+            .Select(attribute => new
+            {
+                XmlNamespace = attribute.ConstructorArguments[0].Value as string,
+                ClrNamespace = attribute.ConstructorArguments[1].Value as string
+            })
+            .Where(mapping =>
+                mapping.XmlNamespace is not null &&
+                mapping.ClrNamespace is not null &&
+                (typeNamespace == mapping.ClrNamespace ||
+                 typeNamespace.StartsWith($"{mapping.ClrNamespace}.", StringComparison.Ordinal)))
+            .OrderByDescending(mapping => mapping.ClrNamespace!.Length)
+            .Select(mapping => mapping.XmlNamespace)
+            .FirstOrDefault();
     }
 
     private static string? GetContentPropertyName(Type type)
