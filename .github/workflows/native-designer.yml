@@ -1,0 +1,45 @@
+name: Native MAUI designer
+
+on:
+  push:
+    paths:
+      - 'maui-designer-native/**'
+      - '.github/workflows/native-designer.yml'
+      - '.github/workflows/release-native.yml'
+    branches: [main, master]
+  pull_request:
+    paths:
+      - 'maui-designer-native/**'
+      - '.github/workflows/native-designer.yml'
+      - '.github/workflows/release-native.yml'
+
+jobs:
+  build-windows:
+    name: Build WinUI designer
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Restore
+        run: dotnet restore maui-designer-native/MAUIDesigner.csproj
+
+      - name: Build
+        run: dotnet build maui-designer-native/MAUIDesigner.csproj -c Release -f net8.0-windows10.0.19041.0 --no-restore
+
+      - name: Publish unpackaged
+        run: dotnet publish maui-designer-native/MAUIDesigner.csproj -c Release -f net8.0-windows10.0.19041.0 -p:WindowsPackageType=None --no-restore
+
+      - name: Upload unpackaged app
+        uses: actions/upload-artifact@v5
+        with:
+          name: maui-designer-native-win
+          path: maui-designer-native/bin/Release/net8.0-windows10.0.19041.0/**/publish/
+          if-no-files-found: error
+          retention-days: 14
