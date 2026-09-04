@@ -21,10 +21,10 @@ for MAUI. It is **not** a visual designer. Useful pieces for this repository:
 The public comment that “this isn’t actually rendering MAUI controls” is true of the web
 designer and **false** of the native app.
 
-## Wiring DevFlow (after .NET 10)
+## DevFlow integration
 
-The DevFlow agent package currently targets **.NET 10**. This native app is **net8** so the
-package is not referenced yet. When the TFM moves:
+The native designer targets **.NET 10** and registers the DevFlow agent in
+Debug builds:
 
 ```csharp
 #if DEBUG
@@ -38,7 +38,7 @@ maui devflow broker start
 # inspector: http://localhost:19223/inspector/
 ```
 
-Keep the agent out of Release builds.
+The agent remains disabled in Release builds.
 
 ## What we will not take from maui-labs
 

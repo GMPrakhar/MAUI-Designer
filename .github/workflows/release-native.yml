@@ -1,4 +1,4 @@
-name: Release native MAUI designer
+name: Release MAUI Designer
 
 on:
   push:
@@ -7,37 +7,37 @@ on:
 
 jobs:
   publish:
-    name: Publish native Windows app
+    name: Publish Windows app
     runs-on: windows-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 10.0.x
 
       - name: Install MAUI Windows workload
         run: dotnet workload install maui-windows
 
       - name: Publish unpackaged
-        run: dotnet publish maui-designer-native/MAUIDesigner.csproj -c Release -f net8.0-windows10.0.19041.0 -p:WindowsPackageType=None
+        run: dotnet publish maui-designer-native/MAUIDesigner.Fresh.App/MAUIDesigner.Fresh.App.csproj -c Release -r win-x64 -p:PublishReadyToRun=false
 
       - name: Stage zip
         shell: pwsh
         run: |
           $publish = Get-ChildItem -Recurse -Directory -Filter publish |
-            Where-Object { $_.FullName -match 'net8.0-windows10.0.19041.0' } |
+            Where-Object { $_.FullName -match 'MAUIDesigner\.Fresh\.App.+net10\.0-windows10\.0\.19041\.0.+win-x64' } |
             Select-Object -First 1
           if (-not $publish) { throw 'publish folder not found' }
           New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path (Join-Path $publish.FullName '*') -DestinationPath dist/MAUIDesignerNative-win-x64.zip -Force
+          Compress-Archive -Path (Join-Path $publish.FullName '*') -DestinationPath dist/MAUIDesigner-win-x64.zip -Force
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          name: MAUI Designer Native ${{ github.ref_name }}
+          name: MAUI Designer ${{ github.ref_name }}
           prerelease: true
           generate_release_notes: true
-          files: dist/MAUIDesignerNative-win-x64.zip
+          files: dist/MAUIDesigner-win-x64.zip
