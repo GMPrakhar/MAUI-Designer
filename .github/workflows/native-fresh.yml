@@ -1,0 +1,52 @@
+name: Native Fresh Designer
+
+on:
+  push:
+    branches:
+      - main
+      - feat/maui-designer-native-fresh
+    paths:
+      - maui-designer-native-fresh/**
+      - .github/workflows/native-fresh.yml
+  pull_request:
+    paths:
+      - maui-designer-native-fresh/**
+      - .github/workflows/native-fresh.yml
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: maui-designer-native-fresh
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Install MAUI Windows workload
+        run: dotnet workload install maui-windows
+
+      - name: Restore tests
+        run: dotnet restore .\MAUIDesigner.Fresh.Core.Tests\MAUIDesigner.Fresh.Core.Tests.csproj
+
+      - name: Restore Windows tests
+        run: dotnet restore .\MAUIDesigner.Fresh.App.Tests\MAUIDesigner.Fresh.App.Tests.csproj -r win-x64 -p:PublishReadyToRun=false
+
+      - name: Restore Windows app
+        run: dotnet restore .\MAUIDesigner.Fresh.App\MAUIDesigner.Fresh.App.csproj -r win-x64
+
+      - name: Test core
+        run: dotnet test .\MAUIDesigner.Fresh.Core.Tests\MAUIDesigner.Fresh.Core.Tests.csproj -c Release --no-restore --nologo
+
+      - name: Test Windows catalog
+        run: dotnet test .\MAUIDesigner.Fresh.App.Tests\MAUIDesigner.Fresh.App.Tests.csproj -c Release -r win-x64 --no-restore --nologo -p:PublishReadyToRun=false
+
+      - name: Build Windows app
+        run: dotnet build .\MAUIDesigner.Fresh.App\MAUIDesigner.Fresh.App.csproj -c Release --no-restore --nologo

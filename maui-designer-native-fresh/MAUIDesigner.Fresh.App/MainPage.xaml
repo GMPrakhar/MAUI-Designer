@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="MAUIDesigner.Fresh.App.MainPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:catalog="clr-namespace:MAUIDesigner.Fresh.App.Catalog"
+    xmlns:controls="clr-namespace:MAUIDesigner.Fresh.App.Controls"
+    xmlns:workspace="clr-namespace:MAUIDesigner.Fresh.App.Workspace"
+    BackgroundColor="#0F1117">
+
+    <Grid x:Name="ApplicationGrid" RowDefinitions="56,*,Auto">
+        <Border
+            Grid.Row="0"
+            Padding="20,0"
+            BackgroundColor="#171A23"
+            Stroke="#292E3D"
+            StrokeThickness="1">
+            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+                <HorizontalStackLayout VerticalOptions="Center" Spacing="10">
+                    <Border
+                        WidthRequest="30"
+                        HeightRequest="30"
+                        BackgroundColor="#7C5CFF"
+                        StrokeThickness="0"
+                        StrokeShape="RoundRectangle 8">
+                        <Label
+                            HorizontalOptions="Center"
+                            VerticalOptions="Center"
+                            FontAttributes="Bold"
+                            FontSize="16"
+                            Text="M"
+                            TextColor="White" />
+                    </Border>
+                    <VerticalStackLayout Spacing="-2" VerticalOptions="Center">
+                        <Label FontAttributes="Bold" FontSize="15" Text="MAUI Designer" TextColor="#F5F7FF" />
+                        <Label FontSize="10" Text="NATIVE PREVIEW" TextColor="#8D94A8" />
+                    </VerticalStackLayout>
+                </HorizontalStackLayout>
+
+                <HorizontalStackLayout
+                    Grid.Column="2"
+                    VerticalOptions="Center"
+                    Spacing="8">
+                    <Button x:Name="UndoButton" AutomationId="toolbar-undo" Clicked="OnUndoClicked" Style="{StaticResource ToolbarButton}" Text="Undo" />
+                    <Button x:Name="RedoButton" AutomationId="toolbar-redo" Clicked="OnRedoClicked" Style="{StaticResource ToolbarButton}" Text="Redo" />
+                    <Button AutomationId="toolbar-load-controls" Clicked="OnLoadControlsClicked" Style="{StaticResource ToolbarButton}" Text="Load controls" />
+                    <Button AutomationId="toolbar-xaml" Clicked="OnToggleXamlClicked" Style="{StaticResource ToolbarButton}" Text="XAML" />
+                    <Button AutomationId="toolbar-delete" Clicked="OnDeleteClicked" Style="{StaticResource ToolbarButton}" Text="Delete" />
+                </HorizontalStackLayout>
+            </Grid>
+        </Border>
+
+        <Grid
+            x:Name="DesignerBody"
+            Grid.Row="1"
+            ColumnDefinitions="260,1,*,1,320"
+            BackgroundColor="#0F1117"
+            IsClippedToBounds="True">
+            <Grid Grid.Column="0" Padding="14" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout>
+                        <Label FontAttributes="Bold" FontSize="14" Text="Toolbox" TextColor="#F5F7FF" />
+                        <Label FontSize="11" Text="Reflected from loaded assemblies" TextColor="#798196" />
+                    </VerticalStackLayout>
+                    <Border
+                        Grid.Column="1"
+                        Padding="7,3"
+                        BackgroundColor="#242033"
+                        Stroke="#5946A3"
+                        StrokeShape="RoundRectangle 8">
+                        <Label x:Name="ControlCountLabel" FontSize="10" TextColor="#BFAFFF" />
+                    </Border>
+                </Grid>
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="6">
+                    <Button
+                        x:Name="ToolboxTabButton"
+                        AutomationId="tab-toolbox"
+                        Clicked="OnToolboxTabClicked"
+                        FontSize="11"
+                        HeightRequest="32"
+                        Text="Toolbox" />
+                    <Button
+                        x:Name="HierarchyTabButton"
+                        Grid.Column="1"
+                        AutomationId="tab-hierarchy"
+                        Clicked="OnHierarchyTabClicked"
+                        FontSize="11"
+                        HeightRequest="32"
+                        Text="Hierarchy" />
+                </Grid>
+                <SearchBar
+                    x:Name="ToolboxSearch"
+                    Grid.Row="2"
+                    AutomationId="toolbox-search"
+                    HeightRequest="38"
+                    Placeholder="Search controls..."
+                    TextChanged="OnToolboxSearchChanged" />
+                <ScrollView
+                    x:Name="ToolboxList"
+                    Grid.Row="3">
+                    <VerticalStackLayout x:Name="ToolboxItemsHost">
+                        <BindableLayout.ItemTemplate>
+                            <DataTemplate x:DataType="catalog:ControlDescriptor">
+                                <controls:ToolboxItemView
+                                    AutomationId="{Binding AutomationId}"
+                                    Descriptor="{Binding .}"
+                                    ItemDragUpdated="OnToolboxDragUpdated"
+                                    ItemTapped="OnToolboxItemTapped"
+                                    Margin="0,0,0,7"
+                                    Padding="10,8"
+                                    BackgroundColor="#171A23"
+                                    Stroke="#292E3D"
+                                    StrokeShape="RoundRectangle 8">
+                                    <Grid ColumnDefinitions="34,*" RowDefinitions="Auto,Auto">
+                                        <Border
+                                            Grid.RowSpan="2"
+                                            WidthRequest="28"
+                                            HeightRequest="28"
+                                            BackgroundColor="#242033"
+                                            StrokeThickness="0"
+                                            StrokeShape="RoundRectangle 7">
+                                            <Label
+                                                HorizontalOptions="Center"
+                                                VerticalOptions="Center"
+                                                FontAttributes="Bold"
+                                                Text="+"
+                                                TextColor="#A994FF" />
+                                        </Border>
+                                        <Label
+                                            Grid.Column="1"
+                                            FontSize="12"
+                                            Text="{Binding DisplayName}"
+                                            TextColor="#E7EAF4" />
+                                        <Label
+                                            Grid.Row="1"
+                                            Grid.Column="1"
+                                            FontSize="9"
+                                            Text="{Binding Category}"
+                                            TextColor="#747D92" />
+                                    </Grid>
+                                </controls:ToolboxItemView>
+                            </DataTemplate>
+                        </BindableLayout.ItemTemplate>
+                    </VerticalStackLayout>
+                </ScrollView>
+                <CollectionView
+                    x:Name="HierarchyList"
+                    Grid.Row="2"
+                    Grid.RowSpan="2"
+                    AutomationId="hierarchy-list"
+                    IsVisible="False"
+                    SelectionChanged="OnHierarchySelectionChanged"
+                    SelectionMode="Single">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="workspace:HierarchyItem">
+                            <Border
+                                Margin="{Binding Indent}"
+                                Padding="10,8"
+                                BackgroundColor="#171A23"
+                                Stroke="#292E3D"
+                                StrokeShape="RoundRectangle 7">
+                                <VerticalStackLayout Spacing="1">
+                                    <Label FontSize="11" Text="{Binding DisplayName}" TextColor="#E7EAF4" />
+                                    <Label FontSize="9" Text="{Binding Identity}" TextColor="#747D92" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+
+            <BoxView Grid.Column="1" BackgroundColor="#292E3D" />
+
+            <Grid Grid.Column="2" RowDefinitions="88,*">
+                <Border
+                    Padding="14,0"
+                    BackgroundColor="#131620"
+                    Stroke="#292E3D"
+                    StrokeThickness="1">
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Label VerticalOptions="Center" FontSize="11" Text="DESIGN SURFACE" TextColor="#8D94A8" />
+                            <HorizontalStackLayout Grid.Column="1" HorizontalOptions="End" Spacing="6">
+                                <Picker
+                                    x:Name="DevicePicker"
+                                    AutomationId="canvas-device"
+                                    WidthRequest="145"
+                                    FontSize="10"
+                                    SelectedIndexChanged="OnDeviceChanged"
+                                    TextColor="#D8DCE8" />
+                                <Button AutomationId="canvas-zoom-out" Clicked="OnZoomOutClicked" Style="{StaticResource ToolbarButton}" Text="-" />
+                                <Label
+                                    x:Name="ZoomLabel"
+                                    AutomationId="canvas-zoom-value"
+                                    WidthRequest="44"
+                                    HorizontalTextAlignment="Center"
+                                    VerticalTextAlignment="Center"
+                                    FontSize="10"
+                                    TextColor="#B9C0D3" />
+                                <Button AutomationId="canvas-zoom-in" Clicked="OnZoomInClicked" Style="{StaticResource ToolbarButton}" Text="+" />
+                                <Button AutomationId="canvas-zoom-fit" Clicked="OnZoomFitClicked" Style="{StaticResource ToolbarButton}" Text="Fit" />
+                                <Button AutomationId="canvas-zoom-reset" Clicked="OnZoomResetClicked" Style="{StaticResource ToolbarButton}" Text="1:1" />
+                            </HorizontalStackLayout>
+                        </Grid>
+                        <HorizontalStackLayout Grid.Row="1" HorizontalOptions="End" Spacing="6">
+                                <Button x:Name="ThemeButton" AutomationId="canvas-theme" Clicked="OnThemeClicked" Style="{StaticResource ToolbarButton}" Text="Dark" />
+                                <Button x:Name="SnapButton" AutomationId="canvas-snap" Clicked="OnSnapClicked" Style="{StaticResource ToolbarButton}" Text="Snap" />
+                                <Button x:Name="GridButton" AutomationId="canvas-grid" Clicked="OnGridClicked" Style="{StaticResource ToolbarButton}" Text="Grid" />
+                                <Button x:Name="RulersButton" AutomationId="canvas-rulers" Clicked="OnRulersClicked" Style="{StaticResource ToolbarButton}" Text="Rulers" />
+                                <Label VerticalOptions="Center" FontSize="9" Text="Grid size" TextColor="#8D94A8" />
+                                <Stepper
+                                    x:Name="GridSizeStepper"
+                                    AutomationId="canvas-grid-size"
+                                    Increment="2"
+                                    Maximum="64"
+                                    Minimum="2"
+                                    ValueChanged="OnGridSizeChanged" />
+                                <Label
+                                    x:Name="GridSizeLabel"
+                                    WidthRequest="22"
+                                    VerticalTextAlignment="Center"
+                                    FontSize="9"
+                                    TextColor="#B9C0D3" />
+                        </HorizontalStackLayout>
+                    </Grid>
+                </Border>
+                <controls:CanvasViewportView
+                    x:Name="CanvasViewport"
+                    Grid.Row="1"
+                    AutomationId="canvas-viewport"
+                    BackgroundColor="#0B0D12"
+                    IsClippedToBounds="True"
+                    PanRequested="OnCanvasPanRequested"
+                    SizeChanged="OnCanvasViewportSizeChanged"
+                    ZoomRequested="OnCanvasZoomRequested">
+                    <Grid
+                        x:Name="CanvasTransformHost"
+                        AnchorX="0"
+                        AnchorY="0"
+                        HorizontalOptions="Start"
+                        VerticalOptions="Start">
+                        <Border
+                            x:Name="CanvasFrame"
+                            WidthRequest="1024"
+                            HeightRequest="720"
+                            HorizontalOptions="Start"
+                            VerticalOptions="Start"
+                            BackgroundColor="White"
+                            Stroke="#343A4E"
+                            StrokeShape="RoundRectangle 12"
+                            Shadow="{Shadow Brush=Black, Opacity=0.4, Radius=24, Offset='0,10'}">
+                            <Grid>
+                                <GraphicsView
+                                    x:Name="CanvasGridOverlay"
+                                    InputTransparent="True" />
+                                <ContentView
+                                    x:Name="CanvasHost"
+                                    AutomationId="designer-canvas" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <GraphicsView
+                        x:Name="CanvasRulerOverlay"
+                        InputTransparent="True" />
+                    <Border
+                        Margin="12"
+                        Padding="9,5"
+                        HorizontalOptions="Start"
+                        VerticalOptions="End"
+                        BackgroundColor="#CC171A23"
+                        Stroke="#343A4E"
+                        StrokeShape="RoundRectangle 7">
+                        <Label
+                            FontSize="9"
+                            Text="Middle-drag or Space+drag to pan | Ctrl+wheel to zoom"
+                            TextColor="#9CA3B8" />
+                    </Border>
+                </controls:CanvasViewportView>
+            </Grid>
+
+            <BoxView Grid.Column="3" BackgroundColor="#292E3D" />
+
+            <Grid Grid.Column="4" Padding="14" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
+                <VerticalStackLayout>
+                    <Label FontAttributes="Bold" FontSize="14" Text="Properties" TextColor="#F5F7FF" />
+                    <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="11" TextColor="#798196" />
+                </VerticalStackLayout>
+                <Border
+                    Grid.Row="1"
+                    Padding="10,7"
+                    BackgroundColor="#171A23"
+                    Stroke="#292E3D"
+                    StrokeShape="RoundRectangle 8">
+                    <Label FontSize="10" Text="Changes commit when an editor loses focus or Enter is pressed." TextColor="#858DA2" />
+                </Border>
+                <SearchBar
+                    x:Name="PropertySearch"
+                    Grid.Row="2"
+                    AutomationId="property-search"
+                    HeightRequest="38"
+                    Placeholder="Search properties..."
+                    TextChanged="OnPropertySearchChanged" />
+                <ScrollView Grid.Row="3">
+                    <VerticalStackLayout x:Name="PropertyPanel" Spacing="8" />
+                </ScrollView>
+            </Grid>
+        </Grid>
+
+        <Border
+            x:Name="XamlPanel"
+            Grid.Row="2"
+            HeightRequest="220"
+            IsVisible="False"
+            Padding="14,10"
+            BackgroundColor="#131620"
+            Stroke="#292E3D"
+            StrokeThickness="1">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,*" ColumnSpacing="10" RowSpacing="8">
+                <HorizontalStackLayout Spacing="10">
+                    <Label FontAttributes="Bold" FontSize="12" Text="XAML" TextColor="#F5F7FF" />
+                    <Label x:Name="XamlStatusLabel" FontSize="10" TextColor="#858DA2" />
+                </HorizontalStackLayout>
+                <HorizontalStackLayout Grid.Column="1" Spacing="7">
+                    <Button AutomationId="xaml-refresh" Clicked="OnRefreshXamlClicked" Style="{StaticResource ToolbarButton}" Text="Refresh" />
+                    <Button AutomationId="xaml-apply" Clicked="OnApplyXamlClicked" Style="{StaticResource ToolbarButton}" Text="Apply" />
+                </HorizontalStackLayout>
+                <Editor
+                    x:Name="XamlEditor"
+                    Grid.Row="1"
+                    Grid.ColumnSpan="2"
+                    AutomationId="xaml-editor"
+                    BackgroundColor="#0B0D12"
+                    FontSize="11"
+                    TextChanged="OnXamlTextChanged"
+                    TextColor="#DCE2F2" />
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>
