@@ -2,7 +2,13 @@
 
 A powerful web-based visual designer for creating MAUI (Microsoft App UI) layouts with drag-and-drop functionality. This Angular application provides an intuitive interface for designing XAML-based user interfaces with real-time preview capabilities.
 
-**Live demo:** https://gmprakhar.github.io/MAUI-Designer/ (deployed to GitHub Pages from `main`)
+**Live demo (web designer):** https://gmprakhar.github.io/MAUI-Designer/ (deployed to GitHub Pages from `main`)
+
+> The web app is a **MAUI XAML-aware HTML/CSS designer**. It does not run the MAUI
+> renderers, so the canvas is an approximation. The restored native app in
+> [`maui-designer-native/`](maui-designer-native/README.md) hosts **real MAUI views**
+> on WinUI. [DevFlow](docs/maui-labs.md) (from maui-labs) inspects that live tree; it
+> is not a designer itself.
 
 ![MAUI Designer](https://img.shields.io/badge/Angular-18.2.0-red) ![TypeScript](https://img.shields.io/badge/TypeScript-5.5.4-blue) ![License](https://img.shields.io/badge/License-GPLv3-blue)
 
