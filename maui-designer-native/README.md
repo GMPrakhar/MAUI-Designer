@@ -1,4 +1,4 @@
-# MAUI Designer Native
+# MAUI Designer
 
 A Windows-native visual designer for .NET MAUI XAML. The designer renders real
 MAUI controls, discovers framework and extension controls through reflection,
