@@ -15,7 +15,7 @@
 		<ApplicationTitle>MAUI Designer</ApplicationTitle>
 
 		<!-- App Identifier -->
-		<ApplicationId>com.gmprakhar.mauidesigner.fresh</ApplicationId>
+		<ApplicationId>com.gmprakhar.mauidesigner</ApplicationId>
 
 		<!-- Versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
