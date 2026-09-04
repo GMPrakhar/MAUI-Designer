@@ -161,6 +161,9 @@ public sealed class ReflectionControlCatalog : IControlCatalog
         type.IsPublic &&
         !type.IsAbstract &&
         !type.IsGenericTypeDefinition &&
+        type.Namespace?.StartsWith(
+            "Microsoft.Maui.Controls.Compatibility",
+            StringComparison.Ordinal) != true &&
         typeof(View).IsAssignableFrom(type);
 
     private static bool AcceptsChildren(Type type) =>

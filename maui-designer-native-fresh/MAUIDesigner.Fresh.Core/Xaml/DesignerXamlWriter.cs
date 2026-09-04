@@ -1,4 +1,5 @@
 using System.Xml.Linq;
+using System.Globalization;
 using MAUIDesigner.Fresh.Core.Documents;
 
 namespace MAUIDesigner.Fresh.Core.Xaml;
@@ -25,13 +26,43 @@ public sealed class DesignerXamlWriter
     {
         var element = new XElement(
             XNamespace.Get(node.ControlType.XamlNamespace) + node.ControlType.XamlName);
-        WriteAttributes(element, node.Properties, namespaces);
+        IReadOnlyDictionary<string, DesignerValue> attributes = node.Properties;
+        if (node.Bounds is { } bounds)
+        {
+            attributes = node.Properties
+                .SetItem(
+                    "AbsoluteLayout.LayoutBounds",
+                    DesignerValue.Literal(string.Join(
+                        ",",
+                        bounds.X.ToString(CultureInfo.InvariantCulture),
+                        bounds.Y.ToString(CultureInfo.InvariantCulture),
+                        bounds.Width.ToString(CultureInfo.InvariantCulture),
+                        bounds.Height.ToString(CultureInfo.InvariantCulture))))
+                .SetItem("AbsoluteLayout.LayoutFlags", DesignerValue.Literal("None"));
+        }
+
+        WriteAttributes(element, attributes, namespaces);
         foreach (XamlSyntaxFragment fragment in node.PreservedContent)
         {
             element.Add(XElement.Parse(fragment.Xml, LoadOptions.PreserveWhitespace));
         }
 
-        foreach (DesignerNode child in node.Children)
+        foreach (IGrouping<string, DesignerNode> propertyGroup in node.Children
+                     .Where(child => child.ParentPropertyName is not null)
+                     .GroupBy(child => child.ParentPropertyName!, StringComparer.Ordinal))
+        {
+            var propertyElement = new XElement(
+                XNamespace.Get(node.ControlType.XamlNamespace) +
+                $"{node.ControlType.XamlName}.{propertyGroup.Key}");
+            foreach (DesignerNode child in propertyGroup)
+            {
+                propertyElement.Add(WriteNode(child, namespaces));
+            }
+
+            element.Add(propertyElement);
+        }
+
+        foreach (DesignerNode child in node.Children.Where(child => child.ParentPropertyName is null))
         {
             element.Add(WriteNode(child, namespaces));
         }

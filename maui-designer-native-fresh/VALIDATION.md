@@ -86,3 +86,120 @@ WinUI pointer input was injected through the actual application window at 125% d
 4. Undo restored the Label to `designer-root` with its original `(24, 24, 160, 48)` bounds.
 5. While a Button was held over the Grid, the target rendered a cyan cell preview and status identified `grid-2`; release parented `button-4` to `designer-grid-2`.
 6. A Label and Button were added to a `VerticalStackLayout`, then an Entry was dragged between them. Their native Y positions confirmed the resulting Label, Entry, Button order at `0`, `24`, and `68` respectively.
+
+## Dependency-injected control factory instrument check
+
+Prediction written before measurement:
+
+1. A control registered through `RegisterFactory` will initially receive the materializer's empty service provider rather than the catalog's application service provider, so `Materializer_uses_the_catalog_service_provider_for_registered_factories` will fail while resolving `RequiredService`.
+2. After routing construction through the catalog, the same dependency instance registered in DI must reach the rendered custom control.
+
+The seeded run failed at the predicted service resolution boundary. Construction
+now flows through `IControlCatalog.Create`, and the factory observes the
+application service provider.
+
+## Complex Toolkit XAML instrument check
+
+Prediction written before measurement:
+
+1. A Toolkit `Expander.Header` visual property element will survive serialization but initially remain absent from the native projection because the document model only tracks the default content slot.
+2. `Toolkit_visual_property_elements_are_rendered_and_round_trip` must therefore fail on the null native `Header` before visual-slot support is implemented.
+3. After the fix, the native projection must contain both `Header` and `Content`, while resources, styles, Toolkit behaviors, and the official Toolkit namespace continue to round-trip.
+4. Interactive reparenting must clear a named visual slot such as `Header`; otherwise a node dropped into a Grid would still be assigned as a nonexistent `Grid.Header` property. Undo must restore the original slot.
+
+The initial native-projection test process encountered the expected WinUI
+thread initialization boundary before it could inspect the `Header`, so the
+regression was moved to the platform-neutral document projection boundary.
+The named `Header` node now parses explicitly and serializes back through an
+`Expander.Header` property element. A separate seeded placement run retained
+`Header` after a Grid drop and failed at `Assert.Null`; clearing the slot on
+reparent fixed the failure, while undo restores it from the immutable snapshot.
+
+## Runtime extension assembly compatibility
+
+The Windows integration suite loads its own compiled assembly through the same
+collectible dependency-resolving context used by the UI. The fixture publishes
+an official `XmlnsDefinition`, exposes a bindable numeric property, accepts
+visual content, and is then parsed from XAML through the refreshed catalog.
+This covers the same runtime boundary used by third-party NuGet control packs
+without adding a product-specific control registration.
+
+## Modern MAUI control identity instrument check
+
+Prediction written before measurement:
+
+1. Scanning the MAUI assembly without filtering compatibility shims exposes both
+   modern `Grid` and `Microsoft.Maui.Controls.Compatibility.Grid` under the same
+   MAUI XAML name.
+2. Catalog resolution can consequently select the legacy shim, whose constructor
+   throws unless `UseMauiCompatibility` is enabled.
+3. A catalog test must fail while duplicate `Grid` identities remain, then pass
+   only when the standard MAUI namespace deterministically resolves to the modern
+   control and compatibility-only controls are absent.
+
+The seeded run found two MAUI `Grid` matches. Native application telemetry then
+confirmed that the selected type was
+`Microsoft.Maui.Controls.Compatibility.Grid`, whose constructor rejected the
+app because compatibility mode was intentionally not enabled. Compatibility
+shims are now excluded from discovery, leaving the modern `Grid` as the sole
+standard-namespace match.
+
+## Binding preview compatibility
+
+Prediction written before measurement:
+
+1. A binding-backed text property is blank in a design process without the
+   application's binding context unless the designer uses its declared
+   `FallbackValue`.
+2. The preview parser must handle both ordinary fallback text and quoted values
+   containing commas without changing the original markup extension stored in
+   the document.
+
+Changing the recognized argument name caused both fallback cases to fail at the
+predicted `Assert.True`. Restoring it rendered `Professional` from the native
+binding sample while the generated XAML retained the original `{Binding ...}`
+expression.
+
+## Native viewport validation
+
+Predictions written before measurement:
+
+1. Zooming around a pointer must keep the same design-space point under that
+   pointer; otherwise controls visibly jump while using Ctrl+wheel.
+2. Fit must select the limiting axis, respect the 64-DIP viewport margin, and
+   center the scaled device surface.
+3. Drop hit-testing, move deltas, and resize deltas must be converted back to
+   design coordinates at non-100% zoom, while transformed target bounds must
+   include the native scale.
+4. Native validation must demonstrate device switching, zoom in/out, fit,
+   reset, middle-button panning, grid and ruler toggles, dark preview, and
+   selection/manipulation on a zoomed canvas.
+
+Observed results:
+
+1. The initial desktop surface fitted at 48%; Zoom In changed it to 58%, and a
+   real Ctrl+wheel event zoomed around the pointer to 64%.
+2. A real middle-button drag shifted the surface and ruler origins while the
+   viewport retained pointer capture.
+3. Switching to the 390 x 844 phone preset fitted and centered it at 45%.
+4. Grid, ruler, snap, and dark-preview controls remained visible in the
+   two-row toolbar; native screenshots confirmed both light and dark grid
+   rendering.
+5. At 48% zoom, moving a Label by `(80,40)` viewport DIPs produced snapped
+   design bounds `(192,104,160,48)`. Resizing by `(48,24)` produced
+   `(192,104,264,96)`, confirming inverse-scale manipulation math.
+6. Viewport WinUI handlers listen to already-handled routed pointer events so
+   panning and Ctrl+wheel remain available over child controls. One-finger
+   touch remains available to select/manipulate controls rather than being
+   unconditionally captured for canvas panning.
+7. Canvas content padding was removed so device dimensions, ruler origin, grid
+   lines, snapping, and document coordinates share the same `(0,0)`.
+8. Invalid visual trees are rejected transactionally: non-container controls
+   cannot receive visual children, and named visual slots cannot receive more
+   than one child.
+9. Absolute-layout bounds survive write/reparse, stale attached bounds are
+   removed when reparenting, descendant namespace declarations are promoted
+   safely for export, and runtime control construction/content-setter failures
+   render a visible unavailable-control placeholder.
+10. Final validation passed 15 core tests and 12 Windows app tests; the signed
+    Release host opened a responsive native `MAUI Designer` window.

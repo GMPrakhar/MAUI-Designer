@@ -69,6 +69,81 @@ public sealed class XamlRoundTripTests
         Assert.Equal(1, result.Diagnostics.Single().Line);
     }
 
+    [Fact]
+    public void Non_container_controls_reject_visual_children()
+    {
+        XamlReadResult result = new DesignerXamlReader().Read(
+            $"""<Label xmlns="{Maui}"><Label /></Label>""",
+            _resolver);
+
+        Assert.False(result.Success);
+        Assert.Contains("cannot contain visual children", result.Diagnostics.Single().Message);
+    }
+
+    [Fact]
+    public void Named_visual_slots_reject_duplicate_children()
+    {
+        XamlReadResult result = new DesignerXamlReader().Read(
+            $"""
+            <Expander xmlns="{Maui}">
+              <Expander.Header>
+                <Label Text="First" />
+                <Label Text="Second" />
+              </Expander.Header>
+            </Expander>
+            """,
+            _resolver);
+
+        Assert.False(result.Success);
+        Assert.Contains("accepts only one child", result.Diagnostics.Single().Message);
+    }
+
+    [Fact]
+    public void Repeated_named_visual_property_elements_are_rejected()
+    {
+        XamlReadResult result = new DesignerXamlReader().Read(
+            $"""
+            <Expander xmlns="{Maui}">
+              <Expander.Header><Label Text="First" /></Expander.Header>
+              <Expander.Header><Label Text="Second" /></Expander.Header>
+            </Expander>
+            """,
+            _resolver);
+
+        Assert.False(result.Success);
+        Assert.Contains("assigned more than once", result.Diagnostics.Single().Message);
+    }
+
+    [Fact]
+    public void Absolute_bounds_and_descendant_namespace_declarations_round_trip()
+    {
+        const string source = """
+            <Grid xmlns="http://schemas.microsoft.com/dotnet/2021/maui">
+              <Label xmlns:dock="urn:sample:dock"
+                     dock:Panel.Position="Left"
+                     AbsoluteLayout.LayoutBounds="12,24,160,48"
+                     AbsoluteLayout.LayoutFlags="None" />
+            </Grid>
+            """;
+
+        XamlReadResult parsed = new DesignerXamlReader().Read(source, _resolver);
+
+        Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
+        Assert.Equal(new MAUIDesigner.Fresh.Core.Geometry.RectD(12, 24, 160, 48),
+            Assert.Single(parsed.Document!.Root.Children).Bounds);
+
+        string generated = new DesignerXamlWriter().Write(parsed.Document);
+        Assert.Contains("xmlns:dock=\"urn:sample:dock\"", generated);
+        Assert.Contains("dock:Panel.Position=\"Left\"", generated);
+        Assert.Contains("AbsoluteLayout.LayoutBounds=\"12,24,160,48\"", generated);
+
+        XamlReadResult reparsed = new DesignerXamlReader().Read(generated, _resolver);
+        Assert.True(reparsed.Success, string.Join(Environment.NewLine, reparsed.Diagnostics));
+        Assert.Equal(
+            parsed.Document.Root.Children[0].Bounds,
+            reparsed.Document!.Root.Children[0].Bounds);
+    }
+
     private sealed class TestResolver : IXamlTypeResolver
     {
         public bool TryResolve(
@@ -76,7 +151,7 @@ public sealed class XamlRoundTripTests
             string localName,
             out XamlTypeResolution? resolution)
         {
-            bool known = localName is "ContentPage" or "Grid" or "Label" or "AvatarView";
+            bool known = localName is "ContentPage" or "Grid" or "Label" or "AvatarView" or "Expander";
             if (!known)
             {
                 resolution = null;
@@ -98,8 +173,11 @@ public sealed class XamlRoundTripTests
                 {
                     "ContentPage" => "Content",
                     "Grid" => "Children",
+                    "Expander" => "Content",
                     _ => null
-                });
+                },
+                localName == "Expander" ? ["Header"] : default,
+                localName is "Grid" or "Expander");
             return true;
         }
     }

@@ -28,4 +28,11 @@
     <ProjectReference Include="..\MAUIDesigner.Fresh.App\MAUIDesigner.Fresh.App.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource
+      Include="..\Samples\ComplexToolkitPage.xaml"
+      Link="Fixtures\ComplexToolkitPage.xaml"
+      LogicalName="ComplexToolkitPage.xaml" />
+  </ItemGroup>
+
 </Project>

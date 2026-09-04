@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MAUIDesigner.Fresh.Core.Documents;
 
 namespace MAUIDesigner.Fresh.Core.Xaml;
@@ -10,4 +11,6 @@ public interface IXamlTypeResolver
 public sealed record XamlTypeResolution(
     ControlTypeId Type,
     bool IsView,
-    string? ContentPropertyName);
+    string? ContentPropertyName,
+    ImmutableArray<string> VisualPropertyNames = default,
+    bool AcceptsChildren = true);

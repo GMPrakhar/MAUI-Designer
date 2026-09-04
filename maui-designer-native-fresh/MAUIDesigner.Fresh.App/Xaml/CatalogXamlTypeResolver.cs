@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.Core.Documents;
 using MAUIDesigner.Fresh.Core.Xaml;
@@ -27,7 +28,11 @@ public sealed class CatalogXamlTypeResolver : MAUIDesigner.Fresh.Core.Xaml.IXaml
             resolution = new XamlTypeResolution(
                 descriptor.Id,
                 true,
-                descriptor.Properties.FirstOrDefault(property => property.IsContent)?.Name);
+                descriptor.Properties.FirstOrDefault(property => property.IsContent)?.Name,
+                VisualContentProperty.FindAll(descriptor.RuntimeType)
+                    .Select(property => property.Name)
+                    .ToImmutableArray(),
+                descriptor.AcceptsChildren);
             return true;
         }
 

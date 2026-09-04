@@ -171,39 +171,111 @@
 
             <BoxView Grid.Column="1" BackgroundColor="#292E3D" />
 
-            <Grid Grid.Column="2" RowDefinitions="44,*">
+            <Grid Grid.Column="2" RowDefinitions="88,*">
                 <Border
                     Padding="14,0"
                     BackgroundColor="#131620"
                     Stroke="#292E3D"
                     StrokeThickness="1">
-                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                        <Label VerticalOptions="Center" FontSize="11" Text="DESIGN SURFACE" TextColor="#8D94A8" />
-                        <HorizontalStackLayout Grid.Column="2" VerticalOptions="Center" Spacing="8">
-                            <Border Padding="9,4" BackgroundColor="#1D2130" Stroke="#343A4E" StrokeShape="RoundRectangle 7">
-                                <Label FontSize="10" Text="Desktop  1024 x 720" TextColor="#B9C0D3" />
-                            </Border>
-                            <Border Padding="9,4" BackgroundColor="#1D2130" Stroke="#343A4E" StrokeShape="RoundRectangle 7">
-                                <Label FontSize="10" Text="100%" TextColor="#B9C0D3" />
-                            </Border>
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
+                            <Label VerticalOptions="Center" FontSize="11" Text="DESIGN SURFACE" TextColor="#8D94A8" />
+                            <HorizontalStackLayout Grid.Column="1" HorizontalOptions="End" Spacing="6">
+                                <Picker
+                                    x:Name="DevicePicker"
+                                    AutomationId="canvas-device"
+                                    WidthRequest="145"
+                                    FontSize="10"
+                                    SelectedIndexChanged="OnDeviceChanged"
+                                    TextColor="#D8DCE8" />
+                                <Button AutomationId="canvas-zoom-out" Clicked="OnZoomOutClicked" Style="{StaticResource ToolbarButton}" Text="-" />
+                                <Label
+                                    x:Name="ZoomLabel"
+                                    AutomationId="canvas-zoom-value"
+                                    WidthRequest="44"
+                                    HorizontalTextAlignment="Center"
+                                    VerticalTextAlignment="Center"
+                                    FontSize="10"
+                                    TextColor="#B9C0D3" />
+                                <Button AutomationId="canvas-zoom-in" Clicked="OnZoomInClicked" Style="{StaticResource ToolbarButton}" Text="+" />
+                                <Button AutomationId="canvas-zoom-fit" Clicked="OnZoomFitClicked" Style="{StaticResource ToolbarButton}" Text="Fit" />
+                                <Button AutomationId="canvas-zoom-reset" Clicked="OnZoomResetClicked" Style="{StaticResource ToolbarButton}" Text="1:1" />
+                            </HorizontalStackLayout>
+                        </Grid>
+                        <HorizontalStackLayout Grid.Row="1" HorizontalOptions="End" Spacing="6">
+                                <Button x:Name="ThemeButton" AutomationId="canvas-theme" Clicked="OnThemeClicked" Style="{StaticResource ToolbarButton}" Text="Dark" />
+                                <Button x:Name="SnapButton" AutomationId="canvas-snap" Clicked="OnSnapClicked" Style="{StaticResource ToolbarButton}" Text="Snap" />
+                                <Button x:Name="GridButton" AutomationId="canvas-grid" Clicked="OnGridClicked" Style="{StaticResource ToolbarButton}" Text="Grid" />
+                                <Button x:Name="RulersButton" AutomationId="canvas-rulers" Clicked="OnRulersClicked" Style="{StaticResource ToolbarButton}" Text="Rulers" />
+                                <Label VerticalOptions="Center" FontSize="9" Text="Grid size" TextColor="#8D94A8" />
+                                <Stepper
+                                    x:Name="GridSizeStepper"
+                                    AutomationId="canvas-grid-size"
+                                    Increment="2"
+                                    Maximum="64"
+                                    Minimum="2"
+                                    ValueChanged="OnGridSizeChanged" />
+                                <Label
+                                    x:Name="GridSizeLabel"
+                                    WidthRequest="22"
+                                    VerticalTextAlignment="Center"
+                                    FontSize="9"
+                                    TextColor="#B9C0D3" />
                         </HorizontalStackLayout>
                     </Grid>
                 </Border>
-                <ScrollView Grid.Row="1" BackgroundColor="#0B0D12">
-                    <Grid Padding="44">
+                <controls:CanvasViewportView
+                    x:Name="CanvasViewport"
+                    Grid.Row="1"
+                    AutomationId="canvas-viewport"
+                    BackgroundColor="#0B0D12"
+                    IsClippedToBounds="True"
+                    PanRequested="OnCanvasPanRequested"
+                    SizeChanged="OnCanvasViewportSizeChanged"
+                    ZoomRequested="OnCanvasZoomRequested">
+                    <Grid
+                        x:Name="CanvasTransformHost"
+                        AnchorX="0"
+                        AnchorY="0"
+                        HorizontalOptions="Start"
+                        VerticalOptions="Start">
                         <Border
+                            x:Name="CanvasFrame"
                             WidthRequest="1024"
                             HeightRequest="720"
-                            HorizontalOptions="Center"
+                            HorizontalOptions="Start"
                             VerticalOptions="Start"
                             BackgroundColor="White"
                             Stroke="#343A4E"
                             StrokeShape="RoundRectangle 12"
                             Shadow="{Shadow Brush=Black, Opacity=0.4, Radius=24, Offset='0,10'}">
-                            <ContentView x:Name="CanvasHost" AutomationId="designer-canvas" Padding="20" />
+                            <Grid>
+                                <GraphicsView
+                                    x:Name="CanvasGridOverlay"
+                                    InputTransparent="True" />
+                                <ContentView
+                                    x:Name="CanvasHost"
+                                    AutomationId="designer-canvas" />
+                            </Grid>
                         </Border>
                     </Grid>
-                </ScrollView>
+                    <GraphicsView
+                        x:Name="CanvasRulerOverlay"
+                        InputTransparent="True" />
+                    <Border
+                        Margin="12"
+                        Padding="9,5"
+                        HorizontalOptions="Start"
+                        VerticalOptions="End"
+                        BackgroundColor="#CC171A23"
+                        Stroke="#343A4E"
+                        StrokeShape="RoundRectangle 7">
+                        <Label
+                            FontSize="9"
+                            Text="Middle-drag or Space+drag to pan | Ctrl+wheel to zoom"
+                            TextColor="#9CA3B8" />
+                    </Border>
+                </controls:CanvasViewportView>
             </Grid>
 
             <BoxView Grid.Column="3" BackgroundColor="#292E3D" />

@@ -28,8 +28,16 @@ public sealed record DesignerDocument(
             throw new InvalidOperationException($"Duplicate element id '{node.Id}'.");
         }
 
+        var visualProperties = new HashSet<string>(StringComparer.Ordinal);
         foreach (DesignerNode child in node.Children)
         {
+            if (child.ParentPropertyName is string propertyName &&
+                !visualProperties.Add(propertyName))
+            {
+                throw new InvalidOperationException(
+                    $"Visual property '{propertyName}' on '{node.Id}' has multiple children.");
+            }
+
             ValidateNode(child, ids);
         }
     }

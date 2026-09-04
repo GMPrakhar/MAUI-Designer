@@ -16,4 +16,6 @@ public interface IControlCatalog
         where TView : View;
 
     bool TryGet(ControlTypeId id, out ControlDescriptor? descriptor);
+
+    View Create(ControlTypeId id);
 }

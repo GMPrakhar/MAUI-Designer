@@ -11,7 +11,8 @@ public sealed record DesignerNode
         ImmutableDictionary<string, DesignerValue>? properties = null,
         ImmutableArray<DesignerNode> children = default,
         RectD? bounds = null,
-        ImmutableArray<XamlSyntaxFragment> preservedContent = default)
+        ImmutableArray<XamlSyntaxFragment> preservedContent = default,
+        string? parentPropertyName = null)
     {
         Id = id;
         ControlType = controlType ?? throw new ArgumentNullException(nameof(controlType));
@@ -19,6 +20,7 @@ public sealed record DesignerNode
         Children = children.IsDefault ? [] : children;
         Bounds = bounds;
         PreservedContent = preservedContent.IsDefault ? [] : preservedContent;
+        ParentPropertyName = parentPropertyName;
     }
 
     public ElementId Id { get; init; }
@@ -32,6 +34,8 @@ public sealed record DesignerNode
     public RectD? Bounds { get; init; }
 
     public ImmutableArray<XamlSyntaxFragment> PreservedContent { get; init; }
+
+    public string? ParentPropertyName { get; init; }
 
     public DesignerNode? Find(ElementId id)
     {

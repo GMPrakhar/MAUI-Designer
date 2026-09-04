@@ -56,7 +56,11 @@ internal static class DocumentEditor
         }
 
         DesignerDocument withoutNode = Remove(document, id);
-        return Add(withoutNode, destinationParentId, node with { Bounds = bounds }, destinationIndex);
+        return Add(
+            withoutNode,
+            destinationParentId,
+            WithBounds(node with { ParentPropertyName = null }, bounds),
+            destinationIndex);
     }
 
     public static DesignerDocument SetProperty(
@@ -77,7 +81,15 @@ internal static class DocumentEditor
     }
 
     public static DesignerDocument SetBounds(DesignerDocument document, ElementId id, RectD? bounds) =>
-        document with { Root = Rewrite(document.Root, id, node => node with { Bounds = bounds }) };
+        document with { Root = Rewrite(document.Root, id, node => WithBounds(node, bounds)) };
+
+    private static DesignerNode WithBounds(DesignerNode node, RectD? bounds)
+    {
+        ImmutableDictionary<string, DesignerValue> properties = node.Properties
+            .Remove("AbsoluteLayout.LayoutBounds")
+            .Remove("AbsoluteLayout.LayoutFlags");
+        return node with { Bounds = bounds, Properties = properties };
+    }
 
     private static DesignerNode Rewrite(
         DesignerNode current,

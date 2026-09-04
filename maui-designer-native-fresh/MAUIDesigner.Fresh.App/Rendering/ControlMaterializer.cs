@@ -1,6 +1,7 @@
 using System.Reflection;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.App.Workspace;
+using MAUIDesigner.Fresh.App.Viewport;
 using MAUIDesigner.Fresh.Core.Documents;
 using MAUIDesigner.Fresh.Core.Geometry;
 
@@ -13,13 +14,18 @@ public sealed class ControlMaterializer
     private readonly Dictionary<ElementId, (View View, ILayoutAdapter Adapter)> _targets = [];
     private readonly LayoutAdapterRegistry _layoutAdapters = new();
     private readonly DesignerWorkspace _workspace;
+    private readonly DesignerViewportState _viewport;
     private View? _activeDropPreview;
     private ManualDragState? _manualDrag;
 
-    public ControlMaterializer(IControlCatalog catalog, DesignerWorkspace workspace)
+    public ControlMaterializer(
+        IControlCatalog catalog,
+        DesignerWorkspace workspace,
+        DesignerViewportState viewport)
     {
         _catalog = catalog;
         _workspace = workspace;
+        _viewport = viewport;
     }
 
     public View Materialize(DesignerDocument document)
@@ -99,8 +105,19 @@ public sealed class ControlMaterializer
             target.View,
             parentNode,
             new PointD(
-                pointer.X - target.Bounds.X,
-                pointer.Y - target.Bounds.Y));
+                (pointer.X - target.Bounds.X) / _viewport.Zoom,
+                (pointer.Y - target.Bounds.Y) / _viewport.Zoom));
+        if (placement.Bounds is RectD bounds)
+        {
+            placement = placement with
+            {
+                Bounds = bounds with
+                {
+                    X = _viewport.Snap(bounds.X),
+                    Y = _viewport.Snap(bounds.Y)
+                }
+            };
+        }
         _workspace.SetDropTarget(target.Id, placement);
         return target.Id;
     }
@@ -130,29 +147,44 @@ public sealed class ControlMaterializer
             return CreateUnknownControl(node);
         }
 
-        View view = descriptor.Factory(EmptyServiceProvider.Instance);
-        view.AutomationId = $"designer-{node.Id.Value}";
-        ApplyProperties(view, descriptor, node);
-        ILayoutAdapter? layoutAdapter = descriptor.AcceptsChildren
-            ? _layoutAdapters.Resolve(descriptor)
-            : null;
-        foreach (DesignerNode childNode in node.Children)
+        try
         {
-            layoutAdapter!.AddChild(view, Build(childNode, isRoot: false), childNode);
-        }
+            View view = _catalog.Create(node.ControlType);
+            ApplyProperties(view, descriptor, node);
+            view.AutomationId = $"designer-{node.Id.Value}";
+            ILayoutAdapter? layoutAdapter = descriptor.AcceptsChildren
+                ? _layoutAdapters.Resolve(descriptor)
+                : null;
+            foreach (DesignerNode childNode in node.Children)
+            {
+                View child = Build(childNode, isRoot: false);
+                if (childNode.ParentPropertyName is string propertyName)
+                {
+                    SetVisualProperty(view, propertyName, child);
+                }
+                else
+                {
+                    layoutAdapter!.AddChild(view, child, childNode);
+                }
+            }
 
-        EnsureDesignSize(view, descriptor);
-        if (layoutAdapter is not null)
+            EnsureDesignSize(view, descriptor);
+            if (layoutAdapter is not null)
+            {
+                _targets[node.Id] = (view, layoutAdapter);
+            }
+
+            if (isRoot)
+            {
+                return view;
+            }
+
+            return CreateChrome(view, node);
+        }
+        catch (Exception exception) when (IsRecoverableMaterializationFailure(exception))
         {
-            _targets[node.Id] = (view, layoutAdapter);
+            return CreateUnavailableControl(node, exception.InnerException?.Message ?? exception.Message);
         }
-
-        if (isRoot)
-        {
-            return view;
-        }
-
-        return CreateChrome(view, node);
     }
 
     private View CreateChrome(View content, DesignerNode node)
@@ -258,8 +290,8 @@ public sealed class ControlMaterializer
             {
                 totalX = args.TotalX;
                 totalY = args.TotalY;
-                chrome.TranslationX = totalX;
-                chrome.TranslationY = totalY;
+                chrome.TranslationX = _viewport.ToDesignDelta(totalX);
+                chrome.TranslationY = _viewport.ToDesignDelta(totalY);
             }
             else if (args.StatusType == GestureStatus.Completed)
             {
@@ -267,8 +299,10 @@ public sealed class ControlMaterializer
                 chrome.TranslationY = 0;
                 _workspace.SetBounds(node.Id, start with
                 {
-                    X = Math.Max(0, start.X + totalX),
-                    Y = Math.Max(0, start.Y + totalY)
+                    X = Math.Max(0, _viewport.Snap(
+                        start.X + _viewport.ToDesignDelta(totalX))),
+                    Y = Math.Max(0, _viewport.Snap(
+                        start.Y + _viewport.ToDesignDelta(totalY)))
                 });
             }
             else if (args.StatusType == GestureStatus.Canceled)
@@ -310,15 +344,23 @@ public sealed class ControlMaterializer
             {
                 totalX = args.TotalX;
                 totalY = args.TotalY;
-                double width = Math.Max(24, start.Width + totalX);
-                double height = Math.Max(24, start.Height + totalY);
+                double width = Math.Max(
+                    24,
+                    _viewport.Snap(start.Width + _viewport.ToDesignDelta(totalX)));
+                double height = Math.Max(
+                    24,
+                    _viewport.Snap(start.Height + _viewport.ToDesignDelta(totalY)));
                 chrome.WidthRequest = width;
                 chrome.HeightRequest = height;
             }
             else if (args.StatusType == GestureStatus.Completed)
             {
-                double width = Math.Max(24, start.Width + totalX);
-                double height = Math.Max(24, start.Height + totalY);
+                double width = Math.Max(
+                    24,
+                    _viewport.Snap(start.Width + _viewport.ToDesignDelta(totalX)));
+                double height = Math.Max(
+                    24,
+                    _viewport.Snap(start.Height + _viewport.ToDesignDelta(totalY)));
                 _workspace.SetBounds(node.Id, start with { Width = width, Height = height });
             }
             else if (args.StatusType == GestureStatus.Canceled)
@@ -340,7 +382,16 @@ public sealed class ControlMaterializer
             Windows.Foundation.Point origin = native
                 .TransformToVisual(null)
                 .TransformPoint(new Windows.Foundation.Point());
-            bounds = new RectD(origin.X, origin.Y, native.ActualWidth, native.ActualHeight);
+            Windows.Foundation.Point opposite = native
+                .TransformToVisual(null)
+                .TransformPoint(new Windows.Foundation.Point(
+                    native.ActualWidth,
+                    native.ActualHeight));
+            bounds = new RectD(
+                Math.Min(origin.X, opposite.X),
+                Math.Min(origin.Y, opposite.Y),
+                Math.Abs(opposite.X - origin.X),
+                Math.Abs(opposite.Y - origin.Y));
             return bounds.Width > 0 && bounds.Height > 0;
         }
 #endif
@@ -370,14 +421,24 @@ public sealed class ControlMaterializer
         _activeDropPreview = null;
     }
 
-    private static void ApplyProperties(
+    private void ApplyProperties(
         View view,
         ControlDescriptor descriptor,
         DesignerNode node)
     {
         foreach ((string name, DesignerValue designerValue) in node.Properties)
         {
-            if (designerValue.Kind != DesignerValueKind.Literal)
+            string text;
+            if (designerValue.Kind == DesignerValueKind.Literal)
+            {
+                text = designerValue.Text;
+            }
+            else if (designerValue.Kind == DesignerValueKind.MarkupExtension &&
+                     DesignerMarkupPreview.TryGetLiteral(designerValue.Text, out string preview))
+            {
+                text = preview;
+            }
+            else
             {
                 continue;
             }
@@ -388,7 +449,7 @@ public sealed class ControlMaterializer
                 ? null
                 : descriptor.RuntimeType.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
             if (property is null ||
-                !DesignerValueConverter.TryConvert(designerValue.Text, property.PropertyType, out object? value))
+                !DesignerValueConverter.TryConvert(text, property.PropertyType, out object? value))
             {
                 continue;
             }
@@ -405,7 +466,7 @@ public sealed class ControlMaterializer
         ApplyPreviewTextContrast(view, descriptor, node);
     }
 
-    private static void ApplyPreviewTextContrast(
+    private void ApplyPreviewTextContrast(
         View view,
         ControlDescriptor descriptor,
         DesignerNode node)
@@ -426,7 +487,9 @@ public sealed class ControlMaterializer
             : descriptor.RuntimeType.GetProperty(
                 textColorDescriptor.Name,
                 BindingFlags.Public | BindingFlags.Instance);
-        textColorProperty?.SetValue(view, Colors.Black);
+        textColorProperty?.SetValue(
+            view,
+            _viewport.IsDarkPreview ? Colors.White : Colors.Black);
     }
 
     private static void EnsureDesignSize(View view, ControlDescriptor descriptor)
@@ -453,11 +516,34 @@ public sealed class ControlMaterializer
             }
         };
 
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public static EmptyServiceProvider Instance { get; } = new();
+    private static View CreateUnavailableControl(DesignerNode node, string reason) =>
+        new Border
+        {
+            Padding = 12,
+            BackgroundColor = Color.FromArgb("#FDECEC"),
+            Stroke = Color.FromArgb("#DC2626"),
+            Content = new Label
+            {
+                Text = $"Could not render {node.ControlType.XamlName}: {reason}",
+                TextColor = Color.FromArgb("#7F1D1D")
+            }
+        };
 
-        public object? GetService(Type serviceType) => null;
+    private static bool IsRecoverableMaterializationFailure(Exception exception) =>
+        exception is not OutOfMemoryException and
+        not StackOverflowException and
+        not AccessViolationException and
+        not AppDomainUnloadedException and
+        not BadImageFormatException;
+
+    private static void SetVisualProperty(View parent, string propertyName, View child)
+    {
+        PropertyInfo property = VisualContentProperty.FindAll(parent.GetType())
+            .FirstOrDefault(candidate =>
+                string.Equals(candidate.Name, propertyName, StringComparison.Ordinal))
+            ?? throw new InvalidOperationException(
+                $"Visual property '{propertyName}' is unavailable on '{parent.GetType().FullName}'.");
+        property.SetValue(parent, child);
     }
 
     private sealed record ManualDropTarget(

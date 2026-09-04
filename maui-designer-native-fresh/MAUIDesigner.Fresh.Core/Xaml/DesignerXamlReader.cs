@@ -1,7 +1,9 @@
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Xml;
 using System.Xml.Linq;
 using MAUIDesigner.Fresh.Core.Documents;
+using MAUIDesigner.Fresh.Core.Geometry;
 
 namespace MAUIDesigner.Fresh.Core.Xaml;
 
@@ -44,7 +46,7 @@ public sealed class DesignerXamlReader
         XamlDocumentMetadata? metadata = null;
         if (rootResolution.IsView)
         {
-            visualRoot = ReadNode(root, resolver, diagnostics, ids, ref nextId);
+            visualRoot = ReadNode(root, resolver, diagnostics, ids, ref nextId, null);
         }
         else
         {
@@ -55,7 +57,7 @@ public sealed class DesignerXamlReader
                 return new XamlReadResult(null, diagnostics);
             }
 
-            visualRoot = ReadNode(content, resolver, diagnostics, ids, ref nextId);
+            visualRoot = ReadNode(content, resolver, diagnostics, ids, ref nextId, null);
             int contentIndex = root.Elements().ToList().FindIndex(element =>
                 element == content || element.Descendants().Contains(content));
             XElement[] wrapperElements = root.Elements().ToArray();
@@ -71,12 +73,12 @@ public sealed class DesignerXamlReader
             return new XamlReadResult(null, diagnostics);
         }
 
-        ImmutableDictionary<string, string> namespaces = root.Attributes()
-            .Where(attribute => attribute.IsNamespaceDeclaration)
-            .ToImmutableDictionary(
-                attribute => attribute.Name.LocalName == "xmlns" ? string.Empty : attribute.Name.LocalName,
-                attribute => attribute.Value,
-                StringComparer.Ordinal);
+        ImmutableDictionary<string, string>? namespaces = ReadNamespaces(root, diagnostics);
+        if (namespaces is null)
+        {
+            return new XamlReadResult(null, diagnostics);
+        }
+
         var document = new DesignerDocument(visualRoot, namespaces, metadata);
         document.Validate();
         return new XamlReadResult(document, []);
@@ -87,7 +89,8 @@ public sealed class DesignerXamlReader
         IXamlTypeResolver resolver,
         List<XamlDiagnostic> diagnostics,
         HashSet<string> ids,
-        ref int nextId)
+        ref int nextId,
+        string? parentPropertyName)
     {
         if (!TryResolve(element, resolver, diagnostics, out XamlTypeResolution? resolution) ||
             resolution is null)
@@ -108,37 +111,153 @@ public sealed class DesignerXamlReader
         string id = MakeUniqueId(requestedId, ids);
         var children = ImmutableArray.CreateBuilder<DesignerNode>();
         var preserved = ImmutableArray.CreateBuilder<XamlSyntaxFragment>();
+        var occupiedVisualProperties = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (XElement child in element.Elements())
         {
             if (!child.Name.LocalName.Contains('.', StringComparison.Ordinal))
             {
-                AddChildNode(children, child, resolver, diagnostics, ids, ref nextId);
+                if (!resolution.AcceptsChildren)
+                {
+                    diagnostics.Add(Diagnostic(
+                        child,
+                        $"'{element.Name.LocalName}' cannot contain visual children."));
+                    continue;
+                }
+
+                AddChildNode(children, child, resolver, diagnostics, ids, ref nextId, null);
                 continue;
             }
 
             string memberName = child.Name.LocalName[(child.Name.LocalName.IndexOf('.') + 1)..];
-            bool containsVisualContent =
+            bool containsDefaultVisualContent =
                 memberName is "Children" or "Content" ||
                 string.Equals(memberName, resolution.ContentPropertyName, StringComparison.Ordinal);
-            if (!containsVisualContent)
+            bool containsNamedVisualContent =
+                !resolution.VisualPropertyNames.IsDefaultOrEmpty &&
+                resolution.VisualPropertyNames.Contains(memberName, StringComparer.Ordinal);
+            if (!containsDefaultVisualContent && !containsNamedVisualContent)
             {
                 preserved.Add(ToFragment(child));
                 continue;
             }
 
-            foreach (XElement nested in child.Elements())
+            XElement[] nestedElements = child.Elements().ToArray();
+            if (containsNamedVisualContent && nestedElements.Length > 1)
             {
-                AddChildNode(children, nested, resolver, diagnostics, ids, ref nextId);
+                diagnostics.Add(Diagnostic(
+                    child,
+                    $"Visual property '{memberName}' accepts only one child."));
+                continue;
+            }
+
+            if (containsNamedVisualContent &&
+                nestedElements.Length > 0 &&
+                !occupiedVisualProperties.Add(memberName))
+            {
+                diagnostics.Add(Diagnostic(
+                    child,
+                    $"Visual property '{memberName}' is assigned more than once."));
+                continue;
+            }
+
+            if (containsDefaultVisualContent && !resolution.AcceptsChildren)
+            {
+                diagnostics.Add(Diagnostic(
+                    child,
+                    $"'{element.Name.LocalName}' cannot contain visual children."));
+                continue;
+            }
+
+            foreach (XElement nested in nestedElements)
+            {
+                AddChildNode(
+                    children,
+                    nested,
+                    resolver,
+                    diagnostics,
+                    ids,
+                    ref nextId,
+                    containsDefaultVisualContent ? null : memberName);
             }
         }
 
+        RectD? bounds = TryReadAbsoluteBounds(properties, out RectD parsedBounds)
+            ? parsedBounds
+            : null;
         return new DesignerNode(
             new ElementId(id),
             resolution.Type,
             properties,
             children.ToImmutable(),
-            preservedContent: preserved.ToImmutable());
+            bounds,
+            preservedContent: preserved.ToImmutable(),
+            parentPropertyName: parentPropertyName);
+    }
+
+    private static ImmutableDictionary<string, string>? ReadNamespaces(
+        XElement root,
+        List<XamlDiagnostic> diagnostics)
+    {
+        var namespaces = ImmutableDictionary.CreateBuilder<string, string>(StringComparer.Ordinal);
+        foreach (XAttribute declaration in root
+                     .DescendantsAndSelf()
+                     .Attributes()
+                     .Where(attribute => attribute.IsNamespaceDeclaration))
+        {
+            string prefix = declaration.Name.LocalName == "xmlns"
+                ? string.Empty
+                : declaration.Name.LocalName;
+            if (prefix.Length == 0 && declaration.Parent != root)
+            {
+                continue;
+            }
+
+            if (namespaces.TryGetValue(prefix, out string? existing) &&
+                !string.Equals(existing, declaration.Value, StringComparison.Ordinal))
+            {
+                diagnostics.Add(Diagnostic(
+                    declaration.Parent!,
+                    $"Namespace prefix '{prefix}' resolves to multiple URIs."));
+                return null;
+            }
+
+            namespaces[prefix] = declaration.Value;
+        }
+
+        return namespaces.ToImmutable();
+    }
+
+    private static bool TryReadAbsoluteBounds(
+        IReadOnlyDictionary<string, DesignerValue> properties,
+        out RectD bounds)
+    {
+        bounds = default;
+        if (!properties.TryGetValue("AbsoluteLayout.LayoutBounds", out DesignerValue? value) ||
+            (properties.TryGetValue("AbsoluteLayout.LayoutFlags", out DesignerValue? flags) &&
+             !flags.Text.Equals("None", StringComparison.OrdinalIgnoreCase)))
+        {
+            return false;
+        }
+
+        string[] parts = value.Text.Split(',', StringSplitOptions.TrimEntries);
+        if (parts.Length != 4 ||
+            !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double x) ||
+            !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double y) ||
+            !double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double width) ||
+            !double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double height) ||
+            !double.IsFinite(x) ||
+            !double.IsFinite(y) ||
+            !double.IsFinite(width) ||
+            !double.IsFinite(height) ||
+            width < 0 ||
+            height < 0)
+        {
+            return false;
+        }
+
+        bounds = new RectD(x, y, width, height);
+        return true;
     }
 
     private static void AddChildNode(
@@ -147,9 +266,16 @@ public sealed class DesignerXamlReader
         IXamlTypeResolver resolver,
         List<XamlDiagnostic> diagnostics,
         HashSet<string> ids,
-        ref int nextId)
+        ref int nextId,
+        string? parentPropertyName)
     {
-        DesignerNode? childNode = ReadNode(childElement, resolver, diagnostics, ids, ref nextId);
+        DesignerNode? childNode = ReadNode(
+            childElement,
+            resolver,
+            diagnostics,
+            ids,
+            ref nextId,
+            parentPropertyName);
         if (childNode is not null)
         {
             children.Add(childNode);

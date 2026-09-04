@@ -1,0 +1,46 @@
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+    x:Class="Sample.DetailsPage">
+    <ContentPage.Resources>
+        <Color x:Key="Accent">#6750A4</Color>
+        <Style x:Key="TitleStyle" TargetType="Label">
+            <Setter Property="FontAttributes" Value="Bold" />
+        </Style>
+    </ContentPage.Resources>
+    <Grid Padding="24" RowDefinitions="Auto,*" RowSpacing="16">
+        <toolkit:Expander IsExpanded="True">
+            <toolkit:Expander.Header>
+                <Label Style="{StaticResource TitleStyle}" Text="Account details" />
+            </toolkit:Expander.Header>
+            <VerticalStackLayout Spacing="12">
+                <toolkit:AvatarView
+                    BackgroundColor="#6750A4"
+                    Text="GP"
+                    TextColor="White" />
+                <Entry Placeholder="Email">
+                    <Entry.Behaviors>
+                        <toolkit:TextValidationBehavior MinimumLength="3" />
+                    </Entry.Behaviors>
+                </Entry>
+            </VerticalStackLayout>
+        </toolkit:Expander>
+        <Border
+            Grid.Row="1"
+            Padding="16"
+            BackgroundColor="#F3F4F6">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                <Label FontAttributes="Bold" Text="Current plan" />
+                <Label
+                    x:Name="PlanPreview"
+                    Grid.Row="1"
+                    Text="{Binding PlanName, FallbackValue=Professional}" />
+                <Button
+                    Grid.Column="1"
+                    Grid.RowSpan="2"
+                    Text="Upgrade" />
+            </Grid>
+        </Border>
+    </Grid>
+</ContentPage>

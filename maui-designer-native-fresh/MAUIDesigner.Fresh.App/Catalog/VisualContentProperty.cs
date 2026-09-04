@@ -7,17 +7,23 @@ internal static class VisualContentProperty
     public static PropertyInfo? Find(Type type)
     {
         string? contentPropertyName = GetContentPropertyName(type);
-        return type
+        return FindAll(type)
+            .Where(property => property.Name == (contentPropertyName ?? "Content"))
+            .FirstOrDefault();
+    }
+
+    public static IReadOnlyList<PropertyInfo> FindAll(Type type) =>
+        type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(property =>
-                property.Name == (contentPropertyName ?? "Content") &&
                 property.GetIndexParameters().Length == 0 &&
                 property.CanWrite &&
                 property.SetMethod?.IsPublic == true &&
+                property.PropertyType != typeof(object) &&
                 property.PropertyType.IsAssignableFrom(typeof(View)))
             .OrderByDescending(property => property.DeclaringType == type)
-            .FirstOrDefault();
-    }
+            .ThenBy(property => property.Name, StringComparer.Ordinal)
+            .ToArray();
 
     private static string? GetContentPropertyName(Type type)
     {

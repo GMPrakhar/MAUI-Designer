@@ -4,6 +4,7 @@ using MAUIDesigner.Fresh.App.PropertyEditing;
 using MAUIDesigner.Fresh.App.Rendering;
 using MAUIDesigner.Fresh.App.Workspace;
 using MAUIDesigner.Fresh.App.Xaml;
+using MAUIDesigner.Fresh.App.Viewport;
 using MAUIDesigner.Fresh.Core.Xaml;
 using Microsoft.Extensions.Logging;
 #if DEBUG
@@ -49,6 +50,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<XamlWorkspace>();
 		builder.Services.AddSingleton<DesignerWorkspace>();
 		builder.Services.AddSingleton<ControlMaterializer>();
+		builder.Services.AddSingleton<DesignerViewportState>();
 		builder.Services.AddSingleton<PropertyEditorRegistry>();
 		builder.Services.AddSingleton<MainPage>();
 

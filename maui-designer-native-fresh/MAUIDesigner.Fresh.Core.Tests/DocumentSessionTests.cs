@@ -101,7 +101,12 @@ public sealed class DocumentSessionTests
         session.Execute(new AddElementCommand(sourceId, new DesignerNode(
             labelId,
             LabelType,
-            ImmutableDictionary<string, DesignerValue>.Empty.Add("Grid.Row", DesignerValue.Literal("0")))));
+            ImmutableDictionary<string, DesignerValue>.Empty
+                .Add("Grid.Row", DesignerValue.Literal("0"))
+                .Add("AbsoluteLayout.LayoutBounds", DesignerValue.Literal("1,2,30,40"))
+                .Add("AbsoluteLayout.LayoutFlags", DesignerValue.Literal("None")),
+            bounds: new RectD(1, 2, 30, 40),
+            parentPropertyName: "Header")));
 
         session.Execute(new PlaceElementCommand(
             labelId,
@@ -115,11 +120,17 @@ public sealed class DocumentSessionTests
         Assert.Equal(new RectD(4, 8, 100, 32), placed.Bounds);
         Assert.Equal("2", placed.Properties["Grid.Row"].Text);
         Assert.Equal("1", placed.Properties["Grid.Column"].Text);
+        Assert.False(placed.Properties.ContainsKey("AbsoluteLayout.LayoutBounds"));
+        Assert.False(placed.Properties.ContainsKey("AbsoluteLayout.LayoutFlags"));
+        Assert.Null(placed.ParentPropertyName);
 
         Assert.True(session.Undo());
         DesignerNode restored = Assert.IsType<DesignerNode>(session.Current.Find(sourceId)!.Find(labelId));
-        Assert.Null(restored.Bounds);
+        Assert.Equal(new RectD(1, 2, 30, 40), restored.Bounds);
         Assert.Equal("0", restored.Properties["Grid.Row"].Text);
         Assert.False(restored.Properties.ContainsKey("Grid.Column"));
+        Assert.Equal("1,2,30,40", restored.Properties["AbsoluteLayout.LayoutBounds"].Text);
+        Assert.Equal("None", restored.Properties["AbsoluteLayout.LayoutFlags"].Text);
+        Assert.Equal("Header", restored.ParentPropertyName);
     }
 }

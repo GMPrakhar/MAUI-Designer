@@ -14,11 +14,16 @@ and keeps edits in an immutable document model that supports undo and redo.
   property inspector, and transactional XAML drawer.
 - Supports click-to-add, pointer-captured drag/drop with target previews,
   selection, delete, move, resize, reparenting, and bounded undo/redo.
+- Matches the web designer's viewport workflow with device presets, 25%-300%
+  focal-point zoom, fit/reset, Ctrl+wheel zoom, middle-button or Space+drag
+  panning, configurable snap/grid controls, rulers, and light/dark previews.
 - Uses extensible layout adapters for `AbsoluteLayout`, measured Grid cells,
   stack insertion positions, generic layouts, and single-content containers.
 - Preserves resources, namespaces, markup extensions, attached properties,
   custom-control namespaces, and unknown property elements during XAML
   round-trips.
+- Uses binding `FallbackValue` values for design-time previews while retaining
+  the original binding expression in generated XAML.
 - Loads custom-control assemblies and their adjacent dependencies at runtime.
 
 ## Requirements
@@ -66,6 +71,15 @@ Open **XAML** to edit the current document. **Apply** parses into a temporary
 document and only replaces the active design when the entire input is valid.
 Errors include source locations and leave the current design unchanged.
 **Refresh** regenerates XAML from the current immutable document.
+
+Runtime-only constructs such as live bindings, converters, commands, and
+behaviors are retained in XAML but are not executed by the designer. Literal
+properties and binding fallback values drive the native preview.
+
+[`Samples/ComplexToolkitPage.xaml`](Samples/ComplexToolkitPage.xaml) is the
+native compatibility fixture. It combines page resources, a style, Grid
+definitions and attached properties, binding fallback text, a Toolkit
+`Expander` named visual slot, `AvatarView`, and a Toolkit behavior.
 
 ## DevFlow validation
 

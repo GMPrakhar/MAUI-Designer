@@ -5,6 +5,7 @@ using MAUIDesigner.Fresh.App.PropertyEditing;
 using MAUIDesigner.Fresh.App.Rendering;
 using MAUIDesigner.Fresh.App.Workspace;
 using MAUIDesigner.Fresh.App.Xaml;
+using MAUIDesigner.Fresh.App.Viewport;
 using MAUIDesigner.Fresh.Core.Documents;
 using MAUIDesigner.Fresh.Core.Xaml;
 
@@ -18,10 +19,14 @@ public partial class MainPage : ContentPage
     private readonly PropertyEditorRegistry _propertyEditors;
     private readonly AssemblyExtensionLoader _extensionLoader;
     private readonly XamlWorkspace _xamlWorkspace;
+    private readonly DesignerViewportState _viewport;
+    private readonly CanvasGridDrawable _gridDrawable;
+    private readonly CanvasRulerDrawable _rulerDrawable;
     private readonly ObservableCollection<ControlDescriptor> _toolboxItems = [];
     private readonly ObservableCollection<HierarchyItem> _hierarchyItems = [];
     private bool _updatingXaml;
     private bool _xamlDirty;
+    private bool _viewportInitialized;
 
     public MainPage(
         IControlCatalog catalog,
@@ -29,7 +34,8 @@ public partial class MainPage : ContentPage
         ControlMaterializer materializer,
         PropertyEditorRegistry propertyEditors,
         AssemblyExtensionLoader extensionLoader,
-        XamlWorkspace xamlWorkspace)
+        XamlWorkspace xamlWorkspace,
+        DesignerViewportState viewport)
     {
         InitializeComponent();
         _catalog = catalog;
@@ -38,6 +44,15 @@ public partial class MainPage : ContentPage
         _propertyEditors = propertyEditors;
         _extensionLoader = extensionLoader;
         _xamlWorkspace = xamlWorkspace;
+        _viewport = viewport;
+        _gridDrawable = new CanvasGridDrawable(viewport);
+        _rulerDrawable = new CanvasRulerDrawable(viewport);
+        CanvasGridOverlay.Drawable = _gridDrawable;
+        CanvasRulerOverlay.Drawable = _rulerDrawable;
+        DevicePicker.ItemDisplayBinding = new Binding(nameof(DevicePreset.Name));
+        DevicePicker.ItemsSource = _viewport.Devices.ToList();
+        DevicePicker.SelectedItem = _viewport.SelectedDevice;
+        GridSizeStepper.Value = _viewport.GridSize;
         BindableLayout.SetItemsSource(ToolboxItemsHost, _toolboxItems);
         HierarchyList.ItemsSource = _hierarchyItems;
         _workspace.Session.Changed += OnDocumentChanged;
@@ -48,6 +63,132 @@ public partial class MainPage : ContentPage
         ShowToolbox(show: true);
         RebuildDesigner();
         RefreshXaml();
+        UpdateViewportVisuals();
+    }
+
+    private void OnDeviceChanged(object? sender, EventArgs e)
+    {
+        if (DevicePicker.SelectedItem is not DevicePreset device)
+        {
+            return;
+        }
+
+        _viewport.SelectDevice(device);
+        _viewport.Fit(CanvasViewport.Width, CanvasViewport.Height);
+        UpdateViewportVisuals();
+    }
+
+    private void OnZoomOutClicked(object? sender, EventArgs e) =>
+        ZoomAtCenter(_viewport.Zoom - 0.1);
+
+    private void OnZoomInClicked(object? sender, EventArgs e) =>
+        ZoomAtCenter(_viewport.Zoom + 0.1);
+
+    private void OnZoomFitClicked(object? sender, EventArgs e)
+    {
+        _viewport.Fit(CanvasViewport.Width, CanvasViewport.Height);
+        UpdateViewportVisuals();
+    }
+
+    private void OnZoomResetClicked(object? sender, EventArgs e)
+    {
+        _viewport.Reset(CanvasViewport.Width, CanvasViewport.Height);
+        UpdateViewportVisuals();
+    }
+
+    private void OnThemeClicked(object? sender, EventArgs e)
+    {
+        _viewport.ToggleTheme();
+        RebuildDesigner();
+        UpdateViewportVisuals();
+    }
+
+    private void OnGridClicked(object? sender, EventArgs e)
+    {
+        _viewport.ToggleGrid();
+        UpdateViewportVisuals();
+    }
+
+    private void OnSnapClicked(object? sender, EventArgs e)
+    {
+        _viewport.ToggleSnap();
+        UpdateViewportVisuals();
+    }
+
+    private void OnGridSizeChanged(object? sender, ValueChangedEventArgs e)
+    {
+        _viewport.SetGridSize((int)e.NewValue);
+        UpdateViewportVisuals();
+    }
+
+    private void OnRulersClicked(object? sender, EventArgs e)
+    {
+        _viewport.ToggleRulers();
+        UpdateViewportVisuals();
+    }
+
+    private void OnCanvasPanRequested(object? sender, CanvasPanEventArgs e)
+    {
+        _viewport.PanBy(e.DeltaX, e.DeltaY);
+        UpdateViewportVisuals();
+    }
+
+    private void OnCanvasZoomRequested(object? sender, CanvasZoomEventArgs e)
+    {
+        double factor = e.WheelDelta > 0 ? 1.1 : 0.9;
+        _viewport.ZoomAt(_viewport.Zoom * factor, e.X, e.Y);
+        UpdateViewportVisuals();
+    }
+
+    private void OnCanvasViewportSizeChanged(object? sender, EventArgs e)
+    {
+        if (!_viewportInitialized && CanvasViewport.Width > 0 && CanvasViewport.Height > 0)
+        {
+            _viewportInitialized = true;
+            _viewport.Fit(CanvasViewport.Width, CanvasViewport.Height);
+            UpdateViewportVisuals();
+        }
+    }
+
+    private void ZoomAtCenter(double zoom)
+    {
+        _viewport.ZoomAt(
+            zoom,
+            CanvasViewport.Width / 2,
+            CanvasViewport.Height / 2);
+        UpdateViewportVisuals();
+    }
+
+    private void UpdateViewportVisuals()
+    {
+        CanvasTransformHost.WidthRequest = _viewport.DesignWidth;
+        CanvasTransformHost.HeightRequest = _viewport.DesignHeight;
+        CanvasTransformHost.Scale = _viewport.Zoom;
+        CanvasTransformHost.TranslationX = _viewport.PanX;
+        CanvasTransformHost.TranslationY = _viewport.PanY;
+        CanvasFrame.WidthRequest = _viewport.DesignWidth;
+        CanvasFrame.HeightRequest = _viewport.DesignHeight;
+        CanvasFrame.BackgroundColor = _viewport.IsDarkPreview
+            ? Color.FromArgb("#111827")
+            : Colors.White;
+        CanvasViewport.BackgroundColor = _viewport.IsDarkPreview
+            ? Color.FromArgb("#080D17")
+            : Color.FromArgb("#0B0D12");
+        ZoomLabel.Text = $"{Math.Round(_viewport.Zoom * 100)}%";
+        ThemeButton.Text = _viewport.IsDarkPreview ? "Light" : "Dark";
+        GridButton.BackgroundColor = _viewport.ShowGrid
+            ? Color.FromArgb("#5946A3")
+            : Color.FromArgb("#202431");
+        SnapButton.BackgroundColor = _viewport.SnapToGrid
+            ? Color.FromArgb("#5946A3")
+            : Color.FromArgb("#202431");
+        RulersButton.BackgroundColor = _viewport.ShowRulers
+            ? Color.FromArgb("#5946A3")
+            : Color.FromArgb("#202431");
+        GridSizeLabel.Text = _viewport.GridSize.ToString(
+            System.Globalization.CultureInfo.InvariantCulture);
+        CanvasGridOverlay.Invalidate();
+        CanvasRulerOverlay.Invalidate();
     }
 
     private void OnToolboxSearchChanged(object? sender, TextChangedEventArgs e) =>
