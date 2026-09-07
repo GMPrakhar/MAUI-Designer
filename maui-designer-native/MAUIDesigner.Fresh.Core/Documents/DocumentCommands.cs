@@ -50,6 +50,14 @@ public sealed record ReparentElementCommand(
         DocumentEditor.Reparent(document, ElementId, DestinationParentId, DestinationIndex, Bounds);
 }
 
+public sealed record ReorderElementCommand(ElementId ElementId, int DestinationIndex) : IDocumentCommand
+{
+    public string Description => $"Reorder {ElementId}";
+
+    public DesignerDocument Apply(DesignerDocument document) =>
+        DocumentEditor.Reorder(document, ElementId, DestinationIndex);
+}
+
 public sealed record PlaceElementCommand(
     ElementId ElementId,
     ElementId DestinationParentId,

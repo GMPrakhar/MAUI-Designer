@@ -10,13 +10,16 @@ and keeps edits in an immutable document model that supports undo and redo.
   `View` types without a per-control registry.
 - Uses assembly-qualified control identities so controls with the same short
   name do not collide.
-- Renders a searchable toolbox, hierarchy, native design surface, grouped
-  property inspector, and transactional XAML drawer.
+- Renders a categorized toolbox, virtualized recursive interactive hierarchy,
+  native design surface, grouped property inspector, and live XAML drawer.
 - Supports click-to-add, pointer-captured drag/drop with target previews,
-  selection, delete, move, resize, reparenting, and bounded undo/redo.
+  selection, delete, move, resize, reparenting, cut/copy/paste/duplicate,
+  hierarchy reordering, context menus, keyboard commands, and bounded undo/redo.
 - Matches the web designer's viewport workflow with device presets, 25%-300%
   focal-point zoom, fit/reset, Ctrl+wheel zoom, middle-button or Space+drag
-  panning, configurable snap/grid controls, rulers, and light/dark previews.
+  panning, configurable snap/grid controls, rulers, and a light-only workspace.
+- Provides specialized Grid row/column collection editors, dotted track
+  boundaries, and a separate real-MAUI runtime preview window.
 - Uses extensible layout adapters for `AbsoluteLayout`, measured Grid cells,
   stack insertion positions, generic layouts, and single-content containers.
 - Preserves resources, namespaces, markup extensions, attached properties,
@@ -67,10 +70,10 @@ Controls requiring constructor arguments can be registered through
 
 ## XAML workflow
 
-Open **XAML** to edit the current document. **Apply** parses into a temporary
-document and only replaces the active design when the entire input is valid.
-Errors include source locations and leave the current design unchanged.
-**Refresh** regenerates XAML from the current immutable document.
+Open **XAML** to edit the current document. Changes are parsed automatically
+after a 300 ms pause and replace the active design only when the entire input
+is valid. Errors include source locations and leave the current design
+unchanged. Canvas and property edits automatically serialize back to XAML.
 
 Runtime-only constructs such as live bindings, converters, commands, and
 behaviors are retained in XAML but are not executed by the designer. Literal

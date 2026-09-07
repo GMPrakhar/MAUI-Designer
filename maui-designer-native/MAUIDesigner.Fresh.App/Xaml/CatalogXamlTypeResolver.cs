@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Collections.Concurrent;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.Core.Documents;
 using MAUIDesigner.Fresh.Core.Xaml;
@@ -9,13 +10,36 @@ public sealed class CatalogXamlTypeResolver : MAUIDesigner.Fresh.Core.Xaml.IXaml
 {
     private const string MauiNamespace = "http://schemas.microsoft.com/dotnet/2021/maui";
     private readonly IControlCatalog _catalog;
+    private readonly ConcurrentDictionary<(string Namespace, string Name), XamlTypeResolution>
+        _cache = new();
 
     public CatalogXamlTypeResolver(IControlCatalog catalog)
     {
         _catalog = catalog;
+        _catalog.Changed += (_, _) => _cache.Clear();
     }
 
     public bool TryResolve(
+        string xamlNamespace,
+        string localName,
+        out XamlTypeResolution? resolution)
+    {
+        if (_cache.TryGetValue((xamlNamespace, localName), out resolution))
+        {
+            return true;
+        }
+
+        if (TryResolveCore(xamlNamespace, localName, out resolution) &&
+            resolution is not null)
+        {
+            _cache[(xamlNamespace, localName)] = resolution;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryResolveCore(
         string xamlNamespace,
         string localName,
         out XamlTypeResolution? resolution)

@@ -3,50 +3,66 @@
     x:Class="MAUIDesigner.Fresh.App.MainPage"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-    xmlns:catalog="clr-namespace:MAUIDesigner.Fresh.App.Catalog"
     xmlns:controls="clr-namespace:MAUIDesigner.Fresh.App.Controls"
-    xmlns:workspace="clr-namespace:MAUIDesigner.Fresh.App.Workspace"
-    BackgroundColor="#0F1117">
+    BackgroundColor="{StaticResource SurfaceSubtle}">
 
-    <Grid x:Name="ApplicationGrid" RowDefinitions="56,*,Auto">
+    <Grid x:Name="ApplicationGrid" RowDefinitions="64,*,Auto">
         <Border
             Grid.Row="0"
-            Padding="20,0"
-            BackgroundColor="#171A23"
-            Stroke="#292E3D"
+            Padding="18,0"
+            BackgroundColor="{StaticResource Surface}"
+            Stroke="{StaticResource Border}"
             StrokeThickness="1">
             <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
                 <HorizontalStackLayout VerticalOptions="Center" Spacing="10">
                     <Border
-                        WidthRequest="30"
-                        HeightRequest="30"
-                        BackgroundColor="#7C5CFF"
+                        WidthRequest="34"
+                        HeightRequest="34"
+                        BackgroundColor="{StaticResource Primary}"
                         StrokeThickness="0"
-                        StrokeShape="RoundRectangle 8">
+                        StrokeShape="RoundRectangle 9">
                         <Label
                             HorizontalOptions="Center"
                             VerticalOptions="Center"
                             FontAttributes="Bold"
-                            FontSize="16"
+                            FontSize="17"
                             Text="M"
                             TextColor="White" />
                     </Border>
-                    <VerticalStackLayout Spacing="-2" VerticalOptions="Center">
-                        <Label FontAttributes="Bold" FontSize="15" Text="MAUI Designer" TextColor="#F5F7FF" />
-                        <Label FontSize="10" Text="NATIVE PREVIEW" TextColor="#8D94A8" />
+                    <VerticalStackLayout Spacing="-1" VerticalOptions="Center">
+                        <Label FontAttributes="Bold" FontSize="15" Text="MAUI Designer" TextColor="{StaticResource TextPrimary}" />
+                        <Label CharacterSpacing="1.1" FontSize="9" Text="NATIVE DESIGN WORKSPACE" TextColor="{StaticResource TextMuted}" />
                     </VerticalStackLayout>
                 </HorizontalStackLayout>
 
-                <HorizontalStackLayout
-                    Grid.Column="2"
-                    VerticalOptions="Center"
-                    Spacing="8">
-                    <Button x:Name="UndoButton" AutomationId="toolbar-undo" Clicked="OnUndoClicked" Style="{StaticResource ToolbarButton}" Text="Undo" />
-                    <Button x:Name="RedoButton" AutomationId="toolbar-redo" Clicked="OnRedoClicked" Style="{StaticResource ToolbarButton}" Text="Redo" />
-                    <Button AutomationId="toolbar-load-controls" Clicked="OnLoadControlsClicked" Style="{StaticResource ToolbarButton}" Text="Load controls" />
-                    <Button AutomationId="toolbar-xaml" Clicked="OnToggleXamlClicked" Style="{StaticResource ToolbarButton}" Text="XAML" />
-                    <Button AutomationId="toolbar-delete" Clicked="OnDeleteClicked" Style="{StaticResource ToolbarButton}" Text="Delete" />
-                </HorizontalStackLayout>
+                <ScrollView Grid.Column="2" Orientation="Horizontal" HorizontalScrollBarVisibility="Never">
+                    <HorizontalStackLayout VerticalOptions="Center" Spacing="6">
+                        <Button
+                            x:Name="UndoButton"
+                            AutomationId="toolbar-undo"
+                            Clicked="OnUndoClicked"
+                            SemanticProperties.Description="Undo the last change"
+                            Style="{StaticResource ToolbarButton}"
+                            Text="Undo" />
+                        <Button
+                            x:Name="RedoButton"
+                            AutomationId="toolbar-redo"
+                            Clicked="OnRedoClicked"
+                            SemanticProperties.Description="Redo the last undone change"
+                            Style="{StaticResource ToolbarButton}"
+                            Text="Redo" />
+                        <BoxView Margin="3,7" WidthRequest="1" BackgroundColor="{StaticResource Border}" />
+                        <Button AutomationId="toolbar-cut" Clicked="OnCutClicked" SemanticProperties.Description="Cut the selected control" Style="{StaticResource ToolbarButton}" Text="Cut" />
+                        <Button AutomationId="toolbar-copy" Clicked="OnCopyClicked" SemanticProperties.Description="Copy the selected control" Style="{StaticResource ToolbarButton}" Text="Copy" />
+                        <Button AutomationId="toolbar-paste" Clicked="OnPasteClicked" SemanticProperties.Description="Paste controls from the clipboard" Style="{StaticResource ToolbarButton}" Text="Paste" />
+                        <Button AutomationId="toolbar-duplicate" Clicked="OnDuplicateClicked" SemanticProperties.Description="Duplicate the selected control" Style="{StaticResource ToolbarButton}" Text="Duplicate" />
+                        <Button AutomationId="toolbar-delete" Clicked="OnDeleteClicked" SemanticProperties.Description="Delete the selected control" Style="{StaticResource ToolbarButton}" Text="Delete" />
+                        <BoxView Margin="3,7" WidthRequest="1" BackgroundColor="{StaticResource Border}" />
+                        <Button AutomationId="toolbar-load-controls" Clicked="OnLoadControlsClicked" SemanticProperties.Description="Load controls from an assembly" Style="{StaticResource ToolbarButton}" Text="Load controls" />
+                        <Button AutomationId="toolbar-xaml" Clicked="OnToggleXamlClicked" SemanticProperties.Description="Show or hide the live XAML editor" Style="{StaticResource ToolbarButton}" Text="XAML" />
+                        <Button AutomationId="toolbar-run-preview" Clicked="OnRunPreviewClicked" SemanticProperties.Description="Run the current design in a preview window" Style="{StaticResource ToolbarPrimaryButton}" Text="Run preview" />
+                    </HorizontalStackLayout>
+                </ScrollView>
             </Grid>
         </Border>
 
@@ -54,94 +70,50 @@
             x:Name="DesignerBody"
             Grid.Row="1"
             ColumnDefinitions="260,1,*,1,320"
-            BackgroundColor="#0F1117"
+            BackgroundColor="{StaticResource SurfaceSubtle}"
             IsClippedToBounds="True">
-            <Grid Grid.Column="0" Padding="14" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="10">
+            <Grid Grid.Column="0" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="11" BackgroundColor="{StaticResource Surface}">
                 <Grid ColumnDefinitions="*,Auto">
-                    <VerticalStackLayout>
-                        <Label FontAttributes="Bold" FontSize="14" Text="Toolbox" TextColor="#F5F7FF" />
-                        <Label FontSize="11" Text="Reflected from loaded assemblies" TextColor="#798196" />
+                    <VerticalStackLayout Spacing="2">
+                        <Label FontAttributes="Bold" FontSize="15" Text="Elements" TextColor="{StaticResource TextPrimary}" />
+                        <Label FontSize="10" Text="Build and navigate your page" TextColor="{StaticResource TextMuted}" />
                     </VerticalStackLayout>
                     <Border
                         Grid.Column="1"
-                        Padding="7,3"
-                        BackgroundColor="#242033"
-                        Stroke="#5946A3"
-                        StrokeShape="RoundRectangle 8">
-                        <Label x:Name="ControlCountLabel" FontSize="10" TextColor="#BFAFFF" />
+                        Padding="8,3"
+                        VerticalOptions="Center"
+                        BackgroundColor="{StaticResource AccentSoft}"
+                        Stroke="{StaticResource AccentBorder}"
+                        StrokeShape="RoundRectangle 9">
+                        <Label x:Name="ControlCountLabel" FontAttributes="Bold" FontSize="10" TextColor="{StaticResource Primary}" />
                     </Border>
                 </Grid>
-                <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="6">
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="7">
                     <Button
                         x:Name="ToolboxTabButton"
                         AutomationId="tab-toolbox"
                         Clicked="OnToolboxTabClicked"
-                        FontSize="11"
-                        HeightRequest="32"
+                        SemanticProperties.Description="Show the grouped control toolbox"
+                        Style="{StaticResource TabButton}"
                         Text="Toolbox" />
                     <Button
                         x:Name="HierarchyTabButton"
                         Grid.Column="1"
                         AutomationId="tab-hierarchy"
                         Clicked="OnHierarchyTabClicked"
-                        FontSize="11"
-                        HeightRequest="32"
+                        SemanticProperties.Description="Show the visual hierarchy"
+                        Style="{StaticResource TabButton}"
                         Text="Hierarchy" />
                 </Grid>
                 <SearchBar
                     x:Name="ToolboxSearch"
                     Grid.Row="2"
                     AutomationId="toolbox-search"
-                    HeightRequest="38"
-                    Placeholder="Search controls..."
+                    Placeholder="Search controls"
+                    SemanticProperties.Description="Search available controls"
                     TextChanged="OnToolboxSearchChanged" />
-                <ScrollView
-                    x:Name="ToolboxList"
-                    Grid.Row="3">
-                    <VerticalStackLayout x:Name="ToolboxItemsHost">
-                        <BindableLayout.ItemTemplate>
-                            <DataTemplate x:DataType="catalog:ControlDescriptor">
-                                <controls:ToolboxItemView
-                                    AutomationId="{Binding AutomationId}"
-                                    Descriptor="{Binding .}"
-                                    ItemDragUpdated="OnToolboxDragUpdated"
-                                    ItemTapped="OnToolboxItemTapped"
-                                    Margin="0,0,0,7"
-                                    Padding="10,8"
-                                    BackgroundColor="#171A23"
-                                    Stroke="#292E3D"
-                                    StrokeShape="RoundRectangle 8">
-                                    <Grid ColumnDefinitions="34,*" RowDefinitions="Auto,Auto">
-                                        <Border
-                                            Grid.RowSpan="2"
-                                            WidthRequest="28"
-                                            HeightRequest="28"
-                                            BackgroundColor="#242033"
-                                            StrokeThickness="0"
-                                            StrokeShape="RoundRectangle 7">
-                                            <Label
-                                                HorizontalOptions="Center"
-                                                VerticalOptions="Center"
-                                                FontAttributes="Bold"
-                                                Text="+"
-                                                TextColor="#A994FF" />
-                                        </Border>
-                                        <Label
-                                            Grid.Column="1"
-                                            FontSize="12"
-                                            Text="{Binding DisplayName}"
-                                            TextColor="#E7EAF4" />
-                                        <Label
-                                            Grid.Row="1"
-                                            Grid.Column="1"
-                                            FontSize="9"
-                                            Text="{Binding Category}"
-                                            TextColor="#747D92" />
-                                    </Grid>
-                                </controls:ToolboxItemView>
-                            </DataTemplate>
-                        </BindableLayout.ItemTemplate>
-                    </VerticalStackLayout>
+                <ScrollView x:Name="ToolboxList" Grid.Row="3">
+                    <VerticalStackLayout x:Name="ToolboxItemsHost" Spacing="6" />
                 </ScrollView>
                 <CollectionView
                     x:Name="HierarchyList"
@@ -149,78 +121,68 @@
                     Grid.RowSpan="2"
                     AutomationId="hierarchy-list"
                     IsVisible="False"
-                    SelectionChanged="OnHierarchySelectionChanged"
-                    SelectionMode="Single">
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="workspace:HierarchyItem">
-                            <Border
-                                Margin="{Binding Indent}"
-                                Padding="10,8"
-                                BackgroundColor="#171A23"
-                                Stroke="#292E3D"
-                                StrokeShape="RoundRectangle 7">
-                                <VerticalStackLayout Spacing="1">
-                                    <Label FontSize="11" Text="{Binding DisplayName}" TextColor="#E7EAF4" />
-                                    <Label FontSize="9" Text="{Binding Identity}" TextColor="#747D92" />
-                                </VerticalStackLayout>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
+                    ItemSizingStrategy="MeasureFirstItem">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="0" />
+                    </CollectionView.ItemsLayout>
                 </CollectionView>
             </Grid>
 
-            <BoxView Grid.Column="1" BackgroundColor="#292E3D" />
+            <BoxView Grid.Column="1" BackgroundColor="{StaticResource Border}" />
 
             <Grid Grid.Column="2" RowDefinitions="88,*">
                 <Border
-                    Padding="14,0"
-                    BackgroundColor="#131620"
-                    Stroke="#292E3D"
+                    Padding="16,0"
+                    BackgroundColor="{StaticResource Surface}"
+                    Stroke="{StaticResource Border}"
                     StrokeThickness="1">
-                    <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
-                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10">
-                            <Label VerticalOptions="Center" FontSize="11" Text="DESIGN SURFACE" TextColor="#8D94A8" />
-                            <HorizontalStackLayout Grid.Column="1" HorizontalOptions="End" Spacing="6">
+                    <Grid RowDefinitions="Auto,Auto" RowSpacing="5">
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                            <VerticalStackLayout VerticalOptions="Center" Spacing="0">
+                                <Label FontAttributes="Bold" FontSize="11" Text="DESIGN SURFACE" TextColor="{StaticResource TextSecondary}" />
+                                <Label FontSize="9" Text="Interactive canvas" TextColor="{StaticResource TextMuted}" />
+                            </VerticalStackLayout>
+                            <HorizontalStackLayout Grid.Column="1" HorizontalOptions="End" VerticalOptions="Center" Spacing="6">
                                 <Picker
                                     x:Name="DevicePicker"
                                     AutomationId="canvas-device"
-                                    WidthRequest="145"
-                                    FontSize="10"
-                                    SelectedIndexChanged="OnDeviceChanged"
-                                    TextColor="#D8DCE8" />
-                                <Button AutomationId="canvas-zoom-out" Clicked="OnZoomOutClicked" Style="{StaticResource ToolbarButton}" Text="-" />
+                                    WidthRequest="154"
+                                    SelectedIndexChanged="OnDeviceChanged" />
+                                <Button AutomationId="canvas-zoom-out" Clicked="OnZoomOutClicked" SemanticProperties.Description="Zoom out" Style="{StaticResource CompactToolbarButton}" Text="−" />
                                 <Label
                                     x:Name="ZoomLabel"
                                     AutomationId="canvas-zoom-value"
-                                    WidthRequest="44"
+                                    WidthRequest="46"
                                     HorizontalTextAlignment="Center"
                                     VerticalTextAlignment="Center"
+                                    FontAttributes="Bold"
                                     FontSize="10"
-                                    TextColor="#B9C0D3" />
-                                <Button AutomationId="canvas-zoom-in" Clicked="OnZoomInClicked" Style="{StaticResource ToolbarButton}" Text="+" />
-                                <Button AutomationId="canvas-zoom-fit" Clicked="OnZoomFitClicked" Style="{StaticResource ToolbarButton}" Text="Fit" />
-                                <Button AutomationId="canvas-zoom-reset" Clicked="OnZoomResetClicked" Style="{StaticResource ToolbarButton}" Text="1:1" />
+                                    TextColor="{StaticResource TextSecondary}" />
+                                <Button AutomationId="canvas-zoom-in" Clicked="OnZoomInClicked" SemanticProperties.Description="Zoom in" Style="{StaticResource CompactToolbarButton}" Text="+" />
+                                <Button AutomationId="canvas-zoom-fit" Clicked="OnZoomFitClicked" SemanticProperties.Description="Fit the design to the available canvas" Style="{StaticResource ToolbarButton}" Text="Fit" />
+                                <Button AutomationId="canvas-zoom-reset" Clicked="OnZoomResetClicked" SemanticProperties.Description="Reset zoom to one hundred percent" Style="{StaticResource ToolbarButton}" Text="1:1" />
                             </HorizontalStackLayout>
                         </Grid>
-                        <HorizontalStackLayout Grid.Row="1" HorizontalOptions="End" Spacing="6">
-                                <Button x:Name="ThemeButton" AutomationId="canvas-theme" Clicked="OnThemeClicked" Style="{StaticResource ToolbarButton}" Text="Dark" />
-                                <Button x:Name="SnapButton" AutomationId="canvas-snap" Clicked="OnSnapClicked" Style="{StaticResource ToolbarButton}" Text="Snap" />
-                                <Button x:Name="GridButton" AutomationId="canvas-grid" Clicked="OnGridClicked" Style="{StaticResource ToolbarButton}" Text="Grid" />
-                                <Button x:Name="RulersButton" AutomationId="canvas-rulers" Clicked="OnRulersClicked" Style="{StaticResource ToolbarButton}" Text="Rulers" />
-                                <Label VerticalOptions="Center" FontSize="9" Text="Grid size" TextColor="#8D94A8" />
-                                <Stepper
-                                    x:Name="GridSizeStepper"
-                                    AutomationId="canvas-grid-size"
-                                    Increment="2"
-                                    Maximum="64"
-                                    Minimum="2"
-                                    ValueChanged="OnGridSizeChanged" />
-                                <Label
-                                    x:Name="GridSizeLabel"
-                                    WidthRequest="22"
-                                    VerticalTextAlignment="Center"
-                                    FontSize="9"
-                                    TextColor="#B9C0D3" />
+                        <HorizontalStackLayout Grid.Row="1" HorizontalOptions="End" VerticalOptions="Center" Spacing="6">
+                            <Button x:Name="SnapButton" AutomationId="canvas-snap" Clicked="OnSnapClicked" SemanticProperties.Description="Toggle snapping" Style="{StaticResource ToolbarButton}" Text="Snap" />
+                            <Button x:Name="GridButton" AutomationId="canvas-grid" Clicked="OnGridClicked" SemanticProperties.Description="Toggle the canvas grid" Style="{StaticResource ToolbarButton}" Text="Grid" />
+                            <Button x:Name="RulersButton" AutomationId="canvas-rulers" Clicked="OnRulersClicked" SemanticProperties.Description="Toggle canvas rulers" Style="{StaticResource ToolbarButton}" Text="Rulers" />
+                            <Label Margin="6,0,0,0" VerticalOptions="Center" FontSize="10" Text="Grid size" TextColor="{StaticResource TextSecondary}" />
+                            <Stepper
+                                x:Name="GridSizeStepper"
+                                AutomationId="canvas-grid-size"
+                                Increment="2"
+                                Maximum="64"
+                                Minimum="2"
+                                SemanticProperties.Description="Change the canvas grid size"
+                                ValueChanged="OnGridSizeChanged" />
+                            <Label
+                                x:Name="GridSizeLabel"
+                                WidthRequest="24"
+                                VerticalTextAlignment="Center"
+                                FontAttributes="Bold"
+                                FontSize="10"
+                                TextColor="{StaticResource TextSecondary}" />
                         </HorizontalStackLayout>
                     </Grid>
                 </Border>
@@ -228,7 +190,7 @@
                     x:Name="CanvasViewport"
                     Grid.Row="1"
                     AutomationId="canvas-viewport"
-                    BackgroundColor="#0B0D12"
+                    BackgroundColor="{StaticResource CanvasBackdrop}"
                     IsClippedToBounds="True"
                     PanRequested="OnCanvasPanRequested"
                     SizeChanged="OnCanvasViewportSizeChanged"
@@ -246,59 +208,50 @@
                             HorizontalOptions="Start"
                             VerticalOptions="Start"
                             BackgroundColor="White"
-                            Stroke="#343A4E"
+                            Stroke="{StaticResource BorderStrong}"
                             StrokeShape="RoundRectangle 12"
-                            Shadow="{Shadow Brush=Black, Opacity=0.4, Radius=24, Offset='0,10'}">
+                            Shadow="{Shadow Brush=#475569, Opacity=0.22, Radius=24, Offset='0,10'}">
                             <Grid>
-                                <GraphicsView
-                                    x:Name="CanvasGridOverlay"
-                                    InputTransparent="True" />
-                                <ContentView
-                                    x:Name="CanvasHost"
-                                    AutomationId="designer-canvas" />
+                                <GraphicsView x:Name="CanvasGridOverlay" InputTransparent="True" />
+                                <ContentView x:Name="CanvasHost" AutomationId="designer-canvas" />
                             </Grid>
                         </Border>
                     </Grid>
-                    <GraphicsView
-                        x:Name="CanvasRulerOverlay"
-                        InputTransparent="True" />
+                    <GraphicsView x:Name="CanvasRulerOverlay" InputTransparent="True" />
                     <Border
-                        Margin="12"
-                        Padding="9,5"
+                        Margin="14"
+                        Padding="10,6"
                         HorizontalOptions="Start"
                         VerticalOptions="End"
-                        BackgroundColor="#CC171A23"
-                        Stroke="#343A4E"
+                        BackgroundColor="#F2FFFFFF"
+                        Stroke="{StaticResource BorderStrong}"
                         StrokeShape="RoundRectangle 7">
-                        <Label
-                            FontSize="9"
-                            Text="Middle-drag or Space+drag to pan | Ctrl+wheel to zoom"
-                            TextColor="#9CA3B8" />
+                        <Label FontSize="9" Text="Middle-drag or Space+drag to pan  •  Ctrl+wheel to zoom" TextColor="{StaticResource TextSecondary}" />
                     </Border>
                 </controls:CanvasViewportView>
             </Grid>
 
-            <BoxView Grid.Column="3" BackgroundColor="#292E3D" />
+            <BoxView Grid.Column="3" BackgroundColor="{StaticResource Border}" />
 
-            <Grid Grid.Column="4" Padding="14" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12">
-                <VerticalStackLayout>
-                    <Label FontAttributes="Bold" FontSize="14" Text="Properties" TextColor="#F5F7FF" />
-                    <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="11" TextColor="#798196" />
+            <Grid Grid.Column="4" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12" BackgroundColor="{StaticResource Surface}">
+                <VerticalStackLayout Spacing="2">
+                    <Label FontAttributes="Bold" FontSize="15" Text="Properties" TextColor="{StaticResource TextPrimary}" />
+                    <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="10" TextColor="{StaticResource TextMuted}" />
                 </VerticalStackLayout>
                 <Border
                     Grid.Row="1"
-                    Padding="10,7"
-                    BackgroundColor="#171A23"
-                    Stroke="#292E3D"
+                    Padding="10,8"
+                    BackgroundColor="{StaticResource SurfaceSubtle}"
+                    Stroke="{StaticResource Border}"
                     StrokeShape="RoundRectangle 8">
-                    <Label FontSize="10" Text="Changes commit when an editor loses focus or Enter is pressed." TextColor="#858DA2" />
+                    <Label FontSize="10" LineBreakMode="WordWrap" Text="Changes save when an editor loses focus or you press Enter." TextColor="{StaticResource TextSecondary}" />
                 </Border>
                 <SearchBar
                     x:Name="PropertySearch"
                     Grid.Row="2"
                     AutomationId="property-search"
-                    HeightRequest="38"
-                    Placeholder="Search properties..."
+                    Placeholder="Search properties"
+                    SemanticProperties.Description="Search properties for the selected control"
                     TextChanged="OnPropertySearchChanged" />
                 <ScrollView Grid.Row="3">
                     <VerticalStackLayout x:Name="PropertyPanel" Spacing="8" />
@@ -309,31 +262,74 @@
         <Border
             x:Name="XamlPanel"
             Grid.Row="2"
-            HeightRequest="220"
+            HeightRequest="228"
             IsVisible="False"
-            Padding="14,10"
-            BackgroundColor="#131620"
-            Stroke="#292E3D"
+            Padding="16,11"
+            BackgroundColor="{StaticResource Surface}"
+            Stroke="{StaticResource Border}"
             StrokeThickness="1">
-            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,*" ColumnSpacing="10" RowSpacing="8">
-                <HorizontalStackLayout Spacing="10">
-                    <Label FontAttributes="Bold" FontSize="12" Text="XAML" TextColor="#F5F7FF" />
-                    <Label x:Name="XamlStatusLabel" FontSize="10" TextColor="#858DA2" />
-                </HorizontalStackLayout>
-                <HorizontalStackLayout Grid.Column="1" Spacing="7">
-                    <Button AutomationId="xaml-refresh" Clicked="OnRefreshXamlClicked" Style="{StaticResource ToolbarButton}" Text="Refresh" />
-                    <Button AutomationId="xaml-apply" Clicked="OnApplyXamlClicked" Style="{StaticResource ToolbarButton}" Text="Apply" />
-                </HorizontalStackLayout>
-                <Editor
-                    x:Name="XamlEditor"
-                    Grid.Row="1"
-                    Grid.ColumnSpan="2"
-                    AutomationId="xaml-editor"
-                    BackgroundColor="#0B0D12"
-                    FontSize="11"
-                    TextChanged="OnXamlTextChanged"
-                    TextColor="#DCE2F2" />
+            <Grid RowDefinitions="Auto,*" RowSpacing="9">
+                <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="9">
+                    <Label VerticalOptions="Center" FontAttributes="Bold" FontSize="12" Text="XAML" TextColor="{StaticResource TextPrimary}" />
+                    <ActivityIndicator
+                        x:Name="XamlBusyIndicator"
+                        Grid.Column="1"
+                        WidthRequest="18"
+                        HeightRequest="18"
+                        IsRunning="False"
+                        IsVisible="False"
+                        SemanticProperties.Description="Synchronizing XAML" />
+                    <HorizontalStackLayout Grid.Column="2" HorizontalOptions="End" Spacing="8">
+                        <Label VerticalOptions="Center" FontSize="10" Text="Changes sync live after a short pause" TextColor="{StaticResource TextMuted}" />
+                        <Border Padding="8,3" BackgroundColor="{StaticResource AccentSoft}" Stroke="{StaticResource AccentBorder}" StrokeShape="RoundRectangle 8">
+                            <Label x:Name="XamlStatusLabel" FontAttributes="Bold" FontSize="10" TextColor="{StaticResource TextSecondary}" />
+                        </Border>
+                    </HorizontalStackLayout>
+                </Grid>
+                <Border Grid.Row="1" BackgroundColor="{StaticResource SurfaceSubtle}" Stroke="{StaticResource BorderStrong}" StrokeShape="RoundRectangle 8">
+                    <Editor
+                        x:Name="XamlEditor"
+                        AutomationId="xaml-editor"
+                        Margin="1"
+                        BackgroundColor="Transparent"
+                        FontFamily="Consolas"
+                        FontSize="12"
+                        TextChanged="OnXamlTextChanged"
+                        TextColor="{StaticResource TextPrimary}" />
+                </Border>
             </Grid>
         </Border>
+
+        <Grid
+            x:Name="BusyOverlay"
+            Grid.RowSpan="3"
+            AutomationId="busy-overlay"
+            BackgroundColor="#66F8FAFC"
+            InputTransparent="False"
+            IsVisible="False">
+            <Border
+                Padding="28,22"
+                HorizontalOptions="Center"
+                VerticalOptions="Center"
+                BackgroundColor="{StaticResource Surface}"
+                Stroke="{StaticResource BorderStrong}"
+                StrokeShape="RoundRectangle 12"
+                Shadow="{Shadow Brush=#475569, Opacity=0.2, Radius=22, Offset='0,8'}">
+                <VerticalStackLayout MinimumWidthRequest="220" Spacing="12">
+                    <ActivityIndicator
+                        x:Name="BusyIndicator"
+                        HorizontalOptions="Center"
+                        IsRunning="False"
+                        SemanticProperties.Description="Designer operation in progress" />
+                    <Label
+                        x:Name="BusyLabel"
+                        HorizontalTextAlignment="Center"
+                        FontAttributes="Bold"
+                        FontSize="12"
+                        Text="Working…"
+                        TextColor="{StaticResource TextPrimary}" />
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
     </Grid>
 </ContentPage>

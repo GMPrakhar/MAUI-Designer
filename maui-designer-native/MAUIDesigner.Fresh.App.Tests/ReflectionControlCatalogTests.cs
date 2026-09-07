@@ -66,6 +66,21 @@ public sealed class ReflectionControlCatalogTests
         Assert.Same(services, observedProvider);
     }
 
+    [Fact]
+    public void Catalog_deduplicates_shadowed_inherited_properties()
+    {
+        var catalog = new ReflectionControlCatalog(
+            new ServiceCollection().BuildServiceProvider());
+        catalog.RegisterAssembly(typeof(View).Assembly);
+
+        ControlDescriptor stack = Find(catalog, typeof(VerticalStackLayout));
+
+        Assert.Equal(
+            stack.Properties.Length,
+            stack.Properties.Select(property => property.Name).Distinct().Count());
+        Assert.Single(stack.Properties, property => property.Name == nameof(Element.Handler));
+    }
+
     private static ControlDescriptor Find(ReflectionControlCatalog catalog, Type type) =>
         catalog.Controls.Single(control => control.RuntimeType == type);
 

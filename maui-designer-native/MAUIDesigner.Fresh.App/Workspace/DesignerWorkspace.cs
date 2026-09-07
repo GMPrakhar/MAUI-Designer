@@ -7,8 +7,11 @@ namespace MAUIDesigner.Fresh.App.Workspace;
 
 public sealed class DesignerWorkspace
 {
+    private const double PasteOffset = 16;
     private readonly IControlCatalog _catalog;
     private long _nextId;
+    private DesignerNode? _clipboard;
+    private int _pasteCount;
 
     public DesignerWorkspace(IControlCatalog catalog)
     {
@@ -29,6 +32,24 @@ public sealed class DesignerWorkspace
     public ElementId? DropTargetId { get; private set; }
 
     public LayoutPlacement? DropPlacement { get; private set; }
+
+    public bool CanCopy => SelectedId != Session.Current.Root.Id &&
+        Session.Current.Find(SelectedId) is not null;
+
+    public bool CanCut => SelectedId != Session.Current.Root.Id &&
+        Session.Current.Find(SelectedId) is not null;
+
+    public bool CanPaste => _clipboard is not null && TryResolveInsertionParent(out _);
+
+    public bool CanDuplicate => TryGetSelectedSiblingPosition(out DesignerNode? parent, out _) &&
+        CanAcceptChild(parent!.Id);
+
+    public bool CanMoveSelectionUp =>
+        TryGetSelectedSiblingPosition(out _, out int index) && index > 0;
+
+    public bool CanMoveSelectionDown =>
+        TryGetSelectedSiblingPosition(out DesignerNode? parent, out int index) &&
+        index < parent!.Children.Length - 1;
 
     public void Select(ElementId id)
     {
@@ -125,8 +146,90 @@ public sealed class DesignerWorkspace
             return;
         }
 
-        Session.Execute(new RemoveElementCommand(SelectedId));
-        Select(Session.Current.Root.Id);
+        ElementId removedId = SelectedId;
+        DesignerNode parent = FindParent(Session.Current.Root, removedId)
+            ?? throw new InvalidOperationException($"Element '{removedId}' has no parent.");
+        Session.Execute(new RemoveElementCommand(removedId));
+        Select(parent.Id);
+    }
+
+    public void CopySelection()
+    {
+        if (!CanCopy)
+        {
+            return;
+        }
+
+        _clipboard = Session.Current.Find(SelectedId)
+            ?? throw new KeyNotFoundException($"Element '{SelectedId}' was not found.");
+        _pasteCount = 0;
+        InteractionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void CutSelection()
+    {
+        if (!CanCut)
+        {
+            return;
+        }
+
+        CopySelection();
+        DeleteSelection();
+    }
+
+    public ElementId? Paste()
+    {
+        if (_clipboard is null || !TryResolveInsertionParent(out ElementId parentId))
+        {
+            return null;
+        }
+
+        _pasteCount++;
+        DesignerNode clone = PrepareCloneForParent(_clipboard, parentId, _pasteCount);
+        Session.Execute(new AddElementCommand(parentId, clone));
+        Select(clone.Id);
+        return clone.Id;
+    }
+
+    public ElementId? DuplicateSelection()
+    {
+        if (!TryGetSelectedSiblingPosition(out DesignerNode? parent, out int index) ||
+            !CanAcceptChild(parent!.Id))
+        {
+            return null;
+        }
+
+        DesignerNode source = Session.Current.Find(SelectedId)!;
+        DesignerNode clone = PrepareCloneForParent(source, parent.Id, 1);
+        Session.Execute(new AddElementCommand(parent.Id, clone, index + 1));
+        Select(clone.Id);
+        return clone.Id;
+    }
+
+    public bool MoveSelectionUp() => MoveSelection(-1);
+
+    public bool MoveSelectionDown() => MoveSelection(1);
+
+    public bool MoveSelection(int direction)
+    {
+        if (direction is not (-1 or 1))
+        {
+            throw new ArgumentOutOfRangeException(nameof(direction), "Direction must be -1 or 1.");
+        }
+
+        if (!TryGetSelectedSiblingPosition(out DesignerNode? parent, out int index))
+        {
+            return false;
+        }
+
+        int destinationIndex = index + direction;
+        if (destinationIndex < 0 || destinationIndex >= parent!.Children.Length)
+        {
+            return false;
+        }
+
+        Session.Execute(new ReorderElementCommand(SelectedId, destinationIndex));
+        return true;
     }
 
     public void ReplaceDocument(DesignerDocument document)
@@ -139,18 +242,30 @@ public sealed class DesignerWorkspace
 
     private ElementId ResolveInsertionParent()
     {
+        if (TryResolveInsertionParent(out ElementId parentId))
+        {
+            return parentId;
+        }
+
+        throw new InvalidOperationException("The document has no container that can accept another child control.");
+    }
+
+    private bool TryResolveInsertionParent(out ElementId parentId)
+    {
         DesignerNode? candidate = Session.Current.Find(SelectedId) ?? Session.Current.Root;
         while (candidate is not null)
         {
             if (CanAcceptChild(candidate.Id))
             {
-                return candidate.Id;
+                parentId = candidate.Id;
+                return true;
             }
 
             candidate = FindParent(Session.Current.Root, candidate.Id);
         }
 
-        throw new InvalidOperationException("The document has no container that can accept another child control.");
+        parentId = default;
+        return false;
     }
 
     public bool CanAcceptChild(ElementId parentId, ElementId? movingId = null)
@@ -214,6 +329,57 @@ public sealed class DesignerWorkspace
         return node is not null &&
             _catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor) &&
             descriptor?.RuntimeType == typeof(AbsoluteLayout);
+    }
+
+    private DesignerNode PrepareCloneForParent(DesignerNode source, ElementId parentId, int offsetMultiplier)
+    {
+        DesignerNode clone = DesignerNodeCloner.CloneSubtree(source);
+        RectD? bounds = null;
+        if (IsAbsoluteLayout(parentId))
+        {
+            RectD sourceBounds = source.Bounds ?? CreateDefaultBounds(source);
+            double offset = PasteOffset * offsetMultiplier;
+            bounds = sourceBounds with
+            {
+                X = sourceBounds.X + offset,
+                Y = sourceBounds.Y + offset
+            };
+        }
+
+        return clone with
+        {
+            ParentPropertyName = null,
+            Bounds = bounds,
+            Properties = clone.Properties
+                .Remove("AbsoluteLayout.LayoutBounds")
+                .Remove("AbsoluteLayout.LayoutFlags")
+        };
+    }
+
+    private RectD CreateDefaultBounds(DesignerNode node)
+    {
+        bool acceptsChildren = _catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor) &&
+            descriptor?.AcceptsChildren == true;
+        return new RectD(24, 24, acceptsChildren ? 280 : 160, acceptsChildren ? 180 : 48);
+    }
+
+    private bool TryGetSelectedSiblingPosition(out DesignerNode? parent, out int index)
+    {
+        parent = FindParent(Session.Current.Root, SelectedId);
+        index = -1;
+        if (parent is not null)
+        {
+            for (int childIndex = 0; childIndex < parent.Children.Length; childIndex++)
+            {
+                if (parent.Children[childIndex].Id == SelectedId)
+                {
+                    index = childIndex;
+                    break;
+                }
+            }
+        }
+
+        return parent is not null && index >= 0;
     }
 
     private static DesignerNode? FindParent(DesignerNode parent, ElementId childId)

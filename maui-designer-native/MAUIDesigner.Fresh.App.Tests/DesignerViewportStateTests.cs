@@ -47,4 +47,16 @@ public sealed class DesignerViewportStateTests
         viewport.SetGridSize(500);
         Assert.Equal(200, viewport.GridSize);
     }
+
+    [Fact]
+    public void Center_on_places_the_requested_design_point_at_viewport_center()
+    {
+        var viewport = new DesignerViewportState();
+        viewport.ZoomAt(2, 0, 0);
+
+        viewport.CenterOn(120, 80, 1000, 600);
+
+        Assert.Equal(500, viewport.PanX + 120 * viewport.Zoom, 6);
+        Assert.Equal(300, viewport.PanY + 80 * viewport.Zoom, 6);
+    }
 }
