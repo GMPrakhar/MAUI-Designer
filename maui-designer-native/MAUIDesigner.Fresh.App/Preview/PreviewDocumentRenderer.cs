@@ -37,7 +37,10 @@ public sealed class PreviewDocumentRenderer
         {
             view = _catalog.Create(node.ControlType);
             ApplyProperties(view, descriptor, node);
-            view.AutomationId = $"preview-{node.Id.Value}";
+            if (!node.Properties.ContainsKey(nameof(VisualElement.AutomationId)))
+            {
+                view.AutomationId = $"preview-{node.Id.Value}";
+            }
         }
         catch (Exception exception) when (IsRecoverable(exception))
         {

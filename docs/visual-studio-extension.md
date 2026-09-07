@@ -1,10 +1,9 @@
 # Converting MAUI Designer into a Visual Studio extension
 
-*Design rationale — verified against Microsoft Learn, WebView2 and VS Code extension docs.*
+*Design rationale for the out-of-process native host.*
 
-> **Status: Route A is implemented.** The VSIX and its cross-platform core library live in
-> [`extension/`](../extension/README.md); this document explains why it is built the way it is, and
-> what the alternatives were. Route B (VS Code) is still open.
+> **Status: the native out-of-process route is implemented.** The VSIX and its
+> cross-platform protocol library live in [`extension/`](../extension/README.md).
 
 ## Short answer
 
@@ -14,36 +13,32 @@ and Microsoft has stated a drag-and-drop UI designer "is not part of our directi
 What ships instead is XAML Hot Reload and XAML Live Preview (design-time Live Preview arrived in
 17.14) — read-only mirrors of a running app, not layout editing.
 
-Two hosting routes are viable today. Both reuse this Angular app essentially unchanged, because the
-designer core (parser, generator, element/alignment/clipboard services, custom-control registry) is
-pure TypeScript with no server dependency.
+The supported Visual Studio route keeps MAUI outside `devenv`: a self-contained
+native process renders real controls, while a small classic VSSDK editor owns
+the text buffer and embeds the process window.
 
 | Route | Feasible today | Rough effort | Trade-off |
 | --- | --- | --- | --- |
 | **VS Code extension** — `CustomTextEditorProvider` + webview | ✅ | ~10–15 dev-days | Cross-platform, simple file APIs; .NET type introspection is awkward from Node |
-| **VS 2022 VSIX** — classic VSSDK + WebView2 + `IVsEditorFactory` | ✅ | ~18–28 dev-days | Deepest integration and real NuGet/type discovery; COM-heavy, Windows-only |
+| **VS 2022/2026 VSIX** — classic VSSDK + native child process | ✅ | Implemented | Real MAUI backend, crash isolation, shared VS text buffer; Windows-only |
 | **VisualStudio.Extensibility (out-of-process)** | ❌ | — | Remote UI is WPF-XAML-over-RPC with no WebView2, and custom document editors are not supported out-of-process yet |
 
-Recommended sequencing: **ship the VS Code extension first, then the VS 2022 VSIX** on the same
-Angular core.
+The modern `VisualStudio.Extensibility` model remains unsuitable for this part:
+it does not provide custom document editors or arbitrary native child windows.
 
 ## Route A — VS 2022 VSIX
 
 ### Hosting the app
-Only the **classic in-process VSSDK** model can host web content. A WPF `UserControl` containing
-`Microsoft.Web.WebView2.Wpf.WebView2` is placed in a `ToolWindowPane` (or an editor pane).
 
-```csharp
-var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder);
-await webView.EnsureCoreWebView2Async(env);          // never set Source/CreationProperties in XAML
-webView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-    "maui-designer.local", Path.Combine(installDir, "WebApp"),
-    CoreWebView2HostResourceAccessKind.Allow);
-webView.CoreWebView2.Navigate("https://maui-designer.local/index.html");
-```
+`DesignerControl` contains a WPF `HwndHost`. It starts the packaged
+`native\MAUIDesigner.exe` with a unique pipe name, waits for its WinUI top-level
+window, changes that window to `WS_CHILD`, and reparents it into the document
+tab. Layout changes call `SetWindowPos`, so docking and tab resizing flow to the
+MAUI window. Closing the tab terminates its owned process.
 
-`SetVirtualHostNameToFolderMapping` is the right way to serve the Angular `dist/` folder — `file://`
-is blocked, and a local HTTP server is unnecessary. Ship `dist/` as VSIX `Content`.
+The process boundary is also the workload boundary: Visual Studio loads only
+the net472 VSIX and netstandard protocol assemblies. MAUI 10, WinUI, Toolkit,
+and third-party control code remain in the self-contained child process.
 
 ### Editing real `.xaml` files
 - `IVsEditorFactory.CreateEditorInstance` + `IVsPersistDocData` + `IVsWindowPane` register a designer
@@ -61,15 +56,20 @@ automatically** from the project.
 3. Enumerate types with `System.Reflection.MetadataLoadContext` (load-only, no execution) or the
    Roslyn `VisualStudioWorkspace` compilation; keep types deriving from
    `Microsoft.Maui.Controls.View` and their static `BindableProperty` fields.
-4. Emit the same manifest schema the designer already consumes and push it into the webview.
+4. Emit the designer manifest schema and send it to the native process over the private pipe.
 
 The manifest format documented in the README is deliberately the contract for exactly this.
 
 ### Main risks
-- Synchronising three states — the Angular canvas, the `IVsTextBuffer`, and VS's own undo stack — is
-  the hardest problem; the app's undo history is independent of VS's.
-- WPF "airspace" glitches when VS popups overlap WebView2 (mitigate with `WebView2CompositionControl`).
-- The WebView2 Runtime must be present (ships with Windows 11/Edge, not guaranteed on locked-down machines).
+- Synchronising native designer state, the `IVsTextBuffer`, and VS's undo stack
+  remains the hardest boundary; messages are ordered over one duplex pipe.
+- Pane shutdown uses a bounded, request-correlated `host.close` /
+  `designer.closed` handshake so the final canvas state reaches the shared
+  buffer before Visual Studio's save decision. Irreversible process cleanup
+  waits for `FRAMESHOW_WinClosed`, so a canceled save prompt leaves the pane
+  synchronized and usable.
+- Cross-process `SetParent` requires compatible DPI-awareness modes.
+- A child-process crash must be surfaced in the editor without affecting VS.
 - Classic VSSDK is maintained but is not where Microsoft is investing; the modern out-of-process
   model cannot host this app yet.
 
@@ -97,30 +97,19 @@ Constraints:
 - The extension host is Node.js, so .NET reflection is not directly available. Control metadata must
   come from a spawned .NET helper, a pre-generated manifest, or the Roslyn language server.
 
-## What changes in this repository
+## Implementation map
 
-Reusable unchanged: `xaml-parser.ts`, `xaml-generator.ts`, `element.ts`, `alignment.ts`,
-`clipboard.ts`, `drag-drop.ts`, `layout-designer.ts`, `custom-control-registry.ts`, and every
-component template.
-
-Needs work:
-
-| Area | Change |
-| --- | --- |
-| New `host-bridge.service.ts` | ~50 lines abstracting `chrome.webview.postMessage` (VS) vs `acquireVsCodeApi()` (VS Code) vs standalone browser |
-| Save/load | Route through the host bridge instead of `localStorage` and browser download/upload |
-| Custom control registry | Accept manifests pushed by the host (generated from `PackageReference`s) alongside imported and bundled ones |
-| `angular.json` | Use a relative `baseHref` (`./`) so the bundle works under a virtual host |
-| `index.html` | VS Code only: nonce injection point |
-
-A separate companion repository is the cleanest home for the C#/TypeScript host, consuming this
-project's `dist/` output as a build artifact.
+The classic VSSDK shim is under `extension/src/MauiDesigner.Vsix`. The shared,
+testable protocol and project-inspection code is under
+`extension/src/MauiDesigner.Core`. The native pipe client is under
+`maui-designer-native/MAUIDesigner.Fresh.App/Hosting`. The VSIX build publishes
+the native app self-contained and packages it beneath `native/`.
 
 ## Key references
 
 - [Out-of-process extensibility model overview](https://learn.microsoft.com/en-us/visualstudio/extensibility/visualstudio.extensibility/get-started/oop-extensibility-model-overview?view=visualstudio) and [Remote UI](https://learn.microsoft.com/en-us/visualstudio/extensibility/visualstudio.extensibility/inside-the-sdk/remote-ui?view=visualstudio)
 - [Creating custom editors and designers](https://learn.microsoft.com/en-us/visualstudio/extensibility/creating-custom-editors-and-designers?view=visualstudio), [Supporting multiple document views](https://learn.microsoft.com/en-us/visualstudio/extensibility/supporting-multiple-document-views?view=visualstudio)
-- [WebView2 in WPF](https://learn.microsoft.com/en-us/microsoft-edge/webview2/get-started/wpf), [`SetVirtualHostNameToFolderMapping`](https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.setvirtualhostnametofoldermapping)
+- [`HwndHost`](https://learn.microsoft.com/en-us/dotnet/api/system.windows.interop.hwndhost) and [`SetParent`](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent)
 - [NuGet API in Visual Studio](https://learn.microsoft.com/en-us/nuget/visual-studio-extensibility/nuget-api-in-visual-studio), [MetadataLoadContext](https://learn.microsoft.com/en-us/dotnet/standard/assembly/inspect-contents-using-metadataloadcontext)
 - [VS Code custom editors](https://code.visualstudio.com/api/extension-guides/custom-editors) and [webviews](https://code.visualstudio.com/api/extension-guides/webview)
 - [XAML Live Preview enhancements for .NET MAUI](https://devblogs.microsoft.com/visualstudio/enhancements-to-xaml-live-preview-in-visual-studio-for-net-maui/)

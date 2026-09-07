@@ -8,9 +8,7 @@ using MauiDesigner.Core.Manifests;
 namespace MauiDesigner.Core.Protocol
 {
     /// <summary>
-    /// The message contract between the IDE host and the Angular designer.
-    /// Mirrors <c>src/app/services/host-bridge.ts</c>; changing one side requires
-    /// changing the other.
+    /// The message contract between an IDE host and a designer process.
     /// </summary>
     public static class MessageTypes
     {
@@ -19,6 +17,7 @@ namespace MauiDesigner.Core.Protocol
         public const string DocumentLoad = "document.load";
         public const string ManifestsPush = "manifests.push";
         public const string DocumentSaved = "document.saved";
+        public const string HostClose = "host.close";
 
         // Designer -> host
         public const string DesignerReady = "designer.ready";
@@ -26,6 +25,7 @@ namespace MauiDesigner.Core.Protocol
         public const string DocumentSave = "document.save";
         public const string ManifestsRequest = "manifests.request";
         public const string DesignerError = "designer.error";
+        public const string DesignerClosed = "designer.closed";
     }
 
     /// <summary>A single message in either direction.</summary>
@@ -49,6 +49,10 @@ namespace MauiDesigner.Core.Protocol
         [JsonPropertyName("message")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Message { get; set; }
+
+        [JsonPropertyName("requestId")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? RequestId { get; set; }
 
         [JsonPropertyName("manifests")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -77,6 +81,13 @@ namespace MauiDesigner.Core.Protocol
             });
 
         public static string DocumentSaved() => Serialize(new DesignerMessage { Type = MessageTypes.DocumentSaved });
+
+        public static string HostClose(string requestId) =>
+            Serialize(new DesignerMessage { Type = MessageTypes.HostClose, RequestId = requestId });
+
+        public static bool IsCloseResponseFor(DesignerMessage? message, string requestId) =>
+            message?.Type == MessageTypes.DesignerClosed &&
+            message.RequestId == requestId;
 
         public static string Serialize(DesignerMessage message) => JsonSerializer.Serialize(message, Options);
 

@@ -1,6 +1,7 @@
 using System.Reflection;
 using CommunityToolkit.Maui.Views;
 using MAUIDesigner.Fresh.App.Catalog;
+using MAUIDesigner.Fresh.App.Controls;
 using MAUIDesigner.Fresh.App.Xaml;
 using MAUIDesigner.Fresh.Core.Documents;
 using MAUIDesigner.Fresh.Core.Xaml;
@@ -91,6 +92,24 @@ public sealed class ComplexXamlIntegrationTests
         Assert.Contains(
             "xmlns:external=\"urn:maui-designer:test-controls\"",
             xaml.Write(parsed.Document));
+    }
+
+    [Fact]
+    public void Local_clr_namespace_without_assembly_resolves_to_the_registered_control()
+    {
+        var catalog = new ReflectionControlCatalog(
+            new ServiceCollection().BuildServiceProvider());
+        catalog.RegisterAssembly(typeof(CanvasViewportView).Assembly);
+        var xaml = new XamlWorkspace(new CatalogXamlTypeResolver(catalog));
+
+        XamlReadResult parsed = xaml.Parse("""
+            <controls:CanvasViewportView
+                xmlns:controls="clr-namespace:MAUIDesigner.Fresh.App.Controls" />
+            """);
+
+        Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
+        Assert.True(catalog.TryGet(parsed.Document!.Root.ControlType, out ControlDescriptor? control));
+        Assert.Equal(typeof(CanvasViewportView), control!.RuntimeType);
     }
 
     private static ReflectionControlCatalog CreateCatalog()

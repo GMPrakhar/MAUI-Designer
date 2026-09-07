@@ -67,6 +67,47 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Pending_host_edits_take_precedence_over_close_response()
+        {
+            Assert.False(DesignerSession.ShouldApplyFinalXaml(true, "<ContentPage />"));
+            Assert.True(DesignerSession.ShouldApplyFinalXaml(false, "<ContentPage />"));
+            Assert.False(DesignerSession.ShouldApplyFinalXaml(false, null));
+        }
+
+        [Fact]
+        public void Close_requests_include_their_correlation_id()
+        {
+            DesignerMessage message = DesignerProtocol.Parse(
+                DesignerProtocol.HostClose("close-3"))!;
+
+            Assert.Equal(MessageTypes.HostClose, message.Type);
+            Assert.Equal("close-3", message.RequestId);
+        }
+
+        [Fact]
+        public void Close_responses_only_match_their_own_request()
+        {
+            var response = new DesignerMessage
+            {
+                Type = MessageTypes.DesignerClosed,
+                RequestId = "close-4",
+                Xaml = "<ContentPage />"
+            };
+
+            Assert.True(DesignerProtocol.IsCloseResponseFor(response, "close-4"));
+            Assert.False(DesignerProtocol.IsCloseResponseFor(response, "close-old"));
+        }
+
+        [Fact]
+        public void Designer_edits_are_rejected_during_close_or_pending_host_updates()
+        {
+            Assert.True(DesignerSession.ShouldAcceptDesignerEdit(false, false, 3, 3));
+            Assert.False(DesignerSession.ShouldAcceptDesignerEdit(true, false, 3, 3));
+            Assert.False(DesignerSession.ShouldAcceptDesignerEdit(false, true, 3, 3));
+            Assert.False(DesignerSession.ShouldAcceptDesignerEdit(false, false, 2, 3));
+        }
+
+        [Fact]
         public void Designer_edits_mark_the_document_dirty()
         {
             var session = CreateSession();

@@ -8,7 +8,7 @@ namespace MauiDesigner.Core.Protocol
     /// <summary>
     /// The host-side half of the designer conversation, kept free of any Visual
     /// Studio types so it can be unit tested on any platform. The VSIX supplies
-    /// the transport (WebView2) and the document services through the callbacks.
+    /// the transport and document services through the callbacks.
     /// </summary>
     public sealed class DesignerSession
     {
@@ -17,7 +17,7 @@ namespace MauiDesigner.Core.Protocol
         private bool _designerReady;
         private string? _pendingXaml;
 
-        /// <param name="post">Sends a JSON payload into the WebView.</param>
+        /// <param name="post">Sends a JSON payload to the designer.</param>
         /// <param name="hostKind"><c>visual-studio</c> or <c>vscode</c>.</param>
         public DesignerSession(Action<string> post, string hostKind = "visual-studio")
         {
@@ -78,6 +78,26 @@ namespace MauiDesigner.Core.Protocol
             IsDirty = false;
             _post(DesignerProtocol.DocumentSaved());
         }
+
+        /// <summary>
+        /// Prevents the designer's close response from replacing a newer host edit
+        /// that has not crossed the debounced transport boundary yet.
+        /// </summary>
+        public static bool ShouldApplyFinalXaml(bool hasPendingHostEdit, string? finalXaml) =>
+            !hasPendingHostEdit && finalXaml is not null;
+
+        /// <summary>
+        /// Rejects asynchronous designer updates that would race a newer host edit
+        /// or run after the host has started closing the session.
+        /// </summary>
+        public static bool ShouldAcceptDesignerEdit(
+            bool isClosing,
+            bool hasPendingHostEdit,
+            int queuedGeneration,
+            int currentGeneration) =>
+            !isClosing &&
+            !hasPendingHostEdit &&
+            queuedGeneration == currentGeneration;
 
         /// <summary>Handles a raw message posted by the designer. Unknown payloads are ignored.</summary>
         public void HandleMessage(string? json)

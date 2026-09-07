@@ -1,9 +1,9 @@
 # MAUI Designer for Visual Studio
 
 Visual Studio 2022 has no drag-and-drop designer for .NET MAUI XAML. This folder
-packages the Angular designer from this repository as a VSIX so it can edit the
-`.xaml` file that is open in the IDE, with the project's own NuGet controls in
-the toolbox.
+packages the native MAUI Designer as a VSIX companion process. Visual Studio
+hosts its HWND inside the document tab and synchronizes the shared `.xaml` text
+buffer over a private named pipe; no MAUI assemblies are loaded into `devenv`.
 
 See [`../docs/visual-studio-extension.md`](../docs/visual-studio-extension.md)
 for the design rationale and the alternatives that were considered.
@@ -30,9 +30,8 @@ files against the real Visual Studio SDK reference assemblies, so CI catches a
 wrong interface, signature or enum on Linux instead of at F5 on someone's
 machine. It is part of `MauiDesigner.Core.sln`, so `dotnet build` covers it.
 
-This is also why `DesignerControl` builds its UI in code instead of in XAML: XAML
-markup compilation is Windows-only, and the UI is one WebView plus a status
-label.
+This is also why `DesignerControl` builds its UI in code instead of in XAML:
+the in-process surface is only an `HwndHost` plus a status label.
 
 ## What can be verified without Visual Studio
 
@@ -48,7 +47,7 @@ wrong are still catchable there:
 | Registration that silently never loads | `RegistrationMetadataTests` | Reads the compiled attributes with `MetadataLoadContext` |
 | A manifest naming a file that isn't there | `RegistrationMetadataTests` | Resolves every path the manifest references |
 | A package that installs but renders nothing | `release-vsix.yml` | Unzips the built VSIX and asserts its contents |
-| Host protocol drift | `e2e/ide-host.spec.ts` | Drives the real app against a stubbed `window.chrome.webview` |
+| Host protocol drift | Native bridge tests | Exchanges ready/load/change messages through a real named pipe |
 | A VSIX that won't install, or installs without registering | `release-vsix.yml` (`install-check`) | Installs it into a real Visual Studio on a Windows runner |
 
 The last row is the one that needs a Windows machine, and CI supplies two: the
@@ -81,7 +80,8 @@ be opened with `RegLoadAppKey`, the API Visual Studio itself uses: `reg load`
 fails with *Access is denied* because the IDE's background service hosts still
 hold the file.
 
-What still needs a human: seeing the designer actually *render* inside the IDE.
+What still needs a Windows UI run: seeing the child process render inside the
+IDE and checking focus, resize, docking, and DPI transitions.
 
 The threading analyzers are worth singling out. They flag exactly the bugs that
 otherwise need a running IDE to find — and they found real ones here: the pane
@@ -93,7 +93,7 @@ shutdown could have dropped an edit on its way to the text buffer. Both it and
 [VSSDK007](https://github.com/Microsoft/VSSDK-Analyzers/blob/main/doc/VSSDK007.md).
 
 What still genuinely requires Windows: installing the VSIX, confirming **Open
-With… → MAUI Designer** appears, and watching WebView2 actually render.
+With… → MAUI Designer** appears, and validating the embedded native window.
 
 ## What the core library does
 
@@ -117,11 +117,13 @@ With… → MAUI Designer** appears, and watching WebView2 actually render.
 | host → designer | `document.load` | XAML to edit |
 | host → designer | `manifests.push` | controls found in the project's packages |
 | host → designer | `document.saved` | the document reached disk |
-| designer → host | `designer.ready` | the WebView finished booting |
+| host → designer | `host.close` | flush final valid XAML for a correlated close attempt |
+| designer → host | `designer.ready` | the native process connected |
 | designer → host | `document.changed` | the user edited the design |
 | designer → host | `document.save` | Ctrl+S inside the designer |
 | designer → host | `manifests.request` | asks for the project's controls |
 | designer → host | `designer.error` | something went wrong, for the output window |
+| designer → host | `designer.closed` | final valid XAML for the matching close request is ready |
 
 Both sides ignore malformed payloads, so a protocol mismatch degrades to "the
 designer does nothing" rather than taking down the IDE.
@@ -146,21 +148,20 @@ drop the `ref` from `IVsEditorFactory.MapLogicalView`) and the build fails.
 The VSIX, on Windows:
 
 ```powershell
-npm ci
-npm run build            # produces dist/angular-designer, embedded in the VSIX
+dotnet workload install maui-windows
 cd extension
 msbuild MauiDesigner.sln /p:Configuration=Release /restore
 ```
 
 `bin\Release\MauiDesigner.Vsix.vsix` can then be installed, or press F5 to debug
-in the experimental instance. Building without running `npm run build` first is a
-hard error: a VSIX that installs but renders an empty WebView is a worse failure
-than one that refuses to build.
+in the experimental instance. The build publishes a self-contained win-x64
+native backend and packages it under `native\`. Set
+`MAUI_DESIGNER_NATIVE_PATH` to use a local executable while debugging the VSIX.
 
 You do not need a Windows machine to get an installer, though —
 `.github/workflows/release-vsix.yml` packages the VSIX on a `windows-latest`
 runner. It runs on every pull request that touches `extension/`, unzips the
-result and asserts that `webview/index.html` and both assemblies are actually
+result and asserts that `native/MAUIDesigner.exe` and both assemblies are actually
 inside, then uploads it as a build artifact. Pushing a `vsix-v*` tag publishes
 the same file as a pre-release asset named `MauiDesigner.vsix`, which is what the
 website's download link points at.
@@ -177,12 +178,12 @@ changes made on the canvas appear in the XAML view immediately, undo/redo and th
 dirty indicator keep working, and Ctrl+S saves through the normal solution
 pipeline.
 
-`DesignerControl` hosts WebView2. The compiled Angular application is copied into
-`webview\` inside the VSIX and served through
-`SetVirtualHostNameToFolderMapping`, because a `file://` origin cannot use the
-storage and module loading the designer relies on. The WebView2 environment is
-created explicitly with a user data folder under `%LOCALAPPDATA%` — the Visual
-Studio install directory is read-only.
+`DesignerControl` creates a child Win32 host, starts the packaged
+`MAUIDesigner.exe`, and reparents its window into the editor pane. A uniquely
+named pipe carries newline-delimited protocol messages. A reversible pre-close
+handshake flushes edits before Visual Studio's save prompt; only the committed
+`FRAMESHOW_WinClosed` notification closes the pipe and terminates the process
+owned by that pane, so canceling the prompt leaves the designer usable.
 
 ## Limitations
 
@@ -191,11 +192,11 @@ Studio install directory is read-only.
   VSIX and clicking through the designer therefore has to happen on Windows; what
   CI can prove on Linux is that everything compiles against the real SDK and that
   the protocol and manifest logic behave correctly.
-* Windows only, Visual Studio 2022 and 2026 (17.x and 18.x). The out-of-process
-  `VisualStudio.Extensibility` model cannot host WebView2, so the classic
-  in-process VSSDK model is required. CI installs the VSIX into both versions.
-* The designer understands the subset of XAML the web app supports; unknown tags
-  are preserved verbatim but are not editable beyond their attributes.
+* Windows only, Visual Studio 2022 and 2026 (17.x and 18.x). A small classic
+  VSSDK shim is still required because the newer extensibility model does not
+  expose custom document editors or arbitrary native child-window hosting.
+* Win32 cross-process parenting requires compatible DPI-awareness modes. The
+  extension and MAUI backend both use per-monitor-aware Windows UI stacks.
 * Manifest generation reads compile-time metadata, so a control's runtime
   defaults are not known — the designer falls back to its own defaults.
 

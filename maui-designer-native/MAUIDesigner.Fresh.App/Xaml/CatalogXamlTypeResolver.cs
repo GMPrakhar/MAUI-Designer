@@ -49,14 +49,7 @@ public sealed class CatalogXamlTypeResolver : MAUIDesigner.Fresh.Core.Xaml.IXaml
             control.Id.XamlName == localName);
         if (descriptor is not null)
         {
-            resolution = new XamlTypeResolution(
-                descriptor.Id,
-                true,
-                descriptor.Properties.FirstOrDefault(property => property.IsContent)?.Name,
-                VisualContentProperty.FindAll(descriptor.RuntimeType)
-                    .Select(property => property.Name)
-                    .ToImmutableArray(),
-                descriptor.AcceptsChildren);
+            resolution = CreateResolution(descriptor, xamlNamespace);
             return true;
         }
 
@@ -73,8 +66,19 @@ public sealed class CatalogXamlTypeResolver : MAUIDesigner.Fresh.Core.Xaml.IXaml
 
         if (TryParseClrNamespace(xamlNamespace, out string? clrNamespace, out string? assemblyName))
         {
+            descriptor = _catalog.Controls.FirstOrDefault(control =>
+                control.RuntimeType.Namespace == clrNamespace &&
+                control.Id.XamlName == localName &&
+                (assemblyName is null ||
+                 control.Id.AssemblyName == assemblyName));
+            if (descriptor is not null)
+            {
+                resolution = CreateResolution(descriptor, xamlNamespace);
+                return true;
+            }
+
             var type = new ControlTypeId(
-                assemblyName,
+                assemblyName ?? clrNamespace,
                 $"{clrNamespace}.{localName}",
                 xamlNamespace,
                 localName);
@@ -86,13 +90,32 @@ public sealed class CatalogXamlTypeResolver : MAUIDesigner.Fresh.Core.Xaml.IXaml
         return false;
     }
 
+    private static XamlTypeResolution CreateResolution(
+        ControlDescriptor descriptor,
+        string xamlNamespace)
+    {
+        var type = new ControlTypeId(
+            descriptor.Id.AssemblyName,
+            descriptor.Id.FullName,
+            xamlNamespace,
+            descriptor.Id.XamlName);
+        return new XamlTypeResolution(
+            type,
+            true,
+            descriptor.Properties.FirstOrDefault(property => property.IsContent)?.Name,
+            VisualContentProperty.FindAll(descriptor.RuntimeType)
+                .Select(property => property.Name)
+                .ToImmutableArray(),
+            descriptor.AcceptsChildren);
+    }
+
     private static bool TryParseClrNamespace(
         string xamlNamespace,
         out string clrNamespace,
-        out string assemblyName)
+        out string? assemblyName)
     {
         clrNamespace = string.Empty;
-        assemblyName = string.Empty;
+        assemblyName = null;
         if (!xamlNamespace.StartsWith("clr-namespace:", StringComparison.Ordinal))
         {
             return false;
@@ -103,7 +126,7 @@ public sealed class CatalogXamlTypeResolver : MAUIDesigner.Fresh.Core.Xaml.IXaml
         assemblyName = segments
             .Skip(1)
             .FirstOrDefault(segment => segment.StartsWith("assembly=", StringComparison.Ordinal))?
-            ["assembly=".Length..] ?? clrNamespace;
-        return clrNamespace.Length > 0 && assemblyName.Length > 0;
+            ["assembly=".Length..];
+        return clrNamespace.Length > 0;
     }
 }

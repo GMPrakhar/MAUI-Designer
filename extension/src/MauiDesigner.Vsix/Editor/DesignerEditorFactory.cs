@@ -2,6 +2,8 @@ using System;
 using System.Runtime.InteropServices;
 
 using Microsoft.VisualStudio;
+using Microsoft.VisualStudio.ComponentModelHost;
+using Microsoft.VisualStudio.Editor;
 using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -23,6 +25,7 @@ namespace MauiDesigner.Vsix
         public const string FactoryGuidString = "c1e5aa5a-2f4f-4c92-9b1c-8f5a55da0e77";
 
         private readonly AsyncPackage _package;
+        private IServiceProvider? _oleServiceProvider;
         private ServiceProvider? _serviceProvider;
 
         public DesignerEditorFactory(AsyncPackage package)
@@ -32,6 +35,7 @@ namespace MauiDesigner.Vsix
 
         public int SetSite(IServiceProvider serviceProvider)
         {
+            _oleServiceProvider = serviceProvider;
             _serviceProvider = new ServiceProvider(serviceProvider);
             return VSConstants.S_OK;
         }
@@ -108,39 +112,21 @@ namespace MauiDesigner.Vsix
         {
             ThreadHelper.ThrowIfNotOnUIThread();
 
-            var localRegistry = _serviceProvider?.GetService(typeof(SLocalRegistry)) as ILocalRegistry;
-            if (localRegistry is null)
+            var componentModel = _serviceProvider?.GetService(typeof(SComponentModel)) as IComponentModel;
+            var adapters = componentModel?.GetService<IVsEditorAdaptersFactoryService>();
+            if (adapters is null || _oleServiceProvider is null)
             {
                 return null;
             }
 
-            var bufferGuid = typeof(IVsTextLines).GUID;
-            var hresult = localRegistry.CreateInstance(
-                typeof(VsTextBufferClass).GUID,
-                null,
-                ref bufferGuid,
-                (uint)CLSCTX.CLSCTX_INPROC_SERVER,
-                out var buffer);
-
-            if (ErrorHandler.Failed(hresult) || buffer == IntPtr.Zero)
-            {
-                return null;
-            }
-
-            try
-            {
-                return (IVsTextLines)Marshal.GetObjectForIUnknown(buffer);
-            }
-            finally
-            {
-                Marshal.Release(buffer);
-            }
+            return adapters.CreateVsTextBufferAdapter(_oleServiceProvider) as IVsTextLines;
         }
 
         public void Dispose()
         {
             _serviceProvider?.Dispose();
             _serviceProvider = null;
+            _oleServiceProvider = null;
         }
     }
 }
