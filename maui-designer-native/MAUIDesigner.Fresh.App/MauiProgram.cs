@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Maui;
 using MAUIDesigner.Fresh.App.Catalog;
+using MAUIDesigner.Fresh.App.Controls;
 using MAUIDesigner.Fresh.App.Hosting;
 using MAUIDesigner.Fresh.App.PropertyEditing;
 using MAUIDesigner.Fresh.App.Preview;
@@ -23,6 +24,12 @@ public static class MauiProgram
 		builder
 			.UseMauiApp<App>()
 			.UseMauiCommunityToolkit()
+			.ConfigureMauiHandlers(handlers =>
+			{
+#if WINDOWS
+				handlers.AddHandler<SidebarResizeHandle, SidebarResizeHandleHandler>();
+#endif
+			})
 			.ConfigureFonts(fonts =>
 			{
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");

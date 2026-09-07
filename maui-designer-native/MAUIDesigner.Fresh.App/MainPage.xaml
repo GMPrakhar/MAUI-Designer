@@ -134,8 +134,6 @@
                 BackgroundColor="{StaticResource SurfaceMuted}"
                 ResizeRequested="OnLeftSidebarResizeRequested"
                 SemanticProperties.Description="Resize or double-click to collapse the elements sidebar"
-                Stroke="{StaticResource BorderStrong}"
-                StrokeThickness="0"
                 ToggleRequested="OnLeftSidebarToggleRequested" />
 
             <Grid Grid.Column="2" RowDefinitions="88,*">
@@ -245,8 +243,6 @@
                 BackgroundColor="{StaticResource SurfaceMuted}"
                 ResizeRequested="OnRightSidebarResizeRequested"
                 SemanticProperties.Description="Resize or double-click to collapse the properties sidebar"
-                Stroke="{StaticResource BorderStrong}"
-                StrokeThickness="0"
                 ToggleRequested="OnRightSidebarToggleRequested" />
 
             <Grid x:Name="PropertiesSidebar" Grid.Column="4" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12" BackgroundColor="{StaticResource Surface}">
