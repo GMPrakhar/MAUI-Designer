@@ -40,6 +40,11 @@ public partial class MainPage : ContentPage
     private bool _pendingSuppressXamlWriteback;
     private bool _hierarchyDirty = true;
     private bool _hostDocumentLoaded;
+    private readonly HashSet<ElementId> _collapsedHierarchyNodes = [];
+    private double _leftSidebarStartWidth;
+    private double _rightSidebarStartWidth;
+    private double _lastOpenLeftSidebarWidth = 260;
+    private double _lastOpenRightSidebarWidth = 320;
     private int _xamlRevision;
     private int _busyOperations;
     private CancellationTokenSource? _xamlSyncCancellation;
@@ -65,7 +70,7 @@ public partial class MainPage : ContentPage
             host.BindingContextChanged += (_, _) =>
             {
                 host.Content = host.BindingContext is HierarchyItem item
-                    ? CreateHierarchyRow(item.Node, item.Depth, item.IsLast)
+                    ? CreateHierarchyRow(item)
                     : null;
             };
             return host;
@@ -224,14 +229,16 @@ public partial class MainPage : ContentPage
         CanvasViewport.BackgroundColor = Color.FromArgb("#EEF2F7");
         ZoomLabel.Text = $"{Math.Round(_viewport.Zoom * 100)}%";
         GridButton.BackgroundColor = _viewport.ShowGrid
-            ? Color.FromArgb("#5946A3")
-            : Color.FromArgb("#202431");
-        SnapButton.BackgroundColor = _viewport.SnapToGrid
-            ? Color.FromArgb("#5946A3")
-            : Color.FromArgb("#202431");
-        RulersButton.BackgroundColor = _viewport.ShowRulers
-            ? Color.FromArgb("#5946A3")
-            : Color.FromArgb("#202431");
+            ? Color.FromArgb("#EDE9FE")
+            : Colors.White;
+        GridButton.TextColor = _viewport.ShowGrid
+            ? Color.FromArgb("#493A9D")
+            : Color.FromArgb("#475569");
+        GridButton.BorderColor = _viewport.ShowGrid
+            ? Color.FromArgb("#A99BE8")
+            : Color.FromArgb("#D8E0EA");
+        UpdateToggleButton(SnapButton, _viewport.SnapToGrid);
+        UpdateToggleButton(RulersButton, _viewport.ShowRulers);
         GridSizeLabel.Text = _viewport.GridSize.ToString(
             System.Globalization.CultureInfo.InvariantCulture);
         CanvasGridOverlay.Invalidate();
@@ -288,6 +295,18 @@ public partial class MainPage : ContentPage
     private void OnToolboxTabClicked(object? sender, EventArgs e) => ShowToolbox(show: true);
 
     private void OnHierarchyTabClicked(object? sender, EventArgs e) => ShowToolbox(show: false);
+
+    private void OnLeftSidebarResizeRequested(object? sender, SidebarResizeEventArgs e) =>
+        ResizeSidebar(e, columnIndex: 0, resizeFromRightEdge: true);
+
+    private void OnRightSidebarResizeRequested(object? sender, SidebarResizeEventArgs e) =>
+        ResizeSidebar(e, columnIndex: 4, resizeFromRightEdge: false);
+
+    private void OnLeftSidebarToggleRequested(object? sender, EventArgs e) =>
+        ToggleSidebar(columnIndex: 0, ElementsSidebar, ref _lastOpenLeftSidebarWidth);
+
+    private void OnRightSidebarToggleRequested(object? sender, EventArgs e) =>
+        ToggleSidebar(columnIndex: 4, PropertiesSidebar, ref _lastOpenRightSidebarWidth);
 
     private void OnUndoClicked(object? sender, EventArgs e) => _workspace.Session.Undo();
 
@@ -619,30 +638,14 @@ public partial class MainPage : ContentPage
     private void RebuildHierarchy()
     {
         _hierarchyDirty = false;
-        var items = new List<HierarchyItem>();
-        AddHierarchyItems(_workspace.Session.Current.Root, 0, isLast: true, items);
-        HierarchyList.ItemsSource = items;
+        HierarchyList.ItemsSource = HierarchyProjection.Build(
+            _workspace.Session.Current.Root,
+            _collapsedHierarchyNodes);
     }
 
-    private static void AddHierarchyItems(
-        DesignerNode node,
-        int depth,
-        bool isLast,
-        List<HierarchyItem> items)
+    private Border CreateHierarchyRow(HierarchyItem item)
     {
-        items.Add(new HierarchyItem(node, depth, isLast));
-        for (int index = 0; index < node.Children.Length; index++)
-        {
-            AddHierarchyItems(
-                node.Children[index],
-                depth + 1,
-                index == node.Children.Length - 1,
-                items);
-        }
-    }
-
-    private Border CreateHierarchyRow(DesignerNode node, int depth, bool isLast)
-    {
+        DesignerNode node = item.Node;
         string displayName = _catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor)
             ? descriptor?.DisplayName ?? node.ControlType.XamlName
             : node.ControlType.XamlName;
@@ -651,8 +654,8 @@ public partial class MainPage : ContentPage
         var row = new Border
         {
             AutomationId = $"hierarchy-{node.Id.Value}",
-            Margin = new Thickness(depth * 16, 0, 0, 5),
-            Padding = new Thickness(8, 6),
+            Margin = new Thickness(item.Depth * 14, 0, 0, 4),
+            Padding = new Thickness(6, 6),
             BackgroundColor = selected
                 ? Color.FromArgb("#EDE9FE")
                 : Colors.White,
@@ -669,21 +672,39 @@ public partial class MainPage : ContentPage
         {
             ColumnDefinitions =
             {
-                new ColumnDefinition(new GridLength(18)),
+                new ColumnDefinition(new GridLength(24)),
                 new ColumnDefinition(GridLength.Star),
-                new ColumnDefinition(new GridLength(28)),
-                new ColumnDefinition(new GridLength(28)),
                 new ColumnDefinition(new GridLength(28))
             },
-            ColumnSpacing = 3
+            ColumnSpacing = 5
         };
-        content.Add(new Label
+        if (node.Children.Length > 0)
         {
-            Text = depth == 0 ? "◆" : isLast ? "└" : "├",
-            FontSize = 10,
-            TextColor = Color.FromArgb("#6D5BD0"),
-            VerticalTextAlignment = TextAlignment.Center
-        });
+            content.Add(CreateHierarchyAction(
+                item.IsExpanded ? "\uE70D" : "\uE76C",
+                item.IsExpanded ? "Collapse branch" : "Expand branch",
+                0,
+                () =>
+                {
+                    if (!_collapsedHierarchyNodes.Add(node.Id))
+                    {
+                        _collapsedHierarchyNodes.Remove(node.Id);
+                    }
+
+                    RebuildHierarchy();
+                },
+                fontFamily: "Segoe Fluent Icons"));
+        }
+        else
+        {
+            content.Add(new ControlIconView(displayName)
+            {
+                WidthRequest = 18,
+                HeightRequest = 18,
+                VerticalOptions = LayoutOptions.Center
+            });
+        }
+
         var labels = new VerticalStackLayout { Spacing = 0 };
         labels.Add(new Label
         {
@@ -699,21 +720,14 @@ public partial class MainPage : ContentPage
             TextColor = Color.FromArgb("#64748B")
         });
         content.Add(labels, 1);
-        content.Add(CreateHierarchyAction("↑", "Move up", 2, () =>
+        if (node.Id != _workspace.Session.Current.Root.Id)
         {
-            _workspace.Select(node.Id);
-            _ = _workspace.MoveSelection(-1);
-        }));
-        content.Add(CreateHierarchyAction("↓", "Move down", 3, () =>
-        {
-            _workspace.Select(node.Id);
-            _ = _workspace.MoveSelection(1);
-        }));
-        content.Add(CreateHierarchyAction("×", "Delete", 4, () =>
-        {
-            _workspace.Select(node.Id);
-            _workspace.DeleteSelection();
-        }, destructive: true));
+            content.Add(CreateHierarchyAction("\uE74D", "Delete", 2, () =>
+            {
+                _workspace.Select(node.Id);
+                _workspace.DeleteSelection();
+            }, destructive: true, fontFamily: "Segoe Fluent Icons"));
+        }
         row.Content = content;
         var select = new TapGestureRecognizer();
         select.Tapped += (_, _) =>
@@ -874,11 +888,13 @@ public partial class MainPage : ContentPage
         string description,
         int column,
         Action action,
-        bool destructive = false)
+        bool destructive = false,
+        string? fontFamily = null)
     {
         var button = new Button
         {
             Text = text,
+            FontFamily = fontFamily,
             FontSize = 11,
             WidthRequest = 26,
             HeightRequest = 26,
@@ -895,6 +911,95 @@ public partial class MainPage : ContentPage
         button.Clicked += (_, _) => action();
         Grid.SetColumn(button, column);
         return button;
+    }
+
+    private static void UpdateToggleButton(Button button, bool active)
+    {
+        button.BackgroundColor = active ? Color.FromArgb("#EDE9FE") : Colors.White;
+        button.TextColor = active ? Color.FromArgb("#493A9D") : Color.FromArgb("#475569");
+        button.BorderColor = active ? Color.FromArgb("#A99BE8") : Color.FromArgb("#D8E0EA");
+    }
+
+    private void ResizeSidebar(
+        SidebarResizeEventArgs e,
+        int columnIndex,
+        bool resizeFromRightEdge)
+    {
+        GridLength width = DesignerBody.ColumnDefinitions[columnIndex].Width;
+        if (e.StatusType == GestureStatus.Started)
+        {
+            double current = width.IsAbsolute ? width.Value : 0;
+            if (current <= 0)
+            {
+                current = columnIndex == 0
+                    ? _lastOpenLeftSidebarWidth
+                    : _lastOpenRightSidebarWidth;
+                SetSidebarWidth(columnIndex, current);
+            }
+
+            if (columnIndex == 0)
+            {
+                _leftSidebarStartWidth = current;
+            }
+            else
+            {
+                _rightSidebarStartWidth = current;
+            }
+        }
+        else if (e.StatusType == GestureStatus.Running)
+        {
+            double start = columnIndex == 0
+                ? _leftSidebarStartWidth
+                : _rightSidebarStartWidth;
+            double next = SidebarResizePolicy.CalculateWidth(
+                start,
+                e.TotalX,
+                resizeFromRightEdge);
+            SetSidebarWidth(columnIndex, next);
+            if (columnIndex == 0)
+            {
+                _lastOpenLeftSidebarWidth = next;
+            }
+            else
+            {
+                _lastOpenRightSidebarWidth = next;
+            }
+        }
+    }
+
+    private void ToggleSidebar(
+        int columnIndex,
+        View sidebar,
+        ref double lastOpenWidth)
+    {
+        GridLength width = DesignerBody.ColumnDefinitions[columnIndex].Width;
+        bool isOpen = width.IsAbsolute && width.Value > 0;
+        if (isOpen)
+        {
+            lastOpenWidth = width.Value;
+            SetSidebarWidth(columnIndex, 0);
+            sidebar.IsVisible = false;
+        }
+        else
+        {
+            sidebar.IsVisible = true;
+            SetSidebarWidth(
+                columnIndex,
+                Math.Max(SidebarResizePolicy.MinimumWidth, lastOpenWidth));
+        }
+    }
+
+    private void SetSidebarWidth(int columnIndex, double width)
+    {
+        DesignerBody.ColumnDefinitions[columnIndex].Width = new GridLength(width);
+        if (columnIndex == 0)
+        {
+            ElementsSidebar.IsVisible = width > 0;
+        }
+        else
+        {
+            PropertiesSidebar.IsVisible = width > 0;
+        }
     }
 
     private void FocusCanvasElement(ElementId elementId)
@@ -1133,14 +1238,7 @@ public partial class MainPage : ContentPage
                         {
                             CornerRadius = new CornerRadius(7)
                         },
-                        Content = new Label
-                        {
-                            Text = "+",
-                            TextColor = Color.FromArgb("#6554C0"),
-                            FontAttributes = FontAttributes.Bold,
-                            HorizontalTextAlignment = TextAlignment.Center,
-                            VerticalTextAlignment = TextAlignment.Center
-                        }
+                        Content = new ControlIconView(descriptor.RuntimeType.Name)
                     },
                     new Label
                     {
@@ -1271,11 +1369,6 @@ public partial class MainPage : ContentPage
             $"[DesignerPerformance] {outcome} {operation} " +
             $"{elapsed.TotalMilliseconds:F2} ms / {budgetMilliseconds} ms");
     }
-
-    private sealed record HierarchyItem(
-        DesignerNode Node,
-        int Depth,
-        bool IsLast);
 
 #if WINDOWS
     private void OnNativeKeyDown(

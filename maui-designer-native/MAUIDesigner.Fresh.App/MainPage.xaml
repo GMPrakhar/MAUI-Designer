@@ -69,10 +69,10 @@
         <Grid
             x:Name="DesignerBody"
             Grid.Row="1"
-            ColumnDefinitions="260,1,*,1,320"
+            ColumnDefinitions="260,7,*,7,320"
             BackgroundColor="{StaticResource SurfaceSubtle}"
             IsClippedToBounds="True">
-            <Grid Grid.Column="0" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="11" BackgroundColor="{StaticResource Surface}">
+            <Grid x:Name="ElementsSidebar" Grid.Column="0" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="11" BackgroundColor="{StaticResource Surface}">
                 <Grid ColumnDefinitions="*,Auto">
                     <VerticalStackLayout Spacing="2">
                         <Label FontAttributes="Bold" FontSize="15" Text="Elements" TextColor="{StaticResource TextPrimary}" />
@@ -128,7 +128,15 @@
                 </CollectionView>
             </Grid>
 
-            <BoxView Grid.Column="1" BackgroundColor="{StaticResource Border}" />
+            <controls:SidebarResizeHandle
+                Grid.Column="1"
+                AutomationId="left-sidebar-resizer"
+                BackgroundColor="{StaticResource SurfaceMuted}"
+                ResizeRequested="OnLeftSidebarResizeRequested"
+                SemanticProperties.Description="Resize or double-click to collapse the elements sidebar"
+                Stroke="{StaticResource BorderStrong}"
+                StrokeThickness="0"
+                ToggleRequested="OnLeftSidebarToggleRequested" />
 
             <Grid Grid.Column="2" RowDefinitions="88,*">
                 <Border
@@ -231,9 +239,17 @@
                 </controls:CanvasViewportView>
             </Grid>
 
-            <BoxView Grid.Column="3" BackgroundColor="{StaticResource Border}" />
+            <controls:SidebarResizeHandle
+                Grid.Column="3"
+                AutomationId="right-sidebar-resizer"
+                BackgroundColor="{StaticResource SurfaceMuted}"
+                ResizeRequested="OnRightSidebarResizeRequested"
+                SemanticProperties.Description="Resize or double-click to collapse the properties sidebar"
+                Stroke="{StaticResource BorderStrong}"
+                StrokeThickness="0"
+                ToggleRequested="OnRightSidebarToggleRequested" />
 
-            <Grid Grid.Column="4" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12" BackgroundColor="{StaticResource Surface}">
+            <Grid x:Name="PropertiesSidebar" Grid.Column="4" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12" BackgroundColor="{StaticResource Surface}">
                 <VerticalStackLayout Spacing="2">
                     <Label FontAttributes="Bold" FontSize="15" Text="Properties" TextColor="{StaticResource TextPrimary}" />
                     <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="10" TextColor="{StaticResource TextMuted}" />

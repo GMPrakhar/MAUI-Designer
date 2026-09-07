@@ -221,6 +221,11 @@ public sealed class ControlMaterializer
         {
             View view = _catalog.Create(node.ControlType);
             ApplyProperties(view, descriptor, node);
+            if (!isRoot && DesignerInputPolicy.SuppressRuntimeInput(descriptor))
+            {
+                view.InputTransparent = true;
+            }
+
             if (!node.Properties.ContainsKey(nameof(VisualElement.AutomationId)))
             {
                 view.AutomationId = $"designer-{node.Id.Value}";
