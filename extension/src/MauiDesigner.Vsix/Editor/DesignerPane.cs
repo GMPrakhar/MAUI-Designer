@@ -20,10 +20,12 @@ using Microsoft.VisualStudio.Threading;
 namespace MauiDesigner.Vsix
 {
     /// <summary>
-    /// The document window: hosts the WebView, and keeps the Visual Studio text
+    /// The document window: hosts the native designer, and keeps the Visual Studio text
     /// buffer and the designer in sync in both directions.
     /// </summary>
-    public sealed class DesignerPane : WindowPane
+    public sealed class DesignerPane :
+        WindowPane,
+        IVsWindowFrameNotify3
     {
         private readonly IVsTextLines _textLines;
         private readonly string _documentMoniker;
@@ -31,6 +33,7 @@ namespace MauiDesigner.Vsix
         private readonly DesignerControl _control;
         private readonly DesignerSession _session;
         private ITextBuffer? _textBuffer;
+        private IVsWindowFrame? _registeredFrame;
         private CancellationTokenSource? _bufferReloadCancellation;
 
         /// <summary>
@@ -42,7 +45,9 @@ namespace MauiDesigner.Vsix
         private readonly JoinableTaskFactory _joinableTaskFactory;
 
         private bool _applyingDesignerEdit;
-        private bool _disposed;
+        private int _closeAttemptActive;
+        private int _designerEditGeneration;
+        private int _disposed;
 
         public DesignerPane(
             AsyncPackage package,
@@ -78,22 +83,41 @@ namespace MauiDesigner.Vsix
         protected override void Initialize()
         {
             base.Initialize();
+            ThreadHelper.ThrowIfNotOnUIThread();
+            RegisterFrameNotifications();
 
             _joinableTaskFactory.RunAsync(async () =>
             {
-                await _control.InitializeAsync(WebAssetLocator.WebRootDirectory);
+                await _control.InitializeAsync(NativeDesignerLocator.ExecutablePath);
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
-                if (_disposed)
+                if (Volatile.Read(ref _disposed) != 0)
                 {
                     return;
                 }
 
+                RegisterFrameNotifications();
                 SubscribeToBufferChanges();
                 _session.OpenDocument(ReadBuffer(), _documentMoniker);
             }).FileAndForget("vs/mauidesigner/initialize");
+        }
 
+        private void RegisterFrameNotifications()
+        {
             ThreadHelper.ThrowIfNotOnUIThread();
-            _session.OpenDocument(ReadBuffer(), _documentMoniker);
+
+            if (_registeredFrame is not null)
+            {
+                return;
+            }
+
+            if (GetService(typeof(SVsWindowFrame)) is not IVsWindowFrame frame)
+            {
+                return;
+            }
+
+            ErrorHandler.ThrowOnFailure(
+                frame.SetProperty((int)__VSFPROPID.VSFPROPID_ViewHelper, this));
+            _registeredFrame = frame;
         }
 
         private void SubscribeToBufferChanges()
@@ -117,7 +141,13 @@ namespace MauiDesigner.Vsix
 
         private void OnDesignerEdited(object sender, DocumentChangedEventArgs args)
         {
-            if (Volatile.Read(ref _bufferReloadCancellation) is not null)
+            var generation = Volatile.Read(ref _designerEditGeneration);
+            if (!DesignerSession.ShouldAcceptDesignerEdit(
+                    Volatile.Read(ref _closeAttemptActive) != 0 ||
+                        Volatile.Read(ref _disposed) != 0,
+                    Volatile.Read(ref _bufferReloadCancellation) is not null,
+                    generation,
+                    Volatile.Read(ref _designerEditGeneration)))
             {
                 return;
             }
@@ -126,7 +156,12 @@ namespace MauiDesigner.Vsix
             {
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
 
-                if (_bufferReloadCancellation is not null)
+                if (!DesignerSession.ShouldAcceptDesignerEdit(
+                        Volatile.Read(ref _closeAttemptActive) != 0 ||
+                            Volatile.Read(ref _disposed) != 0,
+                        _bufferReloadCancellation is not null,
+                        generation,
+                        Volatile.Read(ref _designerEditGeneration)))
                 {
                     return;
                 }
@@ -137,9 +172,23 @@ namespace MauiDesigner.Vsix
 
         private void OnSaveRequested(object sender, DocumentSaveRequestedEventArgs args)
         {
+            var generation = Volatile.Read(ref _designerEditGeneration);
+            if (Volatile.Read(ref _closeAttemptActive) != 0 ||
+                Volatile.Read(ref _disposed) != 0)
+            {
+                return;
+            }
+
             _joinableTaskFactory.RunAsync(async () =>
             {
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
+
+                if (Volatile.Read(ref _closeAttemptActive) != 0 ||
+                    Volatile.Read(ref _disposed) != 0 ||
+                    generation != Volatile.Read(ref _designerEditGeneration))
+                {
+                    return;
+                }
 
                 WriteBuffer(args.Xaml);
 
@@ -231,12 +280,13 @@ namespace MauiDesigner.Vsix
 
         private void OnTextBufferChanged(object sender, TextContentChangedEventArgs args)
         {
-            if (_applyingDesignerEdit || _disposed)
+            if (_applyingDesignerEdit ||
+                Volatile.Read(ref _closeAttemptActive) != 0 ||
+                Volatile.Read(ref _disposed) != 0)
             {
                 return;
             }
 
-            var xaml = args.After.GetText();
             var cancellation = new CancellationTokenSource();
             var previous = Interlocked.Exchange(ref _bufferReloadCancellation, cancellation);
             previous?.Cancel();
@@ -248,9 +298,11 @@ namespace MauiDesigner.Vsix
                     await Task.Delay(250, cancellation.Token);
                     await _joinableTaskFactory.SwitchToMainThreadAsync(cancellation.Token);
 
-                    if (!_applyingDesignerEdit && !_disposed)
+                    if (!_applyingDesignerEdit &&
+                        Volatile.Read(ref _closeAttemptActive) == 0 &&
+                        Volatile.Read(ref _disposed) == 0)
                     {
-                        _session.OpenDocument(xaml, _documentMoniker);
+                        _session.OpenDocument(ReadBuffer(), _documentMoniker);
                     }
                 }
                 catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
@@ -277,6 +329,47 @@ namespace MauiDesigner.Vsix
             }).FileAndForget("vs/mauidesigner/output");
         }
 
+        protected override void OnClose()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            SynchronizeBeforeClose();
+            DisposeResources();
+            base.OnClose();
+        }
+
+        int IVsWindowFrameNotify3.OnShow(int show)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (show == (int)__FRAMESHOW.FRAMESHOW_WinClosed)
+            {
+                DisposeResources();
+            }
+
+            return VSConstants.S_OK;
+        }
+
+        int IVsWindowFrameNotify3.OnMove(int x, int y, int width, int height) =>
+            VSConstants.S_OK;
+
+        int IVsWindowFrameNotify3.OnSize(int x, int y, int width, int height) =>
+            VSConstants.S_OK;
+
+        int IVsWindowFrameNotify3.OnDockableChange(
+            int dockable,
+            int x,
+            int y,
+            int width,
+            int height) =>
+            VSConstants.S_OK;
+
+        int IVsWindowFrameNotify3.OnClose(ref uint saveOptions)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            SynchronizeBeforeClose();
+            return VSConstants.S_OK;
+        }
+
         /// <inheritdoc />
         protected override void Dispose(bool disposing)
         {
@@ -284,22 +377,69 @@ namespace MauiDesigner.Vsix
 
             if (disposing)
             {
-                _disposed = true;
-
-                var cancellation = Interlocked.Exchange(ref _bufferReloadCancellation, null);
-                cancellation?.Cancel();
-                cancellation?.Dispose();
-
-                if (_textBuffer is not null)
-                {
-                    _textBuffer.Changed -= OnTextBufferChanged;
-                    _textBuffer = null;
-                }
-
-                _control.Dispose();
+                SynchronizeBeforeClose();
+                DisposeResources();
             }
 
             base.Dispose(disposing);
+        }
+
+        private void SynchronizeBeforeClose()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (Volatile.Read(ref _disposed) != 0 ||
+                Interlocked.Exchange(ref _closeAttemptActive, 1) != 0)
+            {
+                return;
+            }
+
+            Interlocked.Increment(ref _designerEditGeneration);
+            try
+            {
+                var cancellation = Interlocked.Exchange(ref _bufferReloadCancellation, null);
+                var hasPendingHostBufferEdit = cancellation is not null;
+                cancellation?.Cancel();
+
+                string? finalXaml = _control.RequestFinalXaml(TimeSpan.FromSeconds(1));
+                if (DesignerSession.ShouldApplyFinalXaml(hasPendingHostBufferEdit, finalXaml))
+                {
+                    WriteBuffer(finalXaml!);
+                }
+
+                cancellation?.Dispose();
+                _session.OpenDocument(ReadBuffer(), _documentMoniker);
+            }
+            finally
+            {
+                Volatile.Write(ref _closeAttemptActive, 0);
+            }
+        }
+
+        private void DisposeResources()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+
+            Interlocked.Exchange(ref _closeAttemptActive, 1);
+            Interlocked.Increment(ref _designerEditGeneration);
+
+            var cancellation = Interlocked.Exchange(ref _bufferReloadCancellation, null);
+            cancellation?.Cancel();
+            cancellation?.Dispose();
+
+            if (_textBuffer is not null)
+            {
+                _textBuffer.Changed -= OnTextBufferChanged;
+                _textBuffer = null;
+            }
+
+            _registeredFrame = null;
+            _control.Dispose();
         }
     }
 }

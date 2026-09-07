@@ -58,6 +58,30 @@ public sealed class XamlRoundTripTests
     }
 
     [Fact]
+    public void Event_handlers_names_and_automation_ids_survive()
+    {
+        const string source = """
+            <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                         xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+                         x:Class="Sample.MainPage">
+              <Button x:Name="SaveButton"
+                      AutomationId="save-button"
+                      Clicked="OnSaveClicked"
+                      Text="Save" />
+            </ContentPage>
+            """;
+
+        XamlReadResult result = new DesignerXamlReader().Read(source, _resolver);
+
+        Assert.True(result.Success, string.Join(Environment.NewLine, result.Diagnostics));
+        string generated = new DesignerXamlWriter().Write(result.Document!);
+        Assert.Contains("x:Class=\"Sample.MainPage\"", generated);
+        Assert.Contains("x:Name=\"SaveButton\"", generated);
+        Assert.Contains("AutomationId=\"save-button\"", generated);
+        Assert.Contains("Clicked=\"OnSaveClicked\"", generated);
+    }
+
+    [Fact]
     public void Unknown_control_is_rejected_with_its_source_location()
     {
         XamlReadResult result = new DesignerXamlReader().Read(
@@ -151,7 +175,7 @@ public sealed class XamlRoundTripTests
             string localName,
             out XamlTypeResolution? resolution)
         {
-            bool known = localName is "ContentPage" or "Grid" or "Label" or "AvatarView" or "Expander";
+            bool known = localName is "ContentPage" or "Grid" or "Label" or "Button" or "AvatarView" or "Expander";
             if (!known)
             {
                 resolution = null;

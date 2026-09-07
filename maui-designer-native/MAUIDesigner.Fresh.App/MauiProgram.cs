@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Maui;
 using MAUIDesigner.Fresh.App.Catalog;
+using MAUIDesigner.Fresh.App.Hosting;
 using MAUIDesigner.Fresh.App.PropertyEditing;
 using MAUIDesigner.Fresh.App.Preview;
 using MAUIDesigner.Fresh.App.Rendering;
@@ -57,6 +58,7 @@ public static class MauiProgram
 		builder.Services.AddSingleton<IPreviewDispatcher, MainThreadPreviewDispatcher>();
 		builder.Services.AddSingleton<IPreviewWindowHost, MauiPreviewWindowHost>();
 		builder.Services.AddSingleton<IRuntimePreviewService, RuntimePreviewService>();
+		builder.Services.AddSingleton<IHostedDesignerBridge, NamedPipeHostedDesignerBridge>();
 		builder.Services.AddSingleton<MainPage>();
 
 		return builder.Build();

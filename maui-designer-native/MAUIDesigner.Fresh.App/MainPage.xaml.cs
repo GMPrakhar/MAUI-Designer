@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.App.Controls;
+using MAUIDesigner.Fresh.App.Hosting;
 using MAUIDesigner.Fresh.App.PropertyEditing;
 using MAUIDesigner.Fresh.App.Preview;
 using MAUIDesigner.Fresh.App.Rendering;
@@ -25,6 +26,7 @@ public partial class MainPage : ContentPage
     private readonly CanvasGridDrawable _gridDrawable;
     private readonly CanvasRulerDrawable _rulerDrawable;
     private readonly IRuntimePreviewService _runtimePreview;
+    private readonly IHostedDesignerBridge _hostBridge;
     private bool _updatingXaml;
     private bool _xamlDirty;
     private string _lastSerializedXaml = string.Empty;
@@ -37,6 +39,7 @@ public partial class MainPage : ContentPage
     private bool _pendingSelectionRefresh;
     private bool _pendingSuppressXamlWriteback;
     private bool _hierarchyDirty = true;
+    private bool _hostDocumentLoaded;
     private int _xamlRevision;
     private int _busyOperations;
     private CancellationTokenSource? _xamlSyncCancellation;
@@ -52,7 +55,8 @@ public partial class MainPage : ContentPage
         AssemblyExtensionLoader extensionLoader,
         XamlWorkspace xamlWorkspace,
         DesignerViewportState viewport,
-        IRuntimePreviewService runtimePreview)
+        IRuntimePreviewService runtimePreview,
+        IHostedDesignerBridge hostBridge)
     {
         InitializeComponent();
         HierarchyList.ItemTemplate = new DataTemplate(() =>
@@ -74,6 +78,10 @@ public partial class MainPage : ContentPage
         _xamlWorkspace = xamlWorkspace;
         _viewport = viewport;
         _runtimePreview = runtimePreview;
+        _hostBridge = hostBridge;
+        _hostBridge.DocumentLoadRequested += OnHostedDocumentLoadRequested;
+        _hostBridge.CloseRequested += OnHostedCloseRequested;
+        _hostBridge.ErrorReported += OnHostedErrorReported;
         _gridDrawable = new CanvasGridDrawable(viewport);
         _rulerDrawable = new CanvasRulerDrawable(viewport);
         CanvasGridOverlay.Drawable = _gridDrawable;
@@ -91,6 +99,7 @@ public partial class MainPage : ContentPage
         RebuildDesigner();
         RefreshXaml();
         UpdateViewportVisuals();
+        _hostBridge.Start();
     }
 
     protected override void OnHandlerChanged()
@@ -548,7 +557,64 @@ public partial class MainPage : ContentPage
         _xamlDirty = false;
         XamlStatusLabel.Text = "Synchronized";
         XamlStatusLabel.TextColor = Color.FromArgb("#64748B");
+        if (_hostDocumentLoaded)
+        {
+            _hostBridge.SendDocumentChanged(xaml);
+        }
     }
+
+    private void OnHostedDocumentLoadRequested(object? sender, string xaml) =>
+        Dispatcher.Dispatch(() => LoadHostedDocument(xaml));
+
+    private void OnHostedCloseRequested(object? sender, string requestId) =>
+        Dispatcher.Dispatch(() =>
+        {
+            _xamlSyncCancellation?.Cancel();
+            string? xaml = _xamlDirty
+                ? XamlEditor.Text ?? string.Empty
+                : _hostDocumentLoaded
+                    ? _xamlWorkspace.Write(_workspace.Session.Current)
+                    : null;
+            _hostBridge.SendClosed(requestId, xaml);
+        });
+
+    private void LoadHostedDocument(string xaml)
+    {
+        _hostDocumentLoaded = false;
+        XamlReadResult result = _xamlWorkspace.Parse(xaml);
+        if (!result.Success || result.Document is null)
+        {
+            XamlDiagnostic diagnostic = result.Diagnostics.First();
+            XamlStatusLabel.Text = diagnostic.Message;
+            XamlStatusLabel.TextColor = Color.FromArgb("#DC2626");
+            return;
+        }
+
+        _applyingLiveXaml = true;
+        try
+        {
+            _workspace.ReplaceDocument(result.Document);
+            _hostDocumentLoaded = true;
+            _lastSerializedXaml = XamlTextIdentity.Normalize(xaml);
+            _updatingXaml = true;
+            XamlEditor.Text = xaml;
+            Dispatcher.Dispatch(() => _updatingXaml = false);
+            _xamlDirty = false;
+            XamlStatusLabel.Text = "Connected to Visual Studio";
+            XamlStatusLabel.TextColor = Color.FromArgb("#16A34A");
+        }
+        finally
+        {
+            _applyingLiveXaml = false;
+        }
+    }
+
+    private void OnHostedErrorReported(object? sender, string message) =>
+        Dispatcher.Dispatch(() =>
+        {
+            XamlStatusLabel.Text = message;
+            XamlStatusLabel.TextColor = Color.FromArgb("#DC2626");
+        });
 
     private void RebuildHierarchy()
     {

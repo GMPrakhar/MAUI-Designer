@@ -221,7 +221,11 @@ public sealed class ControlMaterializer
         {
             View view = _catalog.Create(node.ControlType);
             ApplyProperties(view, descriptor, node);
-            view.AutomationId = $"designer-{node.Id.Value}";
+            if (!node.Properties.ContainsKey(nameof(VisualElement.AutomationId)))
+            {
+                view.AutomationId = $"designer-{node.Id.Value}";
+            }
+
             _views[node.Id] = view;
             ILayoutAdapter? layoutAdapter = descriptor.AcceptsChildren
                 ? _layoutAdapters.Resolve(descriptor)

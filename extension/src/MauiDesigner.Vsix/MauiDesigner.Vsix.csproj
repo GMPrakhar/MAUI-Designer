@@ -55,7 +55,6 @@
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.11.435" PrivateAssets="all" />
     <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.11.40262" ExcludeAssets="runtime" />
-    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" />
   </ItemGroup>
 
   <ItemGroup>
@@ -68,8 +67,9 @@
   <ItemGroup>
     <Compile Include="Editor\DesignerControl.cs" />
     <Compile Include="Editor\DesignerEditorFactory.cs" />
+    <Compile Include="Editor\NativeDesignerHost.cs" />
+    <Compile Include="Editor\NativeDesignerLocator.cs" />
     <Compile Include="Editor\DesignerPane.cs" />
-    <Compile Include="Editor\WebAssetLocator.cs" />
     <Compile Include="MauiDesignerPackage.cs" />
     <Compile Include="Projects\ProjectManifestProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -123,33 +123,32 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
 
-  <!--
-    The VSIX ships the compiled Angular application. Run `npm run build` in the
-    repository root first; the output of dist/angular-designer is embedded
-    under `webview\` and served through a virtual host name.
-  -->
+  <!-- The VSIX ships the self-contained out-of-process MAUI Designer. -->
   <PropertyGroup>
-    <AngularDistDirectory Condition="'$(AngularDistDirectory)' == ''">$(MSBuildThisFileDirectory)..\..\..\dist\angular-designer</AngularDistDirectory>
+    <NativeDesignerProject>$(MSBuildThisFileDirectory)..\..\..\maui-designer-native\MAUIDesigner.Fresh.App\MAUIDesigner.Fresh.App.csproj</NativeDesignerProject>
+    <NativeDesignerPublishDirectory Condition="'$(NativeDesignerPublishDirectory)' == ''">$(MSBuildProjectDirectory)\obj\$(Configuration)\native\publish</NativeDesignerPublishDirectory>
+    <NativeDesignerArtifactsDirectory>$(MSBuildProjectDirectory)\obj\$(Configuration)\native\artifacts</NativeDesignerArtifactsDirectory>
   </PropertyGroup>
 
-  <Target Name="IncludeAngularApp" BeforeTargets="PrepareForBuild">
-    <!--
-      Without these assets the editor loads a blank WebView, so this is an error
-      rather than a warning: a VSIX that packages cleanly but cannot render is a
-      worse failure than one that refuses to build.
-    -->
-    <Error Condition="!Exists('$(AngularDistDirectory)')"
-           Text="The Angular application was not found at $(AngularDistDirectory). Run 'npm ci &amp;&amp; npm run build' in the repository root before building the VSIX." />
+  <Target Name="PublishNativeDesigner"
+          BeforeTargets="IncludeNativeDesigner">
+    <RemoveDir Directories="$(NativeDesignerPublishDirectory);$(NativeDesignerArtifactsDirectory)" />
+    <Exec Command="dotnet publish &quot;$(NativeDesignerProject)&quot; -c Release -r win-x64 --self-contained true --nologo --artifacts-path &quot;$(NativeDesignerArtifactsDirectory)&quot; -o &quot;$(NativeDesignerPublishDirectory)&quot;" />
+  </Target>
+
+  <Target Name="IncludeNativeDesigner" BeforeTargets="GetVsixSourceItems">
+    <Error Condition="!Exists('$(NativeDesignerPublishDirectory)\MAUIDesigner.exe')"
+           Text="The native MAUI Designer was not found at $(NativeDesignerPublishDirectory). Install the .NET 10 MAUI Windows workload and publish $(NativeDesignerProject)." />
     <ItemGroup>
-      <AngularAsset Include="$(AngularDistDirectory)\**\*" />
-      <Content Include="@(AngularAsset)">
-        <Link>webview\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <NativeDesignerAsset Include="$(NativeDesignerPublishDirectory)\**\*" />
+      <Content Include="@(NativeDesignerAsset)">
+        <Link>native\%(RecursiveDir)%(Filename)%(Extension)</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         <IncludeInVSIX>true</IncludeInVSIX>
       </Content>
     </ItemGroup>
-    <Error Condition="'@(AngularAsset)' == ''"
-           Text="$(AngularDistDirectory) exists but is empty. Run 'npm run build' in the repository root before building the VSIX." />
+    <Error Condition="'@(NativeDesignerAsset)' == ''"
+           Text="$(NativeDesignerPublishDirectory) exists but is empty." />
   </Target>
 
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
