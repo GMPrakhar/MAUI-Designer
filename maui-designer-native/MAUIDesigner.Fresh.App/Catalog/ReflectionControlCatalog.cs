@@ -143,9 +143,8 @@ public sealed class ReflectionControlCatalog : IControlCatalog
                 : field.Name)
             .ToHashSet(StringComparer.Ordinal);
 
-        return type
-            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .Where(property => property.GetIndexParameters().Length == 0 && property.GetMethod is not null)
+        return RuntimePropertyCache
+            .GetPublicProperties(type)
             .Select(property => new PropertyDescriptor(
                 property.Name,
                 property.PropertyType,

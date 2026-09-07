@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Maui;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.App.PropertyEditing;
+using MAUIDesigner.Fresh.App.Preview;
 using MAUIDesigner.Fresh.App.Rendering;
 using MAUIDesigner.Fresh.App.Workspace;
 using MAUIDesigner.Fresh.App.Xaml;
@@ -52,6 +53,10 @@ public static class MauiProgram
 		builder.Services.AddSingleton<ControlMaterializer>();
 		builder.Services.AddSingleton<DesignerViewportState>();
 		builder.Services.AddSingleton<PropertyEditorRegistry>();
+		builder.Services.AddSingleton<PreviewDocumentRenderer>();
+		builder.Services.AddSingleton<IPreviewDispatcher, MainThreadPreviewDispatcher>();
+		builder.Services.AddSingleton<IPreviewWindowHost, MauiPreviewWindowHost>();
+		builder.Services.AddSingleton<IRuntimePreviewService, RuntimePreviewService>();
 		builder.Services.AddSingleton<MainPage>();
 
 		return builder.Build();

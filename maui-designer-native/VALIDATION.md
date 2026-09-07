@@ -172,7 +172,7 @@ Predictions written before measurement:
    design coordinates at non-100% zoom, while transformed target bounds must
    include the native scale.
 4. Native validation must demonstrate device switching, zoom in/out, fit,
-   reset, middle-button panning, grid and ruler toggles, dark preview, and
+   reset, middle-button panning, grid and ruler toggles, and
    selection/manipulation on a zoomed canvas.
 
 Observed results:
@@ -182,9 +182,7 @@ Observed results:
 2. A real middle-button drag shifted the surface and ruler origins while the
    viewport retained pointer capture.
 3. Switching to the 390 x 844 phone preset fitted and centered it at 45%.
-4. Grid, ruler, snap, and dark-preview controls remained visible in the
-   two-row toolbar; native screenshots confirmed both light and dark grid
-   rendering.
+4. Grid, ruler, and snap controls remained visible in the two-row toolbar.
 5. At 48% zoom, moving a Label by `(80,40)` viewport DIPs produced snapped
    design bounds `(192,104,160,48)`. Resizing by `(48,24)` produced
    `(192,104,264,96)`, confirming inverse-scale manipulation math.
@@ -203,3 +201,56 @@ Observed results:
    render a visible unavailable-control placeholder.
 10. Final validation passed 15 core tests and 12 Windows app tests; the signed
     Release host opened a responsive native `MAUI Designer` window.
+
+## Native UX parity validation
+
+Predictions written before measurement:
+
+1. Reflection metadata for every runtime control must contain one descriptor
+   per property name. Otherwise shadowed MAUI properties can throw
+   `AmbiguousMatchException` and replace valid controls with error placeholders.
+2. Copy, paste, and duplicate must regenerate every subtree ID, preserve
+   properties and children, offset absolute bounds, and undo atomically.
+3. Grid definition parsing must reject malformed lengths and serialize
+   Auto/Star/Absolute values canonically. Track overlays must precompute only
+   internal row and column boundaries and clear without stale lines.
+4. Valid XAML must replace the canvas automatically after the fixed 300 ms
+   debounce; invalid intermediate XAML must preserve the last valid canvas.
+5. Runtime preview must use the selected device dimensions, create a second
+   window without designer chrome, and keep individual render failures visible
+   without terminating the preview.
+6. Selection chrome should update within 5 ms, literal property previews within
+   16 ms, typical live-XAML parse/swap within 100 ms after debounce, and a
+   structural rematerialization of up to 2,000 nodes within 50 ms.
+
+Observed results, with misses reported first:
+
+1. The original 2,000-Label workload missed structural rematerialization at
+   23,757.33 ms and live-XAML parse/command at 51,966.71 ms.
+2. Cached XAML type resolution, lazy interaction chrome and context menus,
+   deferred hierarchy work, and hierarchy virtualization reduced the same
+   measurements to 1,246.96 ms and 1,269.75 ms. These remain explicit misses
+   against the unchanged 50 ms and 100 ms budgets.
+3. The rendered 2,000-control process remained responsive at approximately
+   500 MB working set. Scrolling the virtualized hierarchy near its end
+   realized 34 rows around IDs 1962-1995 rather than all 2,001 rows.
+4. Representative normal-document passes were 0.58-1.52 ms for selection,
+   4.94-6.45 ms for literal property commits, 46.47-98.07 ms for live XAML,
+   and 27.50-48.87 ms for structural rematerialization.
+5. Deliberately disabling inherited-property deduplication, clipboard offsets,
+   duplicate placement, Grid validation, stale-overlay clearing, subtree ID
+   regeneration, copied-name regeneration, and line-ending normalization made
+   their respective tests fail for the predicted reasons before restoration.
+   A final clone-reference mutation also proved the regression catches both
+   binding-path corruption and accidental rewriting of literal text inside
+   preserved XAML. The restored implementation rewrites only `x:Reference`
+   and binding `ElementName` arguments in property values and XML attributes.
+6. Native DevFlow validation confirmed automatic XAML rendering, canvas-to-XAML
+   property updates, recursive hierarchy selection, clipboard duplication,
+   Grid definition editing and dotted boundaries, and a second real-MAUI
+   preview window.
+7. Strict diagnostics reported 134 subpixel desired-size findings at 125%
+   scaling, 33 interaction-occlusion findings despite successful direct taps,
+   and eight offscreen ScrollView clipping findings. Screenshots showed no
+   corresponding visible truncation or overlap; these are recorded rather than
+   suppressed.

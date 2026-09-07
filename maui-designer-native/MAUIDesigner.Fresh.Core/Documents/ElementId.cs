@@ -10,5 +10,7 @@ public readonly record struct ElementId
 
     public string Value { get; }
 
+    public static ElementId CreateUnique() => new(Guid.NewGuid().ToString("N"));
+
     public override string ToString() => Value;
 }

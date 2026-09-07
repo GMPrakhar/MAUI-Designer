@@ -32,8 +32,6 @@ public sealed class DesignerViewportState
 
     public bool SnapToGrid { get; private set; } = true;
 
-    public bool IsDarkPreview { get; private set; }
-
     public DevicePreset SelectedDevice { get; private set; }
 
     public DesignerViewportState()
@@ -86,6 +84,16 @@ public sealed class DesignerViewportState
         Center(viewportWidth, viewportHeight);
     }
 
+    public void CenterOn(
+        double designX,
+        double designY,
+        double viewportWidth,
+        double viewportHeight)
+    {
+        PanX = viewportWidth / 2 - designX * Zoom;
+        PanY = viewportHeight / 2 - designY * Zoom;
+    }
+
     public double ToDesignDelta(double viewportDelta) => viewportDelta / Zoom;
 
     public double Snap(double value) =>
@@ -101,8 +109,6 @@ public sealed class DesignerViewportState
     public void ToggleRulers() => ShowRulers = !ShowRulers;
 
     public void ToggleSnap() => SnapToGrid = !SnapToGrid;
-
-    public void ToggleTheme() => IsDarkPreview = !IsDarkPreview;
 
     private static double ClampZoom(double zoom) =>
         Math.Round(Math.Clamp(zoom, MinimumZoom, MaximumZoom), 2);

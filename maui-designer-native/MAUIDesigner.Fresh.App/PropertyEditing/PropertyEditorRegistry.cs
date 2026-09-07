@@ -172,19 +172,6 @@ public sealed class PropertyEditorRegistry
             CreateEntry(context, "Auto, *, 2*, or pixels", Keyboard.Default);
     }
 
-    private sealed class GridDefinitionsPropertyEditor : IPropertyEditor
-    {
-        public bool CanEdit(PropertyDescriptor property)
-        {
-            Type type = Nullable.GetUnderlyingType(property.ValueType) ?? property.ValueType;
-            return type == typeof(RowDefinitionCollection) ||
-                type == typeof(ColumnDefinitionCollection);
-        }
-
-        public View Create(PropertyEditorContext context) =>
-            CreateEntry(context, "Comma-separated: Auto, *, 2*, 120", Keyboard.Default);
-    }
-
     private sealed class ColorPropertyEditor : IPropertyEditor
     {
         public bool CanEdit(PropertyDescriptor property)

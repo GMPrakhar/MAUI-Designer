@@ -63,6 +63,34 @@ internal static class DocumentEditor
             destinationIndex);
     }
 
+    public static DesignerDocument Reorder(
+        DesignerDocument document,
+        ElementId id,
+        int destinationIndex)
+    {
+        if (document.Root.Id == id)
+        {
+            throw new InvalidOperationException("The document root cannot be reordered.");
+        }
+
+        DesignerNode parent = FindParent(document.Root, id) ?? throw Missing(id);
+        int sourceIndex = IndexOf(parent.Children, id);
+        int clampedIndex = Math.Clamp(destinationIndex, 0, parent.Children.Length - 1);
+        if (sourceIndex == clampedIndex)
+        {
+            return document;
+        }
+
+        DesignerNode child = parent.Children[sourceIndex];
+        ImmutableArray<DesignerNode> reordered = parent.Children
+            .RemoveAt(sourceIndex)
+            .Insert(clampedIndex, child);
+        return document with
+        {
+            Root = Rewrite(document.Root, parent.Id, node => node with { Children = reordered })
+        };
+    }
+
     public static DesignerDocument SetProperty(
         DesignerDocument document,
         ElementId id,
@@ -201,6 +229,38 @@ internal static class DocumentEditor
         {
             CollectIds(child, ids);
         }
+    }
+
+    private static DesignerNode? FindParent(DesignerNode parent, ElementId childId)
+    {
+        if (IndexOf(parent.Children, childId) >= 0)
+        {
+            return parent;
+        }
+
+        foreach (DesignerNode child in parent.Children)
+        {
+            DesignerNode? match = FindParent(child, childId);
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    private static int IndexOf(ImmutableArray<DesignerNode> children, ElementId id)
+    {
+        for (int index = 0; index < children.Length; index++)
+        {
+            if (children[index].Id == id)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static KeyNotFoundException Missing(ElementId id) =>

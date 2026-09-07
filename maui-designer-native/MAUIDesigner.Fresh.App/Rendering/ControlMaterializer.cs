@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.App.Workspace;
 using MAUIDesigner.Fresh.App.Viewport;
@@ -11,7 +12,14 @@ public sealed class ControlMaterializer
 {
     private readonly IControlCatalog _catalog;
     private readonly Dictionary<ElementId, Border> _outlines = [];
+    private readonly Dictionary<ElementId, View> _views = [];
+    private readonly Dictionary<ElementId, Grid> _chromes = [];
+    private readonly Dictionary<ElementId, View> _moveHandles = [];
+    private readonly Dictionary<ElementId, View> _resizeHandles = [];
     private readonly Dictionary<ElementId, (View View, ILayoutAdapter Adapter)> _targets = [];
+    private readonly List<Action> _gridTrackUpdates = [];
+    private readonly ConditionalWeakTable<Microsoft.UI.Xaml.FrameworkElement, object>
+        _contextMenuTargets = new();
     private readonly LayoutAdapterRegistry _layoutAdapters = new();
     private readonly DesignerWorkspace _workspace;
     private readonly DesignerViewportState _viewport;
@@ -31,18 +39,50 @@ public sealed class ControlMaterializer
     public View Materialize(DesignerDocument document)
     {
         _outlines.Clear();
+        _views.Clear();
+        _chromes.Clear();
+        _moveHandles.Clear();
+        _resizeHandles.Clear();
         _targets.Clear();
+        _gridTrackUpdates.Clear();
         _activeDropPreview = null;
         _manualDrag = null;
         return Build(document.Root, isRoot: true);
     }
 
+    public void RefreshGridTrackOverlays()
+    {
+        foreach (Action update in _gridTrackUpdates)
+        {
+            update();
+        }
+    }
+
     public void UpdateInteraction()
     {
         RemoveActiveDropPreview();
-        foreach ((ElementId id, Border outline) in _outlines)
+        foreach ((ElementId id, Grid chrome) in _chromes)
         {
-            UpdateOutline(outline, id);
+            bool selected = id == _workspace.SelectedId;
+            bool highlighted = selected || id == _workspace.DropTargetId;
+            if (highlighted)
+            {
+                Border outline = EnsureOutline(chrome, id);
+                UpdateOutline(outline, id);
+            }
+            else if (_outlines.Remove(id, out Border? outline))
+            {
+                chrome.Remove(outline);
+            }
+
+            if (selected)
+            {
+                EnsureSelectionHandles(chrome, id);
+            }
+            else
+            {
+                RemoveSelectionHandles(chrome, id);
+            }
         }
 
         if (_workspace.DropTargetId is not ElementId targetId ||
@@ -53,6 +93,36 @@ public sealed class ControlMaterializer
         }
 
         _activeDropPreview = target.Adapter.AddDropPreview(target.View, placement);
+    }
+
+    public bool TryApplyProperty(
+        ElementId elementId,
+        string propertyName,
+        DesignerValue? designerValue)
+    {
+        if (designerValue is null ||
+            !_views.TryGetValue(elementId, out View? view) ||
+            propertyName is nameof(Grid.RowDefinitions) or nameof(Grid.ColumnDefinitions))
+        {
+            return false;
+        }
+
+        DesignerNode? node = _workspace.Session.Current.Find(elementId);
+        if (node is null ||
+            !_catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor) ||
+            descriptor is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return TryApplyPropertyValue(view, descriptor, propertyName, designerValue);
+        }
+        catch (Exception exception) when (IsRecoverableMaterializationFailure(exception))
+        {
+            return false;
+        }
     }
 
     public void BeginManualDrag(View source, ElementId? movingId)
@@ -152,6 +222,7 @@ public sealed class ControlMaterializer
             View view = _catalog.Create(node.ControlType);
             ApplyProperties(view, descriptor, node);
             view.AutomationId = $"designer-{node.Id.Value}";
+            _views[node.Id] = view;
             ILayoutAdapter? layoutAdapter = descriptor.AcceptsChildren
                 ? _layoutAdapters.Resolve(descriptor)
                 : null;
@@ -176,7 +247,9 @@ public sealed class ControlMaterializer
 
             if (isRoot)
             {
-                return view;
+                return view is Grid rootGrid
+                    ? CreateGridTrackSurface(rootGrid)
+                    : view;
             }
 
             return CreateChrome(view, node);
@@ -195,23 +268,17 @@ public sealed class ControlMaterializer
             MinimumHeightRequest = 24,
             AutomationId = $"chrome-{node.Id.Value}"
         };
+        _chromes[node.Id] = chrome;
         chrome.Add(content);
-
-        var outline = new Border
+        if (content is Grid gridContent)
         {
-            InputTransparent = true,
-            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
-            {
-                CornerRadius = new CornerRadius(4)
-            }
-        };
-        UpdateOutline(outline, node.Id);
-        _outlines[node.Id] = outline;
-        chrome.Add(outline);
+            AddGridTrackOverlay(chrome, gridContent);
+        }
 
         var tap = new TapGestureRecognizer();
         tap.Tapped += (_, _) => _workspace.Select(node.Id);
         chrome.GestureRecognizers.Add(tap);
+        AttachContextMenu(chrome, node.Id);
 
         var reparent = new PanGestureRecognizer();
         reparent.PanUpdated += (_, args) =>
@@ -246,14 +313,155 @@ public sealed class ControlMaterializer
 
         if (node.Id == _workspace.SelectedId)
         {
-            AddMoveHandle(chrome, node);
-            AddResizeHandle(chrome, node);
+            _ = EnsureOutline(chrome, node.Id);
+            EnsureSelectionHandles(chrome, node.Id);
         }
 
         return chrome;
     }
 
-    private void AddMoveHandle(Grid chrome, DesignerNode node)
+    private Border EnsureOutline(Grid chrome, ElementId id)
+    {
+        if (_outlines.TryGetValue(id, out Border? existing))
+        {
+            return existing;
+        }
+
+        var outline = new Border
+        {
+            InputTransparent = true,
+            StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
+            {
+                CornerRadius = new CornerRadius(4)
+            }
+        };
+        UpdateOutline(outline, id);
+        _outlines[id] = outline;
+        chrome.Add(outline);
+        return outline;
+    }
+
+    private void EnsureSelectionHandles(Grid chrome, ElementId id)
+    {
+        if (_moveHandles.ContainsKey(id) || _resizeHandles.ContainsKey(id))
+        {
+            return;
+        }
+
+        DesignerNode? node = _workspace.Session.Current.Find(id);
+        if (node is null)
+        {
+            return;
+        }
+
+        _moveHandles[id] = AddMoveHandle(chrome, node);
+        _resizeHandles[id] = AddResizeHandle(chrome, node);
+    }
+
+    private void RemoveSelectionHandles(Grid chrome, ElementId id)
+    {
+        if (_moveHandles.Remove(id, out View? moveHandle))
+        {
+            chrome.Remove(moveHandle);
+        }
+
+        if (_resizeHandles.Remove(id, out View? resizeHandle))
+        {
+            chrome.Remove(resizeHandle);
+        }
+    }
+
+    private Grid CreateGridTrackSurface(Grid content)
+    {
+        var surface = new Grid();
+        surface.Add(content);
+        AddGridTrackOverlay(surface, content);
+        return surface;
+    }
+
+    private void AddGridTrackOverlay(Grid surface, Grid content)
+    {
+        var drawable = new GridTrackOverlayDrawable();
+        var overlay = new GraphicsView
+        {
+            InputTransparent = true,
+            Drawable = drawable
+        };
+        void UpdateTracks()
+        {
+            drawable.Update(
+                content,
+                new RectF(0, 0, (float)content.Width, (float)content.Height),
+                _viewport.Zoom);
+            overlay.Invalidate();
+        }
+
+        content.SizeChanged += (_, _) => UpdateTracks();
+        overlay.Loaded += (_, _) => UpdateTracks();
+        _gridTrackUpdates.Add(UpdateTracks);
+        surface.Add(overlay);
+    }
+
+    private void AttachContextMenu(View target, ElementId elementId)
+    {
+#if WINDOWS
+        target.HandlerChanged += (_, _) =>
+        {
+            if (target.Handler?.PlatformView is not Microsoft.UI.Xaml.FrameworkElement native ||
+                _contextMenuTargets.TryGetValue(native, out _))
+            {
+                return;
+            }
+
+            _contextMenuTargets.Add(native, new object());
+            native.ContextRequested += (_, args) =>
+            {
+                var menu = new Microsoft.UI.Xaml.Controls.MenuFlyout();
+                AddContextMenuItem(menu, "Cut", () =>
+                {
+                    _workspace.Select(elementId);
+                    _workspace.CutSelection();
+                });
+                AddContextMenuItem(menu, "Copy", () =>
+                {
+                    _workspace.Select(elementId);
+                    _workspace.CopySelection();
+                });
+                AddContextMenuItem(menu, "Paste", () =>
+                {
+                    _workspace.Select(elementId);
+                    _workspace.Paste();
+                });
+                AddContextMenuItem(menu, "Duplicate", () =>
+                {
+                    _workspace.Select(elementId);
+                    _workspace.DuplicateSelection();
+                });
+                AddContextMenuItem(menu, "Delete", () =>
+                {
+                    _workspace.Select(elementId);
+                    _workspace.DeleteSelection();
+                });
+                menu.ShowAt(native);
+                args.Handled = true;
+            };
+        };
+#endif
+    }
+
+#if WINDOWS
+    private static void AddContextMenuItem(
+        Microsoft.UI.Xaml.Controls.MenuFlyout menu,
+        string text,
+        Action action)
+    {
+        var item = new Microsoft.UI.Xaml.Controls.MenuFlyoutItem { Text = text };
+        item.Click += (_, _) => action();
+        menu.Items.Add(item);
+    }
+#endif
+
+    private View AddMoveHandle(Grid chrome, DesignerNode node)
     {
         var handle = new Border
         {
@@ -313,9 +521,10 @@ public sealed class ControlMaterializer
         };
         handle.GestureRecognizers.Add(pan);
         chrome.Add(handle);
+        return handle;
     }
 
-    private void AddResizeHandle(Grid chrome, DesignerNode node)
+    private View AddResizeHandle(Grid chrome, DesignerNode node)
     {
         var handle = new Border
         {
@@ -371,6 +580,7 @@ public sealed class ControlMaterializer
         };
         handle.GestureRecognizers.Add(pan);
         chrome.Add(handle);
+        return handle;
     }
 
     private static bool TryGetWindowBounds(View view, out RectD bounds)
@@ -428,36 +638,10 @@ public sealed class ControlMaterializer
     {
         foreach ((string name, DesignerValue designerValue) in node.Properties)
         {
-            string text;
-            if (designerValue.Kind == DesignerValueKind.Literal)
-            {
-                text = designerValue.Text;
-            }
-            else if (designerValue.Kind == DesignerValueKind.MarkupExtension &&
-                     DesignerMarkupPreview.TryGetLiteral(designerValue.Text, out string preview))
-            {
-                text = preview;
-            }
-            else
-            {
-                continue;
-            }
-
-            PropertyDescriptor? propertyDescriptor = descriptor.Properties
-                .FirstOrDefault(property => property.Name == name && !property.IsReadOnly);
-            PropertyInfo? property = propertyDescriptor is null
-                ? null
-                : descriptor.RuntimeType.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
-            if (property is null ||
-                !DesignerValueConverter.TryConvert(text, property.PropertyType, out object? value))
-            {
-                continue;
-            }
-
-            property.SetValue(view, value);
+            _ = TryApplyPropertyValue(view, descriptor, name, designerValue);
         }
 
-        PropertyInfo? textProperty = descriptor.RuntimeType.GetProperty("Text", BindingFlags.Public | BindingFlags.Instance);
+        GetWritableProperties(descriptor).TryGetValue("Text", out PropertyInfo? textProperty);
         if (!node.Properties.ContainsKey("Text") && textProperty?.CanWrite == true && textProperty.PropertyType == typeof(string))
         {
             textProperty.SetValue(view, descriptor.DisplayName);
@@ -465,6 +649,41 @@ public sealed class ControlMaterializer
 
         ApplyPreviewTextContrast(view, descriptor, node);
     }
+
+    private static bool TryApplyPropertyValue(
+        View view,
+        ControlDescriptor descriptor,
+        string propertyName,
+        DesignerValue designerValue)
+    {
+        string text;
+        if (designerValue.Kind == DesignerValueKind.Literal)
+        {
+            text = designerValue.Text;
+        }
+        else if (designerValue.Kind == DesignerValueKind.MarkupExtension &&
+                 DesignerMarkupPreview.TryGetLiteral(designerValue.Text, out string preview))
+        {
+            text = preview;
+        }
+        else
+        {
+            return false;
+        }
+
+        if (!GetWritableProperties(descriptor).TryGetValue(propertyName, out PropertyInfo? property) ||
+            !DesignerValueConverter.TryConvert(text, property.PropertyType, out object? value))
+        {
+            return false;
+        }
+
+        property.SetValue(view, value);
+        return true;
+    }
+
+    private static IReadOnlyDictionary<string, PropertyInfo> GetWritableProperties(
+        ControlDescriptor descriptor) =>
+        RuntimePropertyCache.GetWritableProperties(descriptor.RuntimeType);
 
     private void ApplyPreviewTextContrast(
         View view,
@@ -482,14 +701,16 @@ public sealed class ControlMaterializer
                 property.Name == "TextColor" &&
                 !property.IsReadOnly &&
                 property.ValueType == typeof(Color));
-        PropertyInfo? textColorProperty = textColorDescriptor is null
-            ? null
-            : descriptor.RuntimeType.GetProperty(
+        PropertyInfo? textColorProperty = null;
+        if (textColorDescriptor is not null)
+        {
+            GetWritableProperties(descriptor).TryGetValue(
                 textColorDescriptor.Name,
-                BindingFlags.Public | BindingFlags.Instance);
+                out textColorProperty);
+        }
         textColorProperty?.SetValue(
             view,
-            _viewport.IsDarkPreview ? Colors.White : Colors.Black);
+            Colors.Black);
     }
 
     private static void EnsureDesignSize(View view, ControlDescriptor descriptor)
