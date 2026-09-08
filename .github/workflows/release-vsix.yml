@@ -41,6 +41,16 @@ jobs:
             throw 'VSIX releases must be built from a commit already merged into main.'
           }
 
+      - name: Stamp the VSIX release version
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
+        run: |
+          $version = & .\extension\scripts\Set-VsixReleaseVersion.ps1 -Tag $env:RELEASE_TAG
+          "VSIX_VERSION=$version" | Out-File $env:GITHUB_ENV -Append
+          Write-Host "Building VSIX version $version from $env:RELEASE_TAG."
+
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
@@ -67,6 +77,27 @@ jobs:
           $zip = [System.IO.Compression.ZipFile]::OpenRead($vsix.FullName)
           try {
             $names = $zip.Entries | ForEach-Object { $_.FullName }
+            $manifestEntry = $zip.GetEntry('extension.vsixmanifest')
+            if (-not $manifestEntry) { throw 'The VSIX is missing extension.vsixmanifest.' }
+
+            $reader = [IO.StreamReader]::new($manifestEntry.Open())
+            try {
+              [xml] $manifest = $reader.ReadToEnd()
+            } finally {
+              $reader.Dispose()
+            }
+
+            $packageVersion = $manifest.PackageManifest.Metadata.Identity.Version
+            $assemblyEntry = $zip.GetEntry('MauiDesigner.Vsix.dll')
+            if (-not $assemblyEntry) { throw 'The VSIX is missing MauiDesigner.Vsix.dll.' }
+
+            $assemblyPath = Join-Path $env:RUNNER_TEMP 'MauiDesigner.Vsix.dll'
+            [IO.Compression.ZipFileExtensions]::ExtractToFile(
+              $assemblyEntry,
+              $assemblyPath,
+              $true)
+            $assemblyVersion = [Reflection.AssemblyName]::GetAssemblyName($assemblyPath).Version.ToString()
+            $fileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($assemblyPath).FileVersion
           } finally {
             $zip.Dispose()
           }
@@ -81,8 +112,14 @@ jobs:
           if (-not ($names -match '^native/MAUIDesigner\.exe$')) {
             throw 'The VSIX does not contain native/MAUIDesigner.exe.'
           }
+          if ($env:VSIX_VERSION -and $packageVersion -ne $env:VSIX_VERSION) {
+            throw "The VSIX contains version $packageVersion; expected $env:VSIX_VERSION from the release tag."
+          }
+          if ($assemblyVersion -ne $packageVersion -or $fileVersion -ne $packageVersion) {
+            throw "Version mismatch: manifest $packageVersion, assembly $assemblyVersion, file $fileVersion."
+          }
 
-          Write-Host "$($vsix.Name) contains $($names.Count) entries."
+          Write-Host "$($vsix.Name) version $packageVersion contains $($names.Count) entries."
           Copy-Item $vsix.FullName MauiDesigner.vsix
 
       - uses: actions/upload-artifact@v4
