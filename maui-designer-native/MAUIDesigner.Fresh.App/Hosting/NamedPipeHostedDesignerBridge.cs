@@ -38,6 +38,8 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
 
     public event EventHandler<string>? ErrorReported;
 
+    public event EventHandler<string>? CommandRequested;
+
     public void Start()
     {
         if (!IsHosted || Interlocked.Exchange(ref _started, 1) != 0)
@@ -50,6 +52,11 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
 
     public void SendDocumentChanged(string xaml) =>
         Enqueue(new BridgeMessage("document.changed", xaml));
+
+    public void SendTextInputFocusChanged(bool textInputFocused) =>
+        Enqueue(new BridgeMessage(
+            "designer.focusChanged",
+            TextInputFocused: textInputFocused));
 
     public void SendClosed(string requestId, string? xaml) =>
         Enqueue(new BridgeMessage("designer.closed", xaml, requestId));
@@ -108,6 +115,11 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             {
                 CloseRequested?.Invoke(this, message.RequestId);
             }
+            else if (message?.Type == "host.command" &&
+                     !string.IsNullOrWhiteSpace(message.Command))
+            {
+                CommandRequested?.Invoke(this, message.Command);
+            }
         }
     }
 
@@ -147,5 +159,9 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         [property: JsonPropertyName("xaml")]
         string? Xaml = null,
         [property: JsonPropertyName("requestId")]
-        string? RequestId = null);
+        string? RequestId = null,
+        [property: JsonPropertyName("command")]
+        string? Command = null,
+        [property: JsonPropertyName("textInputFocused")]
+        bool? TextInputFocused = null);
 }

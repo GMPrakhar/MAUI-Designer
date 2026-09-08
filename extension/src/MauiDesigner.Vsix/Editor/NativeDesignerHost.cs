@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Input;
 
 namespace MauiDesigner.Vsix
 {
@@ -22,6 +23,14 @@ namespace MauiDesigner.Vsix
             new TaskCompletionSource<IntPtr>(TaskCreationOptions.RunContinuationsAsynchronously);
         private IntPtr _hostHandle;
         private IntPtr _designerHandle;
+        private volatile bool _textInputFocused;
+
+        public event EventHandler<string>? ShortcutRequested;
+
+        public bool TextInputFocused
+        {
+            set => _textInputFocused = value;
+        }
 
         // BuildWindowCore is owned by WPF, so this completion source is the
         // bridge into that lifecycle rather than independently scheduled work.
@@ -89,6 +98,63 @@ namespace MauiDesigner.Vsix
         {
             base.OnWindowPositionChanged(rcBoundingBox);
             ResizeDesigner();
+        }
+
+        protected override bool TranslateAcceleratorCore(
+            ref MSG msg,
+            ModifierKeys modifiers)
+        {
+            const int WmKeyDown = 0x0100;
+            const int WmSysKeyDown = 0x0104;
+            if (msg.message is not (WmKeyDown or WmSysKeyDown) ||
+                _textInputFocused)
+            {
+                return base.TranslateAcceleratorCore(ref msg, modifiers);
+            }
+
+            string? command = ResolveShortcut((int)msg.wParam, modifiers);
+            if (command is null)
+            {
+                return base.TranslateAcceleratorCore(ref msg, modifiers);
+            }
+
+            bool isRepeat = (msg.lParam.ToInt64() & (1L << 30)) != 0;
+            if (!isRepeat)
+            {
+                ShortcutRequested?.Invoke(this, command);
+            }
+
+            return true;
+        }
+
+        private static string? ResolveShortcut(int key, ModifierKeys modifiers)
+        {
+            if ((modifiers & ModifierKeys.Control) != 0)
+            {
+                return key switch
+                {
+                    0x41 => "selectAll",
+                    0x43 => "copy",
+                    0x44 => "duplicate",
+                    0x56 => "paste",
+                    0x58 => "cut",
+                    0x59 => "redo",
+                    0x5A => "undo",
+                    _ => null
+                };
+            }
+
+            if ((modifiers & ModifierKeys.Alt) != 0)
+            {
+                return key switch
+                {
+                    0x26 => "moveUp",
+                    0x28 => "moveDown",
+                    _ => null
+                };
+            }
+
+            return key == 0x2E ? "delete" : null;
         }
 
         private void ResizeDesigner()

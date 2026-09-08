@@ -13,6 +13,17 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Require a commit from main
+        shell: pwsh
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Native releases must be tagged from a commit already merged into main.'
+          }
 
       - uses: actions/setup-dotnet@v5
         with:

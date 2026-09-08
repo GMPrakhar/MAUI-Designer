@@ -3,6 +3,7 @@ name: Native MAUI Designer
 on:
   push:
     branches:
+      - develop
       - main
     paths:
       - maui-designer-native/**

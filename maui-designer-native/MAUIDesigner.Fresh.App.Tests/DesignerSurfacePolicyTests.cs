@@ -1,6 +1,7 @@
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.App.Controls;
 using MAUIDesigner.Fresh.App.Rendering;
+using MAUIDesigner.Fresh.Core.Geometry;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace MAUIDesigner.Fresh.App.Tests;
@@ -44,6 +45,27 @@ public sealed class DesignerSurfacePolicyTests
                 startingWidth,
                 horizontalChange,
                 resizeFromRightEdge));
+
+    [Theory]
+    [InlineData(0, 0, 100, 100, 10, 10, 20, 20, true)]
+    [InlineData(0, 0, 100, 100, -1, 10, 20, 20, false)]
+    [InlineData(0, 0, 100, 100, 90, 90, 20, 20, false)]
+    [InlineData(0, 0, 3, 100, 0, 0, 1, 1, false)]
+    public void Marquee_selection_requires_full_containment_and_a_real_drag(
+        double marqueeX,
+        double marqueeY,
+        double marqueeWidth,
+        double marqueeHeight,
+        double elementX,
+        double elementY,
+        double elementWidth,
+        double elementHeight,
+        bool expected) =>
+        Assert.Equal(
+            expected,
+            MarqueeSelectionPolicy.Contains(
+                new RectD(marqueeX, marqueeY, marqueeWidth, marqueeHeight),
+                new RectD(elementX, elementY, elementWidth, elementHeight)));
 
     private static ReflectionControlCatalog CreateCatalog()
     {

@@ -9,16 +9,20 @@ public sealed class DesignerWorkspace
 {
     private const double PasteOffset = 16;
     private readonly IControlCatalog _catalog;
+    private readonly ControlTypeId _defaultRootType;
     private long _nextId;
-    private DesignerNode? _clipboard;
+    private ImmutableArray<DesignerNode> _clipboard = [];
+    private ImmutableHashSet<ElementId> _selectedIds = [];
     private int _pasteCount;
 
     public DesignerWorkspace(IControlCatalog catalog)
     {
         _catalog = catalog;
         ControlDescriptor root = catalog.Controls.First(descriptor => descriptor.RuntimeType == typeof(AbsoluteLayout));
+        _defaultRootType = root.Id;
         Session = new DocumentSession(DesignerDocument.Create(root.Id));
         SelectedId = Session.Current.Root.Id;
+        _selectedIds = ImmutableHashSet.Create(SelectedId);
     }
 
     public event EventHandler? SelectionChanged;
@@ -29,25 +33,33 @@ public sealed class DesignerWorkspace
 
     public ElementId SelectedId { get; private set; }
 
+    public IReadOnlySet<ElementId> SelectedIds => _selectedIds;
+
+    public int SelectionCount => _selectedIds.Count;
+
     public ElementId? DropTargetId { get; private set; }
 
     public LayoutPlacement? DropPlacement { get; private set; }
 
-    public bool CanCopy => SelectedId != Session.Current.Root.Id &&
-        Session.Current.Find(SelectedId) is not null;
+    public bool CanCopy => GetSelectionRoots().Count > 0;
 
-    public bool CanCut => SelectedId != Session.Current.Root.Id &&
-        Session.Current.Find(SelectedId) is not null;
+    public bool CanCut => CanCopy;
 
-    public bool CanPaste => _clipboard is not null && TryResolveInsertionParent(out _);
+    public bool CanPaste => !_clipboard.IsDefaultOrEmpty &&
+        TryResolveInsertionParent(_clipboard.Length, out _);
 
-    public bool CanDuplicate => TryGetSelectedSiblingPosition(out DesignerNode? parent, out _) &&
-        CanAcceptChild(parent!.Id);
+    public bool CanDuplicate => GetSelectionRoots().Count > 0 &&
+        GetSelectionRoots().All(node =>
+            node.Id != Session.Current.Root.Id &&
+            TryGetSiblingPosition(node.Id, out DesignerNode? parent, out _) &&
+            CanAcceptChild(parent!.Id));
 
     public bool CanMoveSelectionUp =>
+        _selectedIds.Count == 1 &&
         TryGetSelectedSiblingPosition(out _, out int index) && index > 0;
 
     public bool CanMoveSelectionDown =>
+        _selectedIds.Count == 1 &&
         TryGetSelectedSiblingPosition(out DesignerNode? parent, out int index) &&
         index < parent!.Children.Length - 1;
 
@@ -58,12 +70,92 @@ public sealed class DesignerWorkspace
             throw new KeyNotFoundException($"Element '{id}' was not found.");
         }
 
-        if (SelectedId == id)
+        SetSelection([id], additive: false);
+    }
+
+    public void ToggleSelection(ElementId id)
+    {
+        if (Session.Current.Find(id) is null)
+        {
+            throw new KeyNotFoundException($"Element '{id}' was not found.");
+        }
+
+        if (id == Session.Current.Root.Id)
+        {
+            Select(id);
+            return;
+        }
+
+        if (_selectedIds.Contains(id))
+        {
+            if (_selectedIds.Count == 1)
+            {
+                Select(Session.Current.Root.Id);
+                return;
+            }
+
+            ImmutableHashSet<ElementId> remaining = _selectedIds.Remove(id);
+            ElementId primary = SelectedId == id
+                ? GetNodesInDocumentOrder().Last(node => remaining.Contains(node.Id)).Id
+                : SelectedId;
+            ApplySelection(remaining, primary);
+            return;
+        }
+
+        ApplySelection(_selectedIds.Remove(Session.Current.Root.Id).Add(id), id);
+    }
+
+    public void SelectAll()
+    {
+        ElementId[] descendants = GetNodesInDocumentOrder()
+            .Skip(1)
+            .Select(node => node.Id)
+            .ToArray();
+        SetSelection(
+            descendants.Length == 0 ? [Session.Current.Root.Id] : descendants,
+            additive: false);
+    }
+
+    public void SetSelection(IEnumerable<ElementId> ids, bool additive)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        ElementId[] requested = ids
+            .Where(id => Session.Current.Find(id) is not null)
+            .Distinct()
+            .ToArray();
+        ImmutableHashSet<ElementId> selection = additive
+            ? _selectedIds.Union(requested)
+            : requested.ToImmutableHashSet();
+        if (selection.Count > 1)
+        {
+            selection = selection.Remove(Session.Current.Root.Id);
+        }
+
+        if (selection.Count == 0)
+        {
+            selection = ImmutableHashSet.Create(Session.Current.Root.Id);
+        }
+
+        ElementId primary = requested.LastOrDefault(id => selection.Contains(id));
+        if (primary == default || !selection.Contains(primary))
+        {
+            primary = GetNodesInDocumentOrder().Last(node => selection.Contains(node.Id)).Id;
+        }
+
+        ApplySelection(selection, primary);
+    }
+
+    private void ApplySelection(
+        ImmutableHashSet<ElementId> selection,
+        ElementId primary)
+    {
+        if (_selectedIds.SetEquals(selection) && SelectedId == primary)
         {
             return;
         }
 
-        SelectedId = id;
+        _selectedIds = selection;
+        SelectedId = primary;
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -141,16 +233,27 @@ public sealed class DesignerWorkspace
 
     public void DeleteSelection()
     {
-        if (SelectedId == Session.Current.Root.Id)
+        IReadOnlyList<DesignerNode> selected = GetSelectionRoots();
+        if (selected.Count == 0)
         {
             return;
         }
 
-        ElementId removedId = SelectedId;
-        DesignerNode parent = FindParent(Session.Current.Root, removedId)
-            ?? throw new InvalidOperationException($"Element '{removedId}' has no parent.");
-        Session.Execute(new RemoveElementCommand(removedId));
-        Select(parent.Id);
+        if (selected.Any(node => node.Id == Session.Current.Root.Id))
+        {
+            Session.Execute(new ReplaceDocumentCommand(
+                DesignerDocument.Create(_defaultRootType),
+                "Clear document"));
+            Select(Session.Current.Root.Id);
+            return;
+        }
+
+        Session.Execute(new CompositeDocumentCommand(
+            selected
+                .Select(node => (IDocumentCommand)new RemoveElementCommand(node.Id))
+                .ToArray(),
+            selected.Count == 1 ? "Delete element" : $"Delete {selected.Count} elements"));
+        Select(Session.Current.Root.Id);
     }
 
     public void CopySelection()
@@ -160,8 +263,7 @@ public sealed class DesignerWorkspace
             return;
         }
 
-        _clipboard = Session.Current.Find(SelectedId)
-            ?? throw new KeyNotFoundException($"Element '{SelectedId}' was not found.");
+        _clipboard = GetSelectionRoots().ToImmutableArray();
         _pasteCount = 0;
         InteractionChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -179,31 +281,61 @@ public sealed class DesignerWorkspace
 
     public ElementId? Paste()
     {
-        if (_clipboard is null || !TryResolveInsertionParent(out ElementId parentId))
+        if (_clipboard.IsDefaultOrEmpty ||
+            !TryResolveInsertionParent(_clipboard.Length, out ElementId parentId))
         {
             return null;
         }
 
         _pasteCount++;
-        DesignerNode clone = PrepareCloneForParent(_clipboard, parentId, _pasteCount);
-        Session.Execute(new AddElementCommand(parentId, clone));
-        Select(clone.Id);
-        return clone.Id;
+        DesignerNode[] clones = _clipboard
+            .Select(source =>
+                PrepareCloneForParent(source, parentId, _pasteCount))
+            .ToArray();
+        Session.Execute(new CompositeDocumentCommand(
+            clones
+                .Select(clone => (IDocumentCommand)new AddElementCommand(parentId, clone))
+                .ToArray(),
+            clones.Length == 1 ? "Paste element" : $"Paste {clones.Length} elements"));
+        SetSelection(clones.Select(clone => clone.Id), additive: false);
+        return clones[^1].Id;
     }
 
     public ElementId? DuplicateSelection()
     {
-        if (!TryGetSelectedSiblingPosition(out DesignerNode? parent, out int index) ||
-            !CanAcceptChild(parent!.Id))
+        IReadOnlyList<DesignerNode> selected = GetSelectionRoots()
+            .Where(node => node.Id != Session.Current.Root.Id)
+            .ToArray();
+        if (selected.Count == 0 || !CanDuplicate)
         {
             return null;
         }
 
-        DesignerNode source = Session.Current.Find(SelectedId)!;
-        DesignerNode clone = PrepareCloneForParent(source, parent.Id, 1);
-        Session.Execute(new AddElementCommand(parent.Id, clone, index + 1));
-        Select(clone.Id);
-        return clone.Id;
+        var commands = new List<IDocumentCommand>();
+        var clones = new List<DesignerNode>();
+        foreach (IGrouping<ElementId, DesignerNode> group in selected.GroupBy(node =>
+                 FindParent(Session.Current.Root, node.Id)!.Id))
+        {
+            DesignerNode parent = Session.Current.Find(group.Key)!;
+            int inserted = 0;
+            foreach (DesignerNode source in group.OrderBy(node =>
+                         IndexOf(parent.Children, node.Id)))
+            {
+                DesignerNode clone = PrepareCloneForParent(source, parent.Id, 1);
+                commands.Add(new AddElementCommand(
+                    parent.Id,
+                    clone,
+                    IndexOf(parent.Children, source.Id) + 1 + inserted));
+                clones.Add(clone);
+                inserted++;
+            }
+        }
+
+        Session.Execute(new CompositeDocumentCommand(
+            commands,
+            clones.Count == 1 ? "Duplicate element" : $"Duplicate {clones.Count} elements"));
+        SetSelection(clones.Select(clone => clone.Id), additive: false);
+        return clones[^1].Id;
     }
 
     public bool MoveSelectionUp() => MoveSelection(-1);
@@ -242,7 +374,7 @@ public sealed class DesignerWorkspace
 
     private ElementId ResolveInsertionParent()
     {
-        if (TryResolveInsertionParent(out ElementId parentId))
+        if (TryResolveInsertionParent(1, out ElementId parentId))
         {
             return parentId;
         }
@@ -250,12 +382,12 @@ public sealed class DesignerWorkspace
         throw new InvalidOperationException("The document has no container that can accept another child control.");
     }
 
-    private bool TryResolveInsertionParent(out ElementId parentId)
+    private bool TryResolveInsertionParent(int childCount, out ElementId parentId)
     {
         DesignerNode? candidate = Session.Current.Find(SelectedId) ?? Session.Current.Root;
         while (candidate is not null)
         {
-            if (CanAcceptChild(candidate.Id))
+            if (CanAcceptChildren(candidate.Id, childCount))
             {
                 parentId = candidate.Id;
                 return true;
@@ -292,6 +424,20 @@ public sealed class DesignerWorkspace
         return parent.Children.Length == 0 ||
             movingId is not null &&
             parent.Children.Any(child => child.Id == movingId.Value);
+    }
+
+    private bool CanAcceptChildren(ElementId parentId, int childCount)
+    {
+        if (!CanAcceptChild(parentId))
+        {
+            return false;
+        }
+
+        DesignerNode parent = Session.Current.Find(parentId)!;
+        ControlDescriptor descriptor = _catalog.Controls.First(control =>
+            control.Id == parent.ControlType);
+        return typeof(Layout).IsAssignableFrom(descriptor.RuntimeType) ||
+            parent.Children.Length + childCount <= 1;
     }
 
     private void EnsureValidParent(ElementId parentId, ElementId? movingId = null)
@@ -364,14 +510,20 @@ public sealed class DesignerWorkspace
     }
 
     private bool TryGetSelectedSiblingPosition(out DesignerNode? parent, out int index)
+        => TryGetSiblingPosition(SelectedId, out parent, out index);
+
+    private bool TryGetSiblingPosition(
+        ElementId id,
+        out DesignerNode? parent,
+        out int index)
     {
-        parent = FindParent(Session.Current.Root, SelectedId);
+        parent = FindParent(Session.Current.Root, id);
         index = -1;
         if (parent is not null)
         {
             for (int childIndex = 0; childIndex < parent.Children.Length; childIndex++)
             {
-                if (parent.Children[childIndex].Id == SelectedId)
+                if (parent.Children[childIndex].Id == id)
                 {
                     index = childIndex;
                     break;
@@ -380,6 +532,47 @@ public sealed class DesignerWorkspace
         }
 
         return parent is not null && index >= 0;
+    }
+
+    private IReadOnlyList<DesignerNode> GetSelectionRoots()
+    {
+        DesignerNode[] selected = GetNodesInDocumentOrder()
+            .Where(node => _selectedIds.Contains(node.Id))
+            .ToArray();
+        return selected
+            .Where(node => !selected.Any(candidate =>
+                candidate.Id != node.Id && candidate.Find(node.Id) is not null))
+            .ToArray();
+    }
+
+    private IEnumerable<DesignerNode> GetNodesInDocumentOrder() =>
+        Enumerate(Session.Current.Root);
+
+    private static IEnumerable<DesignerNode> Enumerate(DesignerNode node)
+    {
+        yield return node;
+        foreach (DesignerNode child in node.Children)
+        {
+            foreach (DesignerNode descendant in Enumerate(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static int IndexOf(
+        ImmutableArray<DesignerNode> children,
+        ElementId id)
+    {
+        for (int index = 0; index < children.Length; index++)
+        {
+            if (children[index].Id == id)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     private static DesignerNode? FindParent(DesignerNode parent, ElementId childId)

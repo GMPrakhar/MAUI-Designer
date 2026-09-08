@@ -85,6 +85,28 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Host_commands_include_their_designer_command()
+        {
+            DesignerMessage message = DesignerProtocol.Parse(
+                DesignerProtocol.HostCommand("duplicate"))!;
+
+            Assert.Equal(MessageTypes.HostCommand, message.Type);
+            Assert.Equal("duplicate", message.Command);
+        }
+
+        [Theory]
+        [InlineData(true)]
+        [InlineData(false)]
+        public void Designer_focus_messages_identify_text_input_focus(bool focused)
+        {
+            DesignerMessage message = DesignerProtocol.Parse(
+                DesignerProtocol.DesignerFocusChanged(focused))!;
+
+            Assert.Equal(MessageTypes.DesignerFocusChanged, message.Type);
+            Assert.Equal(focused, message.TextInputFocused);
+        }
+
+        [Fact]
         public void Close_responses_only_match_their_own_request()
         {
             var response = new DesignerMessage

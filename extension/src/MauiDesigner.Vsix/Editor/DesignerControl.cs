@@ -49,6 +49,7 @@ namespace MauiDesigner.Vsix
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
+            _nativeHost.ShortcutRequested += OnShortcutRequested;
 
             var root = new Grid();
             root.Children.Add(_nativeHost);
@@ -57,6 +58,9 @@ namespace MauiDesigner.Vsix
         }
 
         public event EventHandler<string>? MessageReceived;
+
+        private void OnShortcutRequested(object? sender, string command) =>
+            PostMessage(DesignerProtocol.HostCommand(command));
 
         public async Task InitializeAsync(string executablePath)
         {
@@ -217,6 +221,12 @@ namespace MauiDesigner.Vsix
                     }
 
                     DesignerMessage? message = DesignerProtocol.Parse(json);
+                    if (message?.Type == MessageTypes.DesignerFocusChanged)
+                    {
+                        _nativeHost.TextInputFocused = message.TextInputFocused == true;
+                        continue;
+                    }
+
                     if (message?.Type == MessageTypes.DesignerClosed)
                     {
                         lock (_closeGate)
@@ -389,6 +399,7 @@ namespace MauiDesigner.Vsix
             _writer?.Dispose();
             _pipe?.Dispose();
             DisposeProcess();
+            _nativeHost.ShortcutRequested -= OnShortcutRequested;
             _nativeHost.Dispose();
             _writeGate.Dispose();
         }

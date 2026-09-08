@@ -73,7 +73,7 @@
             BackgroundColor="{StaticResource SurfaceSubtle}"
             IsClippedToBounds="True">
             <Grid x:Name="ElementsSidebar" Grid.Column="0" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="11" BackgroundColor="{StaticResource Surface}">
-                <Grid ColumnDefinitions="*,Auto">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                     <VerticalStackLayout Spacing="2">
                         <Label FontAttributes="Bold" FontSize="15" Text="Elements" TextColor="{StaticResource TextPrimary}" />
                         <Label FontSize="10" Text="Build and navigate your page" TextColor="{StaticResource TextMuted}" />
@@ -129,6 +129,7 @@
             </Grid>
 
             <controls:SidebarResizeHandle
+                x:Name="LeftSidebarResizeHandle"
                 Grid.Column="1"
                 AutomationId="left-sidebar-resizer"
                 BackgroundColor="{StaticResource SurfaceMuted}"
@@ -199,6 +200,7 @@
                     BackgroundColor="{StaticResource CanvasBackdrop}"
                     IsClippedToBounds="True"
                     PanRequested="OnCanvasPanRequested"
+                    MarqueeRequested="OnCanvasMarqueeRequested"
                     SizeChanged="OnCanvasViewportSizeChanged"
                     ZoomRequested="OnCanvasZoomRequested">
                     <Grid
@@ -223,6 +225,16 @@
                             </Grid>
                         </Border>
                     </Grid>
+                    <Border
+                        x:Name="MarqueeSelectionBorder"
+                        HorizontalOptions="Start"
+                        VerticalOptions="Start"
+                        IsVisible="False"
+                        InputTransparent="True"
+                        BackgroundColor="#1F7C5CFF"
+                        Stroke="#7C5CFF"
+                        StrokeDashArray="4,3"
+                        StrokeThickness="1.5" />
                     <GraphicsView x:Name="CanvasRulerOverlay" InputTransparent="True" />
                     <Border
                         Margin="14"
@@ -238,6 +250,7 @@
             </Grid>
 
             <controls:SidebarResizeHandle
+                x:Name="RightSidebarResizeHandle"
                 Grid.Column="3"
                 AutomationId="right-sidebar-resizer"
                 BackgroundColor="{StaticResource SurfaceMuted}"
@@ -246,10 +259,12 @@
                 ToggleRequested="OnRightSidebarToggleRequested" />
 
             <Grid x:Name="PropertiesSidebar" Grid.Column="4" Padding="16,15" RowDefinitions="Auto,Auto,Auto,*" RowSpacing="12" BackgroundColor="{StaticResource Surface}">
-                <VerticalStackLayout Spacing="2">
-                    <Label FontAttributes="Bold" FontSize="15" Text="Properties" TextColor="{StaticResource TextPrimary}" />
-                    <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="10" TextColor="{StaticResource TextMuted}" />
-                </VerticalStackLayout>
+                <Grid>
+                    <VerticalStackLayout Spacing="2">
+                        <Label FontAttributes="Bold" FontSize="15" Text="Properties" TextColor="{StaticResource TextPrimary}" />
+                        <Label x:Name="SelectionLabel" AutomationId="selection-label" FontSize="10" TextColor="{StaticResource TextMuted}" />
+                    </VerticalStackLayout>
+                </Grid>
                 <Border
                     Grid.Row="1"
                     Padding="10,8"
