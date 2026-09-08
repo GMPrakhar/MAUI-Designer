@@ -4,6 +4,10 @@ A powerful web-based visual designer for creating MAUI (Microsoft App UI) layout
 
 **Live demo (web designer):** https://gmprakhar.github.io/MAUI-Designer/ (deployed to GitHub Pages from `main`)
 
+Development is integrated on `develop`. Changes are promoted to `main` through
+an explicitly approved pull request, and release tags are created only after
+that merge. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 > The web app is a **MAUI XAML-aware HTML/CSS designer**. It does not run the MAUI
 > renderers, so the canvas is an approximation. The Windows-native app in
 > [`maui-designer-native/`](maui-designer-native/README.md) hosts **real MAUI views**

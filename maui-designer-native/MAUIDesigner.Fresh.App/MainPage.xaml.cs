@@ -50,6 +50,8 @@ public partial class MainPage : ContentPage
     private CancellationTokenSource? _xamlSyncCancellation;
 #if WINDOWS
     private Microsoft.UI.Xaml.FrameworkElement? _platformRoot;
+    private readonly List<Microsoft.UI.Xaml.Input.KeyboardAccelerator>
+        _keyboardAccelerators = [];
 #endif
 
     public MainPage(
@@ -87,6 +89,7 @@ public partial class MainPage : ContentPage
         _hostBridge.DocumentLoadRequested += OnHostedDocumentLoadRequested;
         _hostBridge.CloseRequested += OnHostedCloseRequested;
         _hostBridge.ErrorReported += OnHostedErrorReported;
+        _hostBridge.CommandRequested += OnHostedCommandRequested;
         _gridDrawable = new CanvasGridDrawable(viewport);
         _rulerDrawable = new CanvasRulerDrawable(viewport);
         CanvasGridOverlay.Drawable = _gridDrawable;
@@ -112,9 +115,12 @@ public partial class MainPage : ContentPage
 #if WINDOWS
         if (_platformRoot is not null)
         {
+            DetachKeyboardAccelerators();
             _platformRoot.RemoveHandler(
                 Microsoft.UI.Xaml.UIElement.KeyDownEvent,
                 new Microsoft.UI.Xaml.Input.KeyEventHandler(OnNativeKeyDown));
+            _platformRoot.GotFocus -= OnNativeFocusChanged;
+            _platformRoot.LostFocus -= OnNativeFocusChanged;
         }
 #endif
         base.OnHandlerChanged();
@@ -126,6 +132,9 @@ public partial class MainPage : ContentPage
                 Microsoft.UI.Xaml.UIElement.KeyDownEvent,
                 new Microsoft.UI.Xaml.Input.KeyEventHandler(OnNativeKeyDown),
                 true);
+            root.GotFocus += OnNativeFocusChanged;
+            root.LostFocus += OnNativeFocusChanged;
+            AttachKeyboardAccelerators(root);
         }
 #endif
     }
@@ -195,6 +204,45 @@ public partial class MainPage : ContentPage
         double factor = e.WheelDelta > 0 ? 1.1 : 0.9;
         _viewport.ZoomAt(_viewport.Zoom * factor, e.X, e.Y);
         UpdateViewportVisuals();
+    }
+
+    private void OnCanvasMarqueeRequested(object? sender, CanvasMarqueeEventArgs e)
+    {
+        double x = Math.Min(e.StartX, e.CurrentX);
+        double y = Math.Min(e.StartY, e.CurrentY);
+        double width = Math.Abs(e.CurrentX - e.StartX);
+        double height = Math.Abs(e.CurrentY - e.StartY);
+        MarqueeSelectionBorder.TranslationX = x;
+        MarqueeSelectionBorder.TranslationY = y;
+        MarqueeSelectionBorder.WidthRequest = Math.Max(1, width);
+        MarqueeSelectionBorder.HeightRequest = Math.Max(1, height);
+        MarqueeSelectionBorder.IsVisible =
+            e.StatusType is GestureStatus.Started or GestureStatus.Running;
+
+        if (e.StatusType != GestureStatus.Completed)
+        {
+            return;
+        }
+
+        if (width < MarqueeSelectionPolicy.MinimumDragDistance ||
+            height < MarqueeSelectionPolicy.MinimumDragDistance)
+        {
+            if (!e.Additive)
+            {
+                _workspace.Select(_workspace.Session.Current.Root.Id);
+            }
+
+            return;
+        }
+
+        var windowBounds = new MAUIDesigner.Fresh.Core.Geometry.RectD(
+            Math.Min(e.WindowStartX, e.WindowCurrentX),
+            Math.Min(e.WindowStartY, e.WindowCurrentY),
+            Math.Abs(e.WindowCurrentX - e.WindowStartX),
+            Math.Abs(e.WindowCurrentY - e.WindowStartY));
+        _workspace.SetSelection(
+            _materializer.FindElementsInside(windowBounds),
+            e.Additive);
     }
 
     private void OnCanvasViewportSizeChanged(object? sender, EventArgs e)
@@ -597,6 +645,55 @@ public partial class MainPage : ContentPage
             _hostBridge.SendClosed(requestId, xaml);
         });
 
+    private void OnHostedCommandRequested(object? sender, string command) =>
+        Dispatcher.Dispatch(() =>
+        {
+#if WINDOWS
+            if (IsTextInputFocused())
+            {
+                return;
+            }
+#endif
+            ExecuteDesignerCommand(command);
+        });
+
+    private void ExecuteDesignerCommand(string command)
+    {
+        switch (command)
+        {
+            case "selectAll":
+                _workspace.SelectAll();
+                break;
+            case "copy":
+                _workspace.CopySelection();
+                break;
+            case "cut":
+                _workspace.CutSelection();
+                break;
+            case "paste":
+                _ = _workspace.Paste();
+                break;
+            case "duplicate":
+                _ = _workspace.DuplicateSelection();
+                break;
+            case "undo":
+                _workspace.Session.Undo();
+                break;
+            case "redo":
+                _workspace.Session.Redo();
+                break;
+            case "moveUp":
+                _ = _workspace.MoveSelection(-1);
+                break;
+            case "moveDown":
+                _ = _workspace.MoveSelection(1);
+                break;
+            case "delete":
+                _workspace.DeleteSelection();
+                break;
+        }
+    }
+
     private void LoadHostedDocument(string xaml)
     {
         _hostDocumentLoaded = false;
@@ -650,7 +747,7 @@ public partial class MainPage : ContentPage
             ? descriptor?.DisplayName ?? node.ControlType.XamlName
             : node.ControlType.XamlName;
 
-        bool selected = node.Id == _workspace.SelectedId;
+        bool selected = _workspace.SelectedIds.Contains(node.Id);
         var row = new Border
         {
             AutomationId = $"hierarchy-{node.Id.Value}",
@@ -720,19 +817,28 @@ public partial class MainPage : ContentPage
             TextColor = Color.FromArgb("#64748B")
         });
         content.Add(labels, 1);
-        if (node.Id != _workspace.Session.Current.Root.Id)
+        content.Add(CreateHierarchyAction("\uE74D", "Delete", 2, () =>
         {
-            content.Add(CreateHierarchyAction("\uE74D", "Delete", 2, () =>
+            if (!_workspace.SelectedIds.Contains(node.Id))
             {
                 _workspace.Select(node.Id);
-                _workspace.DeleteSelection();
-            }, destructive: true, fontFamily: "Segoe Fluent Icons"));
-        }
+            }
+
+            _workspace.DeleteSelection();
+        }, destructive: true, fontFamily: "Segoe Fluent Icons"));
         row.Content = content;
         var select = new TapGestureRecognizer();
         select.Tapped += (_, _) =>
         {
-            _workspace.Select(node.Id);
+            if (IsControlModifierPressed())
+            {
+                _workspace.ToggleSelection(node.Id);
+            }
+            else
+            {
+                _workspace.Select(node.Id);
+            }
+
             FocusCanvasElement(node.Id);
         };
         row.GestureRecognizers.Add(select);
@@ -1032,41 +1138,60 @@ public partial class MainPage : ContentPage
             var menu = new Microsoft.UI.Xaml.Controls.MenuFlyout();
             AddContextMenuItem(menu, "Cut", () =>
             {
-                _workspace.Select(elementId);
+                SelectForContextMenu(elementId);
                 _workspace.CutSelection();
             });
             AddContextMenuItem(menu, "Copy", () =>
             {
-                _workspace.Select(elementId);
+                SelectForContextMenu(elementId);
                 _workspace.CopySelection();
             });
             AddContextMenuItem(menu, "Paste", () =>
             {
-                _workspace.Select(elementId);
+                SelectForContextMenu(elementId);
                 _ = _workspace.Paste();
             });
             AddContextMenuItem(menu, "Duplicate", () =>
             {
-                _workspace.Select(elementId);
+                SelectForContextMenu(elementId);
                 _ = _workspace.DuplicateSelection();
             });
             AddContextMenuItem(menu, "Move up", () =>
             {
-                _workspace.Select(elementId);
+                SelectForContextMenu(elementId);
                 _ = _workspace.MoveSelection(-1);
             });
             AddContextMenuItem(menu, "Move down", () =>
             {
-                _workspace.Select(elementId);
+                SelectForContextMenu(elementId);
                 _ = _workspace.MoveSelection(1);
             });
             AddContextMenuItem(menu, "Delete", () =>
             {
-                _workspace.Select(elementId);
+                SelectForContextMenu(elementId);
                 _workspace.DeleteSelection();
             });
             native.ContextFlyout = menu;
         };
+#endif
+    }
+
+    private void SelectForContextMenu(ElementId elementId)
+    {
+        if (!_workspace.SelectedIds.Contains(elementId))
+        {
+            _workspace.Select(elementId);
+        }
+    }
+
+    private static bool IsControlModifierPressed()
+    {
+#if WINDOWS
+        return Microsoft.UI.Input.InputKeyboardSource
+            .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control)
+            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+#else
+        return false;
 #endif
     }
 
@@ -1100,6 +1225,18 @@ public partial class MainPage : ContentPage
     private void RebuildPropertyPanel()
     {
         PropertyPanel.Clear();
+        if (_workspace.SelectionCount > 1)
+        {
+            SelectionLabel.Text = $"{_workspace.SelectionCount} controls selected";
+            PropertyPanel.Add(new Label
+            {
+                Text = "Use the toolbar, keyboard shortcuts, or context menu to copy, duplicate, move, or delete the selection.",
+                FontSize = 11,
+                TextColor = Color.FromArgb("#64748B")
+            });
+            return;
+        }
+
         DesignerNode? selected = _workspace.Session.Current.Find(_workspace.SelectedId);
         if (selected is null || !_catalog.TryGet(selected.ControlType, out ControlDescriptor? descriptor) || descriptor is null)
         {
@@ -1371,6 +1508,14 @@ public partial class MainPage : ContentPage
     }
 
 #if WINDOWS
+    private void OnNativeFocusChanged(
+        object sender,
+        Microsoft.UI.Xaml.RoutedEventArgs e)
+    {
+        _platformRoot?.DispatcherQueue.TryEnqueue(() =>
+            _hostBridge.SendTextInputFocusChanged(IsTextInputFocused()));
+    }
+
     private void OnNativeKeyDown(
         object sender,
         Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
@@ -1384,9 +1529,7 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        bool control = Microsoft.UI.Input.InputKeyboardSource
-            .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control)
-            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+        bool control = IsControlModifierPressed();
         bool alt = Microsoft.UI.Input.InputKeyboardSource
             .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Menu)
             .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
@@ -1428,6 +1571,84 @@ public partial class MainPage : ContentPage
             e.Handled = true;
         }
     }
+
+    private void AttachKeyboardAccelerators(
+        Microsoft.UI.Xaml.FrameworkElement root)
+    {
+        AddKeyboardAccelerator(
+            root,
+            Windows.System.VirtualKey.C,
+            () => _workspace.CopySelection());
+        AddKeyboardAccelerator(
+            root,
+            Windows.System.VirtualKey.X,
+            () => _workspace.CutSelection());
+        AddKeyboardAccelerator(
+            root,
+            Windows.System.VirtualKey.V,
+            () => _ = _workspace.Paste());
+        AddKeyboardAccelerator(
+            root,
+            Windows.System.VirtualKey.D,
+            () => _ = _workspace.DuplicateSelection());
+        AddKeyboardAccelerator(
+            root,
+            Windows.System.VirtualKey.A,
+            () => _workspace.SelectAll());
+        AddKeyboardAccelerator(
+            root,
+            Windows.System.VirtualKey.Z,
+            () => _workspace.Session.Undo());
+        AddKeyboardAccelerator(
+            root,
+            Windows.System.VirtualKey.Y,
+            () => _workspace.Session.Redo());
+    }
+
+    private void AddKeyboardAccelerator(
+        Microsoft.UI.Xaml.FrameworkElement root,
+        Windows.System.VirtualKey key,
+        Action action)
+    {
+        var accelerator = new Microsoft.UI.Xaml.Input.KeyboardAccelerator
+        {
+            Key = key,
+            Modifiers = Windows.System.VirtualKeyModifiers.Control
+        };
+        accelerator.Invoked += (_, args) =>
+        {
+            if (IsTextInputFocused())
+            {
+                return;
+            }
+
+            action();
+            args.Handled = true;
+        };
+        root.KeyboardAccelerators.Add(accelerator);
+        _keyboardAccelerators.Add(accelerator);
+    }
+
+    private void DetachKeyboardAccelerators()
+    {
+        if (_platformRoot is not null)
+        {
+            foreach (Microsoft.UI.Xaml.Input.KeyboardAccelerator accelerator in
+                     _keyboardAccelerators)
+            {
+                _platformRoot.KeyboardAccelerators.Remove(accelerator);
+            }
+        }
+
+        _keyboardAccelerators.Clear();
+    }
+
+    private bool IsTextInputFocused() =>
+        _platformRoot?.XamlRoot is not null &&
+        Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(_platformRoot.XamlRoot) is
+            Microsoft.UI.Xaml.Controls.TextBox or
+            Microsoft.UI.Xaml.Controls.RichEditBox or
+            Microsoft.UI.Xaml.Controls.PasswordBox;
 #endif
 
     private static bool IsEditableProperty(PropertyDescriptor property)

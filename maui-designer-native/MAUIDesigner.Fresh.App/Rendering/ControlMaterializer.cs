@@ -63,7 +63,7 @@ public sealed class ControlMaterializer
         RemoveActiveDropPreview();
         foreach ((ElementId id, Grid chrome) in _chromes)
         {
-            bool selected = id == _workspace.SelectedId;
+            bool selected = _workspace.SelectedIds.Contains(id);
             bool highlighted = selected || id == _workspace.DropTargetId;
             if (highlighted)
             {
@@ -75,7 +75,7 @@ public sealed class ControlMaterializer
                 chrome.Remove(outline);
             }
 
-            if (selected)
+            if (id == _workspace.SelectedId)
             {
                 EnsureSelectionHandles(chrome, id);
             }
@@ -123,6 +123,21 @@ public sealed class ControlMaterializer
         {
             return false;
         }
+    }
+
+    public IReadOnlyList<ElementId> FindElementsInside(RectD windowBounds)
+    {
+        if (windowBounds.Width <= 0 || windowBounds.Height <= 0)
+        {
+            return [];
+        }
+
+        return _chromes
+            .Where(pair =>
+                TryGetWindowBounds(pair.Value, out RectD bounds) &&
+                MarqueeSelectionPolicy.Contains(windowBounds, bounds))
+            .Select(pair => pair.Key)
+            .ToArray();
     }
 
     public void BeginManualDrag(View source, ElementId? movingId)
@@ -285,7 +300,17 @@ public sealed class ControlMaterializer
         }
 
         var tap = new TapGestureRecognizer();
-        tap.Tapped += (_, _) => _workspace.Select(node.Id);
+        tap.Tapped += (_, _) =>
+        {
+#if WINDOWS
+            if (IsControlPressed())
+            {
+                _workspace.ToggleSelection(node.Id);
+                return;
+            }
+#endif
+            _workspace.Select(node.Id);
+        };
         chrome.GestureRecognizers.Add(tap);
         AttachContextMenu(chrome, node.Id);
 
@@ -320,10 +345,13 @@ public sealed class ControlMaterializer
         };
         chrome.GestureRecognizers.Add(reparent);
 
-        if (node.Id == _workspace.SelectedId)
+        if (_workspace.SelectedIds.Contains(node.Id))
         {
             _ = EnsureOutline(chrome, node.Id);
-            EnsureSelectionHandles(chrome, node.Id);
+            if (node.Id == _workspace.SelectedId)
+            {
+                EnsureSelectionHandles(chrome, node.Id);
+            }
         }
 
         return chrome;
@@ -428,27 +456,27 @@ public sealed class ControlMaterializer
                 var menu = new Microsoft.UI.Xaml.Controls.MenuFlyout();
                 AddContextMenuItem(menu, "Cut", () =>
                 {
-                    _workspace.Select(elementId);
+                    SelectForContextMenu(elementId);
                     _workspace.CutSelection();
                 });
                 AddContextMenuItem(menu, "Copy", () =>
                 {
-                    _workspace.Select(elementId);
+                    SelectForContextMenu(elementId);
                     _workspace.CopySelection();
                 });
                 AddContextMenuItem(menu, "Paste", () =>
                 {
-                    _workspace.Select(elementId);
+                    SelectForContextMenu(elementId);
                     _workspace.Paste();
                 });
                 AddContextMenuItem(menu, "Duplicate", () =>
                 {
-                    _workspace.Select(elementId);
+                    SelectForContextMenu(elementId);
                     _workspace.DuplicateSelection();
                 });
                 AddContextMenuItem(menu, "Delete", () =>
                 {
-                    _workspace.Select(elementId);
+                    SelectForContextMenu(elementId);
                     _workspace.DeleteSelection();
                 });
                 menu.ShowAt(native);
@@ -620,7 +648,7 @@ public sealed class ControlMaterializer
 
     private void UpdateOutline(Border outline, ElementId id)
     {
-        bool selected = id == _workspace.SelectedId;
+        bool selected = _workspace.SelectedIds.Contains(id);
         bool dropTarget = id == _workspace.DropTargetId;
         outline.Stroke = dropTarget
             ? Color.FromArgb("#38BDF8")
@@ -629,6 +657,21 @@ public sealed class ControlMaterializer
                 : Colors.Transparent;
         outline.StrokeThickness = dropTarget ? 3 : selected ? 2 : 0;
     }
+
+    private void SelectForContextMenu(ElementId elementId)
+    {
+        if (!_workspace.SelectedIds.Contains(elementId))
+        {
+            _workspace.Select(elementId);
+        }
+    }
+
+#if WINDOWS
+    private static bool IsControlPressed() =>
+        Microsoft.UI.Input.InputKeyboardSource
+            .GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control)
+            .HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+#endif
 
     private void RemoveActiveDropPreview()
     {

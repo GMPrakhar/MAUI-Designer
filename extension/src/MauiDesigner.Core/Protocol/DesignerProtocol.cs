@@ -18,6 +18,7 @@ namespace MauiDesigner.Core.Protocol
         public const string ManifestsPush = "manifests.push";
         public const string DocumentSaved = "document.saved";
         public const string HostClose = "host.close";
+        public const string HostCommand = "host.command";
 
         // Designer -> host
         public const string DesignerReady = "designer.ready";
@@ -26,6 +27,7 @@ namespace MauiDesigner.Core.Protocol
         public const string ManifestsRequest = "manifests.request";
         public const string DesignerError = "designer.error";
         public const string DesignerClosed = "designer.closed";
+        public const string DesignerFocusChanged = "designer.focusChanged";
     }
 
     /// <summary>A single message in either direction.</summary>
@@ -53,6 +55,14 @@ namespace MauiDesigner.Core.Protocol
         [JsonPropertyName("requestId")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? RequestId { get; set; }
+
+        [JsonPropertyName("command")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Command { get; set; }
+
+        [JsonPropertyName("textInputFocused")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public bool? TextInputFocused { get; set; }
 
         [JsonPropertyName("manifests")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -84,6 +94,16 @@ namespace MauiDesigner.Core.Protocol
 
         public static string HostClose(string requestId) =>
             Serialize(new DesignerMessage { Type = MessageTypes.HostClose, RequestId = requestId });
+
+        public static string HostCommand(string command) =>
+            Serialize(new DesignerMessage { Type = MessageTypes.HostCommand, Command = command });
+
+        public static string DesignerFocusChanged(bool textInputFocused) =>
+            Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DesignerFocusChanged,
+                TextInputFocused = textInputFocused
+            });
 
         public static bool IsCloseResponseFor(DesignerMessage? message, string requestId) =>
             message?.Type == MessageTypes.DesignerClosed &&

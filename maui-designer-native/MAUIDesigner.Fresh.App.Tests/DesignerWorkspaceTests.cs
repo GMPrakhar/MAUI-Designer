@@ -106,7 +106,7 @@ public sealed class DesignerWorkspaceTests
     }
 
     [Fact]
-    public void Cut_keeps_an_internal_snapshot_and_root_cannot_be_cut_or_deleted()
+    public void Cut_keeps_an_internal_snapshot_and_undoes()
     {
         ReflectionControlCatalog catalog = CreateCatalog();
         var workspace = new DesignerWorkspace(catalog);
@@ -124,15 +124,88 @@ public sealed class DesignerWorkspaceTests
         Assert.True(workspace.CanPaste);
         Assert.True(workspace.Session.Undo());
         Assert.NotNull(workspace.Session.Current.Find(labelId));
+    }
 
+    [Fact]
+    public void Deleting_the_root_resets_the_document_and_undo_restores_it()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        var workspace = new DesignerWorkspace(catalog);
+        ControlDescriptor label = Find(catalog, typeof(Label));
+        ElementId labelId = workspace.Add(label);
         workspace.Select(workspace.Session.Current.Root.Id);
-        workspace.CopySelection();
-        workspace.CutSelection();
         workspace.DeleteSelection();
-        ElementId pastedId = Assert.IsType<ElementId>(workspace.Paste());
-        Assert.NotNull(workspace.Session.Current.Root);
-        Assert.Equal("Cut me", workspace.Session.Current.Find(labelId)!.Properties[nameof(Label.Text)].Text);
-        Assert.Equal(label.Id, workspace.Session.Current.Find(pastedId)!.ControlType);
+
+        Assert.Empty(workspace.Session.Current.Root.Children);
+        Assert.Equal(typeof(AbsoluteLayout).Name, workspace.Session.Current.Root.ControlType.XamlName);
+        Assert.True(workspace.Session.Undo());
+        Assert.NotNull(workspace.Session.Current.Find(labelId));
+    }
+
+    [Fact]
+    public void Multi_selection_deletes_as_one_undoable_change()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        var workspace = new DesignerWorkspace(catalog);
+        ControlDescriptor button = Find(catalog, typeof(Button));
+        ElementId firstId = workspace.Add(button);
+        ElementId secondId = workspace.Add(button);
+        workspace.SetSelection([firstId, secondId], additive: false);
+
+        workspace.DeleteSelection();
+
+        Assert.Null(workspace.Session.Current.Find(firstId));
+        Assert.Null(workspace.Session.Current.Find(secondId));
+        Assert.True(workspace.Session.Undo());
+        Assert.NotNull(workspace.Session.Current.Find(firstId));
+        Assert.NotNull(workspace.Session.Current.Find(secondId));
+    }
+
+    [Fact]
+    public void Multi_selection_copy_paste_and_duplicate_preserve_the_group()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        var workspace = new DesignerWorkspace(catalog);
+        ControlDescriptor button = Find(catalog, typeof(Button));
+        ElementId firstId = workspace.Add(button);
+        ElementId secondId = workspace.Add(button);
+        RectD firstBounds = workspace.Session.Current.Find(firstId)!.Bounds!.Value;
+        RectD secondBounds = workspace.Session.Current.Find(secondId)!.Bounds!.Value;
+        workspace.SetSelection([firstId, secondId], additive: false);
+        workspace.CopySelection();
+        workspace.Select(workspace.Session.Current.Root.Id);
+
+        Assert.NotNull(workspace.Paste());
+        Assert.Equal(2, workspace.SelectionCount);
+        Assert.Equal(4, workspace.Session.Current.Root.Children.Length);
+        DesignerNode[] pasted = workspace.Session.Current.Root.Children.Skip(2).ToArray();
+        Assert.Equal(firstBounds.X + 16, pasted[0].Bounds!.Value.X);
+        Assert.Equal(firstBounds.Y + 16, pasted[0].Bounds!.Value.Y);
+        Assert.Equal(secondBounds.X + 16, pasted[1].Bounds!.Value.X);
+        Assert.Equal(secondBounds.Y + 16, pasted[1].Bounds!.Value.Y);
+
+        Assert.NotNull(workspace.DuplicateSelection());
+        Assert.Equal(2, workspace.SelectionCount);
+        Assert.Equal(6, workspace.Session.Current.Root.Children.Length);
+    }
+
+    [Fact]
+    public void Toggle_selection_supports_control_click_semantics()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        var workspace = new DesignerWorkspace(catalog);
+        ControlDescriptor button = Find(catalog, typeof(Button));
+        ElementId firstId = workspace.Add(button);
+        ElementId secondId = workspace.Add(button);
+
+        workspace.Select(firstId);
+        workspace.ToggleSelection(secondId);
+
+        Assert.Equal(2, workspace.SelectionCount);
+        Assert.Contains(firstId, workspace.SelectedIds);
+        Assert.Contains(secondId, workspace.SelectedIds);
+        workspace.ToggleSelection(secondId);
+        Assert.Equal([firstId], workspace.SelectedIds);
     }
 
     [Fact]

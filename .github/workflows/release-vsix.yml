@@ -28,6 +28,18 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a commit from main before publishing
+        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        shell: pwsh
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw 'VSIX releases must be built from a commit already merged into main.'
+          }
 
       - uses: actions/setup-dotnet@v5
         with:

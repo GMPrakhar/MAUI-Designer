@@ -10,6 +10,23 @@ public interface IDocumentCommand
     DesignerDocument Apply(DesignerDocument document);
 }
 
+public sealed record CompositeDocumentCommand(
+    IReadOnlyList<IDocumentCommand> Commands,
+    string Description) : IDocumentCommand
+{
+    public DesignerDocument Apply(DesignerDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(Commands);
+        DesignerDocument result = document;
+        foreach (IDocumentCommand command in Commands)
+        {
+            result = command.Apply(result);
+        }
+
+        return result;
+    }
+}
+
 public sealed record ReplaceDocumentCommand(
     DesignerDocument Replacement,
     string Description = "Apply XAML") : IDocumentCommand
