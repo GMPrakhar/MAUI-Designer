@@ -364,11 +364,7 @@ namespace MauiDesigner.Core.Tests
                 Assert.True(match.Success, $"AssemblyInfo.cs is missing [assembly: {attribute}].");
 
                 var declared = Version.Parse(match.Groups[1].Value);
-                Assert.True(
-                    declared.Major == manifestVersion.Major
-                        && declared.Minor == manifestVersion.Minor
-                        && declared.Build == manifestVersion.Build,
-                    $"{attribute} is {declared} but the manifest ships {manifestVersion}.");
+                Assert.Equal(manifestVersion, declared);
             }
         }
 
