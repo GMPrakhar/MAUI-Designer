@@ -185,6 +185,19 @@ changes made on the canvas appear in the XAML view immediately, undo/redo and th
 dirty indicator keep working, and Ctrl+S saves through the normal solution
 pipeline.
 
+When hosted by Visual Studio, the native app removes its duplicate header,
+toolbox, hierarchy, properties panel, and canvas toolbar so the document pane is
+dedicated to the design surface. Controls are exposed in a **MAUI Designer** tab
+in Visual Studio's Toolbox, and the selected element is published through
+`ITrackSelection` so Visual Studio's standard Properties window provides
+categorized, typed editors. Activating a Toolbox item with Enter or a
+double-click inserts it into the selected layout.
+
+The compact editor-local toolbar uses Visual Studio `KnownMonikers`, so its
+icons follow the active theme and DPI. It provides undo, redo, clipboard,
+duplicate, delete, zoom, fit, actual-size, snapping, grid, rulers, custom-control
+loading, and preview commands while leaving the canvas as the visual focus.
+
 `DesignerControl` creates a child Win32 host, starts the packaged
 `MAUIDesigner.exe`, and reparents its window into the editor pane. A uniquely
 named pipe carries newline-delimited protocol messages. A reversible pre-close
@@ -204,6 +217,10 @@ owned by that pane, so canceling the prompt leaves the designer usable.
   expose custom document editors or arbitrary native child-window hosting.
 * Win32 cross-process parenting requires compatible DPI-awareness modes. The
   extension and MAUI backend both use per-monitor-aware Windows UI stacks.
+* Toolbox items support keyboard and double-click activation. Dragging directly
+  from Visual Studio's Toolbox into the out-of-process MAUI child window is not
+  supported because Win32 child-window airspace does not participate in WPF
+  drag/drop routing.
 * Manifest generation reads compile-time metadata, so a control's runtime
   defaults are not known — the designer falls back to its own defaults.
 

@@ -1,6 +1,8 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,11 +13,14 @@ using MauiDesigner.Vsix.Projects;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
+using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.TextManager.Interop;
 using Microsoft.VisualStudio.Threading;
+
+using IOleDataObject = Microsoft.VisualStudio.OLE.Interop.IDataObject;
 
 namespace MauiDesigner.Vsix
 {
@@ -25,16 +30,23 @@ namespace MauiDesigner.Vsix
     /// </summary>
     public sealed class DesignerPane :
         WindowPane,
-        IVsWindowFrameNotify3
+        IVsWindowFrameNotify3,
+        IVsToolboxUser
     {
+        private const string ToolboxTabName = "MAUI Designer";
         private readonly IVsTextLines _textLines;
         private readonly string _documentMoniker;
         private readonly IVsHierarchy _hierarchy;
         private readonly DesignerControl _control;
         private readonly DesignerSession _session;
+        private readonly List<OleDataObject> _toolboxDataObjects = new List<OleDataObject>();
         private ITextBuffer? _textBuffer;
         private IVsWindowFrame? _registeredFrame;
         private CancellationTokenSource? _bufferReloadCancellation;
+        private SelectionContainer? _selectionContainer;
+        private DesignerSelectionSnapshot? _lastSelection;
+        private IReadOnlyList<DesignerToolboxItem>? _lastToolboxItems;
+        private bool _toolWindowsShown;
 
         /// <summary>
         /// Taken from the package rather than <see cref="ThreadHelper"/>, whose
@@ -73,6 +85,8 @@ namespace MauiDesigner.Vsix
             _session.DocumentChanged += OnDesignerEdited;
             _session.SaveRequested += OnSaveRequested;
             _session.ManifestsRequested += OnManifestsRequested;
+            _session.ToolboxChanged += OnToolboxChanged;
+            _session.SelectionChanged += OnSelectionChanged;
             _session.ErrorReported += (_, message) => WriteToOutput(message);
         }
 
@@ -99,6 +113,154 @@ namespace MauiDesigner.Vsix
                 SubscribeToBufferChanges();
                 _session.OpenDocument(ReadBuffer(), _documentMoniker);
             }).FileAndForget("vs/mauidesigner/initialize");
+        }
+
+        private void OnToolboxChanged(
+            object sender,
+            IReadOnlyList<DesignerToolboxItem> items)
+        {
+            _lastToolboxItems = items;
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    PopulateToolbox(items);
+                }
+            }).FileAndForget("vs/mauidesigner/toolbox");
+        }
+
+        private void PopulateToolbox(IReadOnlyList<DesignerToolboxItem> items)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (GetService(typeof(SVsToolbox)) is not IVsToolbox toolbox)
+            {
+                return;
+            }
+
+            toolbox.RemoveTab(ToolboxTabName);
+            ErrorHandler.ThrowOnFailure(toolbox.AddTab(ToolboxTabName));
+            _toolboxDataObjects.Clear();
+            foreach (DesignerToolboxItem item in items)
+            {
+                var data = new OleDataObject();
+                data.SetData(
+                    DesignerToolboxPayload.DataFormat,
+                    item.ControlType);
+                _toolboxDataObjects.Add(data);
+                var itemInfo = new[]
+                {
+                    new TBXITEMINFO
+                    {
+                        bstrText = item.DisplayName,
+                        hBmp = IntPtr.Zero,
+                        dwFlags = (uint)__TBXITEMINFOFLAGS.TBXIF_DONTPERSIST
+                    }
+                };
+                ErrorHandler.ThrowOnFailure(
+                    toolbox.AddItem(data, itemInfo, ToolboxTabName));
+            }
+
+            if (!_toolWindowsShown)
+            {
+                ShowToolWindow(new Guid(ToolWindowGuids80.Toolbox));
+                ShowToolWindow(new Guid(ToolWindowGuids.PropertyBrowser));
+                _toolWindowsShown = true;
+            }
+        }
+
+        private void ShowToolWindow(Guid persistenceSlot)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (GetService(typeof(SVsUIShell)) is not IVsUIShell shell)
+            {
+                return;
+            }
+
+            ErrorHandler.ThrowOnFailure(shell.FindToolWindow(
+                (uint)__VSFINDTOOLWIN.FTW_fForceCreate,
+                ref persistenceSlot,
+                out IVsWindowFrame frame));
+            ErrorHandler.ThrowOnFailure(frame.ShowNoActivate());
+        }
+
+        private void OnSelectionChanged(object sender, DesignerSelectionSnapshot selection)
+        {
+            _lastSelection = selection;
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    _control.UpdateCommandState(selection);
+                    PublishSelection(selection);
+                }
+            }).FileAndForget("vs/mauidesigner/selection");
+        }
+
+        private void PublishSelection(DesignerSelectionSnapshot selection)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (GetService(typeof(STrackSelection)) is not ITrackSelection trackSelection)
+            {
+                return;
+            }
+
+            var selected = new ArrayList();
+            if (selection.SelectionCount > 0)
+            {
+                selected.Add(new DesignerSelectionProxy(
+                    selection,
+                    (name, value) =>
+                    {
+                        if (selection.ElementId is not null)
+                        {
+                            _control.PostMessage(DesignerProtocol.HostSetProperty(
+                                selection.ElementId,
+                                name,
+                                value));
+                        }
+                    }));
+            }
+
+            _selectionContainer = new SelectionContainer(true, false)
+            {
+                SelectableObjects = selected,
+                SelectedObjects = selected
+            };
+            ErrorHandler.ThrowOnFailure(trackSelection.OnSelectChange(_selectionContainer));
+        }
+
+        int IVsToolboxUser.IsSupported(IOleDataObject dataObject) =>
+            TryGetToolboxControlType(dataObject, out _)
+                ? VSConstants.S_OK
+                : VSConstants.S_FALSE;
+
+        int IVsToolboxUser.ItemPicked(IOleDataObject dataObject)
+        {
+            if (!TryGetToolboxControlType(dataObject, out string? controlType) ||
+                controlType is null)
+            {
+                return VSConstants.S_FALSE;
+            }
+
+            _control.PostMessage(DesignerProtocol.HostInsertControl(controlType));
+            return VSConstants.S_OK;
+        }
+
+        private static bool TryGetToolboxControlType(
+            IOleDataObject dataObject,
+            out string? controlType)
+        {
+            var managed = new OleDataObject(dataObject);
+            if (!managed.GetDataPresent(DesignerToolboxPayload.DataFormat))
+            {
+                controlType = null;
+                return false;
+            }
+
+            controlType = managed.GetData(DesignerToolboxPayload.DataFormat) as string;
+            return !string.IsNullOrWhiteSpace(controlType);
         }
 
         private void RegisterFrameNotifications()
@@ -350,6 +512,15 @@ namespace MauiDesigner.Vsix
             if (show == (int)__FRAMESHOW.FRAMESHOW_WinClosed)
             {
                 DisposeResources();
+            }
+            else if (_lastSelection is not null)
+            {
+                if (_lastToolboxItems is not null)
+                {
+                    PopulateToolbox(_lastToolboxItems);
+                }
+
+                PublishSelection(_lastSelection);
             }
 
             return VSConstants.S_OK;

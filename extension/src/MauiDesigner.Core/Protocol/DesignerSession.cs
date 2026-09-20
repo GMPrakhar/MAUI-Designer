@@ -46,6 +46,10 @@ namespace MauiDesigner.Core.Protocol
         /// <summary>Raised when the designer asks for the project's control manifests.</summary>
         public event EventHandler? ManifestsRequested;
 
+        public event EventHandler<IReadOnlyList<DesignerToolboxItem>>? ToolboxChanged;
+
+        public event EventHandler<DesignerSelectionSnapshot>? SelectionChanged;
+
         /// <summary>
         /// Queues (or sends, once the designer is ready) the document to edit.
         /// </summary>
@@ -182,6 +186,22 @@ namespace MauiDesigner.Core.Protocol
 
                     CurrentXaml = xaml;
                     SaveRequested?.Invoke(this, new DocumentSaveRequestedEventArgs(xaml, FileName));
+                    break;
+
+                case MessageTypes.DesignerToolboxChanged:
+                    if (message.ToolboxItems is not null)
+                    {
+                        ToolboxChanged?.Invoke(this, message.ToolboxItems);
+                    }
+
+                    break;
+
+                case MessageTypes.DesignerSelectionChanged:
+                    if (message.Selection is not null)
+                    {
+                        SelectionChanged?.Invoke(this, message.Selection);
+                    }
+
                     break;
 
                 case MessageTypes.DesignerError:

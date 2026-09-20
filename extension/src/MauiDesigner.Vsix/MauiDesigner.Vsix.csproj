@@ -67,6 +67,7 @@
   <ItemGroup>
     <Compile Include="Editor\DesignerControl.cs" />
     <Compile Include="Editor\DesignerEditorFactory.cs" />
+    <Compile Include="Editor\DesignerToolboxPayload.cs" />
     <Compile Include="Editor\NativeDesignerHost.cs" />
     <Compile Include="Editor\NativeDesignerLocator.cs" />
     <Compile Include="Editor\DesignerPane.cs" />
@@ -119,6 +120,7 @@
     <Reference Include="PresentationFramework" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase" />
   </ItemGroup>

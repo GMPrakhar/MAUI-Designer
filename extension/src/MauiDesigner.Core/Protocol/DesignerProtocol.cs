@@ -29,6 +29,8 @@ namespace MauiDesigner.Core.Protocol
         public const string DesignerError = "designer.error";
         public const string DesignerClosed = "designer.closed";
         public const string DesignerFocusChanged = "designer.focusChanged";
+        public const string DesignerToolboxChanged = "designer.toolboxChanged";
+        public const string DesignerSelectionChanged = "designer.selectionChanged";
     }
 
     /// <summary>A single message in either direction.</summary>
@@ -72,6 +74,30 @@ namespace MauiDesigner.Core.Protocol
         [JsonPropertyName("manifests")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<CustomControlManifest>? Manifests { get; set; }
+
+        [JsonPropertyName("toolboxItems")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<DesignerToolboxItem>? ToolboxItems { get; set; }
+
+        [JsonPropertyName("selection")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public DesignerSelectionSnapshot? Selection { get; set; }
+
+        [JsonPropertyName("controlType")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ControlType { get; set; }
+
+        [JsonPropertyName("elementId")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? ElementId { get; set; }
+
+        [JsonPropertyName("propertyName")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? PropertyName { get; set; }
+
+        [JsonPropertyName("value")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Value { get; set; }
     }
 
     /// <summary>Builds and parses <see cref="DesignerMessage"/> payloads.</summary>
@@ -102,6 +128,27 @@ namespace MauiDesigner.Core.Protocol
 
         public static string HostCommand(string command) =>
             Serialize(new DesignerMessage { Type = MessageTypes.HostCommand, Command = command });
+
+        public static string HostInsertControl(string controlType) =>
+            Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.HostCommand,
+                Command = "insertControl",
+                ControlType = controlType
+            });
+
+        public static string HostSetProperty(
+            string elementId,
+            string propertyName,
+            string? value) =>
+            Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.HostCommand,
+                Command = "setProperty",
+                ElementId = elementId,
+                PropertyName = propertyName,
+                Value = value
+            });
 
         public static string DocumentApplied(long revision) =>
             Serialize(new DesignerMessage
@@ -144,5 +191,72 @@ namespace MauiDesigner.Core.Protocol
                 return null;
             }
         }
+    }
+
+    public sealed class DesignerToolboxItem
+    {
+        [JsonPropertyName("controlType")]
+        public string ControlType { get; set; } = string.Empty;
+
+        [JsonPropertyName("displayName")]
+        public string DisplayName { get; set; } = string.Empty;
+
+        [JsonPropertyName("category")]
+        public string Category { get; set; } = string.Empty;
+    }
+
+    public sealed class DesignerSelectionSnapshot
+    {
+        [JsonPropertyName("selectionCount")]
+        public int SelectionCount { get; set; }
+
+        [JsonPropertyName("elementId")]
+        public string? ElementId { get; set; }
+
+        [JsonPropertyName("displayName")]
+        public string DisplayName { get; set; } = string.Empty;
+
+        [JsonPropertyName("properties")]
+        public List<DesignerPropertySnapshot> Properties { get; set; } =
+            new List<DesignerPropertySnapshot>();
+
+        [JsonPropertyName("canUndo")]
+        public bool CanUndo { get; set; }
+
+        [JsonPropertyName("canRedo")]
+        public bool CanRedo { get; set; }
+
+        [JsonPropertyName("canCopy")]
+        public bool CanCopy { get; set; }
+
+        [JsonPropertyName("canCut")]
+        public bool CanCut { get; set; }
+
+        [JsonPropertyName("canPaste")]
+        public bool CanPaste { get; set; }
+
+        [JsonPropertyName("canDuplicate")]
+        public bool CanDuplicate { get; set; }
+
+        [JsonPropertyName("canDelete")]
+        public bool CanDelete { get; set; }
+    }
+
+    public sealed class DesignerPropertySnapshot
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = string.Empty;
+
+        [JsonPropertyName("value")]
+        public string? Value { get; set; }
+
+        [JsonPropertyName("valueType")]
+        public string ValueType { get; set; } = typeof(string).FullName;
+
+        [JsonPropertyName("category")]
+        public string Category { get; set; } = string.Empty;
+
+        [JsonPropertyName("isReadOnly")]
+        public bool IsReadOnly { get; set; }
     }
 }

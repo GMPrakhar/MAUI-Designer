@@ -41,7 +41,7 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
 
     public event EventHandler<string>? ErrorReported;
 
-    public event EventHandler<string>? CommandRequested;
+    public event EventHandler<HostedDesignerCommand>? CommandRequested;
 
     public void Start()
     {
@@ -71,6 +71,16 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         Enqueue(new BridgeMessage(
             "designer.focusChanged",
             TextInputFocused: textInputFocused));
+
+    public void SendToolboxSnapshot(IReadOnlyList<HostedToolboxItem> items) =>
+        Enqueue(new BridgeMessage(
+            "designer.toolboxChanged",
+            ToolboxItems: items));
+
+    public void SendSelectionSnapshot(HostedSelectionSnapshot selection) =>
+        Enqueue(new BridgeMessage(
+            "designer.selectionChanged",
+            Selection: selection));
 
     public void SendClosed(string requestId, string? xaml) =>
         Enqueue(new BridgeMessage("designer.closed", xaml, requestId));
@@ -176,7 +186,14 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             else if (message?.Type == "host.command" &&
                      !string.IsNullOrWhiteSpace(message.Command))
             {
-                CommandRequested?.Invoke(this, message.Command);
+                CommandRequested?.Invoke(
+                    this,
+                    new HostedDesignerCommand(
+                        message.Command,
+                        message.ControlType,
+                        message.ElementId,
+                        message.PropertyName,
+                        message.Value));
             }
         }
     }
@@ -242,5 +259,17 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         [property: JsonPropertyName("command")]
         string? Command = null,
         [property: JsonPropertyName("textInputFocused")]
-        bool? TextInputFocused = null);
+        bool? TextInputFocused = null,
+        [property: JsonPropertyName("toolboxItems")]
+        IReadOnlyList<HostedToolboxItem>? ToolboxItems = null,
+        [property: JsonPropertyName("selection")]
+        HostedSelectionSnapshot? Selection = null,
+        [property: JsonPropertyName("controlType")]
+        string? ControlType = null,
+        [property: JsonPropertyName("elementId")]
+        string? ElementId = null,
+        [property: JsonPropertyName("propertyName")]
+        string? PropertyName = null,
+        [property: JsonPropertyName("value")]
+        string? Value = null);
 }

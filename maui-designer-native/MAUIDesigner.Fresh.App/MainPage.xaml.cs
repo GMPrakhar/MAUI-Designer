@@ -83,6 +83,11 @@ public partial class MainPage : ContentPage
         _viewport = viewport;
         _runtimePreview = runtimePreview;
         _hostBridge = hostBridge;
+        if (_hostBridge.IsHosted)
+        {
+            ConfigureHostedLayout();
+        }
+
         _hostBridge.DocumentLoadRequested += OnHostedDocumentLoadRequested;
         _hostBridge.CloseRequested += OnHostedCloseRequested;
         _hostBridge.ErrorReported += OnHostedErrorReported;
@@ -104,7 +109,25 @@ public partial class MainPage : ContentPage
         RebuildDesigner();
         RefreshXaml();
         UpdateViewportVisuals();
+        PublishToolboxSnapshot();
+        PublishSelectionSnapshot();
         _hostBridge.Start();
+    }
+
+    private void ConfigureHostedLayout()
+    {
+        ApplicationToolbar.IsVisible = false;
+        ApplicationGrid.RowDefinitions[0].Height = new GridLength(0);
+        ElementsSidebar.IsVisible = false;
+        LeftSidebarResizeHandle.IsVisible = false;
+        PropertiesSidebar.IsVisible = false;
+        RightSidebarResizeHandle.IsVisible = false;
+        DesignerBody.ColumnDefinitions[0].Width = new GridLength(0);
+        DesignerBody.ColumnDefinitions[1].Width = new GridLength(0);
+        DesignerBody.ColumnDefinitions[3].Width = new GridLength(0);
+        DesignerBody.ColumnDefinitions[4].Width = new GridLength(0);
+        CanvasToolbar.IsVisible = false;
+        CanvasColumn.RowDefinitions[0].Height = new GridLength(0);
     }
 
     protected override void OnHandlerChanged()
@@ -543,17 +566,26 @@ public partial class MainPage : ContentPage
             SetBusy(true, incremental ? "Applying property..." : "Rendering design...");
         }
 
+        PublishSelectionSnapshot();
         ScheduleRender();
     }
 
-    private void OnSelectionChanged(object? sender, EventArgs e) =>
+    private void OnSelectionChanged(object? sender, EventArgs e)
+    {
+        PublishSelectionSnapshot();
         ScheduleSelectionRefresh();
+    }
 
     private void OnInteractionChanged(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(_materializer.UpdateInteraction);
 
     private void OnCatalogChanged(object? sender, EventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(() => ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty);
+            PublishToolboxSnapshot();
+            PublishSelectionSnapshot();
+        });
 
     private void ApplyToolboxFilter(string search)
     {
@@ -646,17 +678,170 @@ public partial class MainPage : ContentPage
             _hostBridge.SendClosed(requestId, xaml);
         });
 
-    private void OnHostedCommandRequested(object? sender, string command) =>
+    private void OnHostedCommandRequested(object? sender, HostedDesignerCommand command) =>
         Dispatcher.Dispatch(() =>
         {
+            if (command.Name == "insertControl")
+            {
+                InsertHostedControl(command.ControlType);
+                return;
+            }
+
+            if (command.Name == "setProperty")
+            {
+                SetHostedProperty(command);
+                return;
+            }
+
 #if WINDOWS
             if (IsTextInputFocused())
             {
                 return;
             }
 #endif
-            ExecuteDesignerCommand(command);
+            ExecuteDesignerCommand(command.Name);
         });
+
+    private void InsertHostedControl(string? controlType)
+    {
+        ControlDescriptor? descriptor = _catalog.Controls.FirstOrDefault(
+            candidate => candidate.Id.FullName == controlType);
+        if (descriptor is null)
+        {
+            ShowPropertyError($"The toolbox control '{controlType}' is unavailable.");
+            return;
+        }
+
+        _workspace.Add(descriptor);
+    }
+
+    private void SetHostedProperty(HostedDesignerCommand command)
+    {
+        if (string.IsNullOrWhiteSpace(command.ElementId) ||
+            string.IsNullOrWhiteSpace(command.PropertyName))
+        {
+            ShowPropertyError("Visual Studio sent an incomplete property update.");
+            return;
+        }
+
+        var elementId = new ElementId(command.ElementId);
+        DesignerNode? selected = _workspace.Session.Current.Find(elementId);
+        if (selected is null ||
+            !_catalog.TryGet(selected.ControlType, out ControlDescriptor? descriptor) ||
+            descriptor is null)
+        {
+            ShowPropertyError($"Element '{command.ElementId}' is no longer available.");
+            PublishSelectionSnapshot();
+            return;
+        }
+
+        DesignerNode? parent = _workspace.Session.Current.FindParent(elementId);
+        PropertyDescriptor? property = PropertyInspectorDescriptorSource
+            .Compose(descriptor, selected, parent)
+            .FirstOrDefault(candidate =>
+                candidate.Name == command.PropertyName &&
+                IsEditableProperty(candidate));
+        if (property is null)
+        {
+            ShowPropertyError($"Property '{command.PropertyName}' is not editable.");
+            PublishSelectionSnapshot();
+            return;
+        }
+
+        CommitProperty(elementId, property, command.Value);
+    }
+
+    private void PublishToolboxSnapshot()
+    {
+        if (!_hostBridge.IsHosted)
+        {
+            return;
+        }
+
+        HostedToolboxItem[] items = _catalog.Controls
+            .OrderBy(descriptor => CategoryOrder(descriptor.Category))
+            .ThenBy(descriptor => descriptor.Category, StringComparer.Ordinal)
+            .ThenBy(descriptor => descriptor.DisplayName, StringComparer.Ordinal)
+            .Select(descriptor => new HostedToolboxItem(
+                descriptor.Id.FullName,
+                descriptor.DisplayName,
+                descriptor.Category))
+            .ToArray();
+        _hostBridge.SendToolboxSnapshot(items);
+    }
+
+    private void PublishSelectionSnapshot()
+    {
+        if (!_hostBridge.IsHosted)
+        {
+            return;
+        }
+
+        if (_workspace.SelectionCount != 1)
+        {
+            _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+                _workspace.SelectionCount,
+                null,
+                $"{_workspace.SelectionCount} controls selected",
+                [],
+                _workspace.Session.CanUndo,
+                _workspace.Session.CanRedo,
+                _workspace.CanCopy,
+                _workspace.CanCut,
+                _workspace.CanPaste,
+                _workspace.CanDuplicate,
+                _workspace.SelectionCount > 0));
+            return;
+        }
+
+        DesignerNode? selected = _workspace.Session.Current.Find(_workspace.SelectedId);
+        if (selected is null ||
+            !_catalog.TryGet(selected.ControlType, out ControlDescriptor? descriptor) ||
+            descriptor is null)
+        {
+            _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+                0,
+                null,
+                "No selection",
+                [],
+                _workspace.Session.CanUndo,
+                _workspace.Session.CanRedo,
+                _workspace.CanCopy,
+                _workspace.CanCut,
+                _workspace.CanPaste,
+                _workspace.CanDuplicate,
+                false));
+            return;
+        }
+
+        DesignerNode? parent = _workspace.Session.Current.FindParent(selected.Id);
+        HostedPropertySnapshot[] properties = PropertyInspectorDescriptorSource
+            .Compose(descriptor, selected, parent)
+            .Where(IsEditableProperty)
+            .OrderBy(PropertyPriority)
+            .ThenBy(property => property.Name, StringComparer.Ordinal)
+            .Select(property => new HostedPropertySnapshot(
+                property.Name,
+                selected.Properties.TryGetValue(property.Name, out DesignerValue? value)
+                    ? value.Text
+                    : PropertyInspectorDescriptorSource.DefaultValue(property.Name),
+                property.ValueType.FullName ?? typeof(string).FullName!,
+                PropertyGroup(property),
+                property.IsReadOnly))
+            .ToArray();
+        _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+            1,
+            selected.Id.Value,
+            descriptor.DisplayName,
+            properties,
+            _workspace.Session.CanUndo,
+            _workspace.Session.CanRedo,
+            _workspace.CanCopy,
+            _workspace.CanCut,
+            _workspace.CanPaste,
+            _workspace.CanDuplicate,
+            _workspace.SelectionCount > 0));
+    }
 
     private void ExecuteDesignerCommand(string command)
     {
@@ -692,7 +877,36 @@ public partial class MainPage : ContentPage
             case "delete":
                 _workspace.DeleteSelection();
                 break;
+            case "zoomOut":
+                OnZoomOutClicked(null, EventArgs.Empty);
+                break;
+            case "zoomIn":
+                OnZoomInClicked(null, EventArgs.Empty);
+                break;
+            case "zoomFit":
+                OnZoomFitClicked(null, EventArgs.Empty);
+                break;
+            case "zoomReset":
+                OnZoomResetClicked(null, EventArgs.Empty);
+                break;
+            case "toggleSnap":
+                OnSnapClicked(null, EventArgs.Empty);
+                break;
+            case "toggleGrid":
+                OnGridClicked(null, EventArgs.Empty);
+                break;
+            case "toggleRulers":
+                OnRulersClicked(null, EventArgs.Empty);
+                break;
+            case "loadControls":
+                OnLoadControlsClicked(null, EventArgs.Empty);
+                break;
+            case "runPreview":
+                OnRunPreviewClicked(null, EventArgs.Empty);
+                break;
         }
+
+        PublishSelectionSnapshot();
     }
 
     private void LoadHostedDocument(string xaml)
@@ -1314,6 +1528,7 @@ public partial class MainPage : ContentPage
         DesignerNode? selected = _workspace.Session.Current.Find(elementId);
         if (selected is null)
         {
+            PublishSelectionSnapshot();
             return;
         }
 
@@ -1324,6 +1539,7 @@ public partial class MainPage : ContentPage
                 out string? error))
         {
             ShowPropertyError(error!);
+            PublishSelectionSnapshot();
             return;
         }
 
@@ -1331,6 +1547,7 @@ public partial class MainPage : ContentPage
         DesignerValue? newValue = normalized is null ? null : DesignerValue.Literal(normalized);
         if (oldValue == newValue)
         {
+            PublishSelectionSnapshot();
             return;
         }
 
@@ -1339,6 +1556,7 @@ public partial class MainPage : ContentPage
         {
             SelectionLabel.Text = $"{property.Name}: invalid {property.ValueType.Name}";
             SelectionLabel.TextColor = Color.FromArgb("#DC2626");
+            PublishSelectionSnapshot();
             return;
         }
 

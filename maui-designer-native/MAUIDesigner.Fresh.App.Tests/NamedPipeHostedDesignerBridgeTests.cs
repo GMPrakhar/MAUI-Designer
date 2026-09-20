@@ -169,6 +169,63 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         Assert.Equal(requestId, message.RootElement.GetProperty("requestId").GetString());
     }
 
+    [Fact]
+    public async Task Bridge_exchanges_toolbox_selection_and_property_commands()
+    {
+        string pipeName = $"MauiDesigner.Test.{Guid.NewGuid():N}";
+        using var server = CreateServer(pipeName);
+        using var bridge = new NamedPipeHostedDesignerBridge(pipeName);
+        var command = new TaskCompletionSource<HostedDesignerCommand>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        bridge.CommandRequested += (_, value) => command.TrySetResult(value);
+
+        bridge.SendToolboxSnapshot(
+        [
+            new HostedToolboxItem(
+                "Microsoft.Maui.Controls.Button",
+                "Button",
+                "Controls")
+        ]);
+        bridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+            1,
+            "button-1",
+            "Button",
+            [
+                new HostedPropertySnapshot(
+                    "Text",
+                    "Save",
+                    typeof(string).FullName!,
+                    "Common",
+                    false)
+            ]));
+        bridge.Start();
+        await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        using var reader = new StreamReader(server);
+        using var writer = new StreamWriter(server) { AutoFlush = true };
+
+        Assert.Equal("designer.ready", MessageType(await ReadLineAsync(reader)));
+        using JsonDocument toolbox = JsonDocument.Parse(await ReadLineAsync(reader));
+        using JsonDocument selection = JsonDocument.Parse(await ReadLineAsync(reader));
+        Assert.Equal(
+            "Microsoft.Maui.Controls.Button",
+            toolbox.RootElement.GetProperty("toolboxItems")[0]
+                .GetProperty("controlType")
+                .GetString());
+        Assert.Equal(
+            "button-1",
+            selection.RootElement.GetProperty("selection")
+                .GetProperty("elementId")
+                .GetString());
+
+        await writer.WriteLineAsync(
+            """{"type":"host.command","command":"setProperty","elementId":"button-1","propertyName":"Text","value":"Updated"}""");
+        HostedDesignerCommand received = await command.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("setProperty", received.Name);
+        Assert.Equal("button-1", received.ElementId);
+        Assert.Equal("Text", received.PropertyName);
+        Assert.Equal("Updated", received.Value);
+    }
+
     private static async Task<string> ReadLineAsync(StreamReader reader) =>
         await reader.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(5)) ??
         throw new EndOfStreamException();

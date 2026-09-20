@@ -104,6 +104,71 @@ namespace MauiDesigner.Core.Tests
             Assert.Equal("duplicate", message.Command);
         }
 
+        [Fact]
+        public void Host_commands_carry_toolbox_and_property_arguments()
+        {
+            DesignerMessage insert = DesignerProtocol.Parse(
+                DesignerProtocol.HostInsertControl("Microsoft.Maui.Controls.Button"))!;
+            DesignerMessage property = DesignerProtocol.Parse(
+                DesignerProtocol.HostSetProperty("button-1", "Text", "Save"))!;
+
+            Assert.Equal("insertControl", insert.Command);
+            Assert.Equal("Microsoft.Maui.Controls.Button", insert.ControlType);
+            Assert.Equal("setProperty", property.Command);
+            Assert.Equal("button-1", property.ElementId);
+            Assert.Equal("Text", property.PropertyName);
+            Assert.Equal("Save", property.Value);
+        }
+
+        [Fact]
+        public void Designer_shell_snapshots_are_forwarded_to_the_host()
+        {
+            var session = CreateSession();
+            IReadOnlyList<DesignerToolboxItem>? toolbox = null;
+            DesignerSelectionSnapshot? selection = null;
+            session.ToolboxChanged += (_, items) => toolbox = items;
+            session.SelectionChanged += (_, value) => selection = value;
+
+            session.HandleMessage(DesignerProtocol.Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DesignerToolboxChanged,
+                ToolboxItems = new List<DesignerToolboxItem>
+                {
+                    new DesignerToolboxItem
+                    {
+                        ControlType = "Microsoft.Maui.Controls.Button",
+                        DisplayName = "Button",
+                        Category = "Controls"
+                    }
+                }
+            }));
+            session.HandleMessage(DesignerProtocol.Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DesignerSelectionChanged,
+                Selection = new DesignerSelectionSnapshot
+                {
+                    SelectionCount = 1,
+                    ElementId = "button-1",
+                    DisplayName = "Button",
+                    Properties =
+                    {
+                        new DesignerPropertySnapshot
+                        {
+                            Name = "Text",
+                            Value = "Save",
+                            ValueType = typeof(string).FullName!,
+                            Category = "Common"
+                        }
+                    }
+                }
+            }));
+
+            DesignerToolboxItem item = Assert.Single(toolbox!);
+            Assert.Equal("Button", item.DisplayName);
+            Assert.Equal("button-1", selection!.ElementId);
+            Assert.Equal("Save", Assert.Single(selection.Properties).Value);
+        }
+
         [Theory]
         [InlineData(true)]
         [InlineData(false)]

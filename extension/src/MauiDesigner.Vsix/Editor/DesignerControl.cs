@@ -11,6 +11,8 @@ using System.Windows.Controls;
 
 using MauiDesigner.Core.Protocol;
 
+using Microsoft.VisualStudio.Imaging;
+using Microsoft.VisualStudio.Imaging.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Threading;
 
@@ -25,6 +27,8 @@ namespace MauiDesigner.Vsix
         private readonly JoinableTaskFactory _joinableTaskFactory;
         private readonly NativeDesignerHost _nativeHost;
         private readonly TextBlock _status;
+        private readonly Dictionary<string, Button> _commandButtons =
+            new Dictionary<string, Button>(StringComparer.Ordinal);
         private readonly LinkedList<string> _pending = new LinkedList<string>();
         private readonly SemaphoreSlim _writeGate = new SemaphoreSlim(1, 1);
         private readonly object _closeGate = new object();
@@ -53,6 +57,14 @@ namespace MauiDesigner.Vsix
             _nativeHost.ShortcutRequested += OnShortcutRequested;
 
             var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition
+            {
+                Height = new GridLength(1, GridUnitType.Star)
+            });
+            root.Children.Add(CreateToolbar());
+            Grid.SetRow(_nativeHost, 1);
+            Grid.SetRow(_status, 1);
             root.Children.Add(_nativeHost);
             root.Children.Add(_status);
             Content = root;
@@ -62,6 +74,85 @@ namespace MauiDesigner.Vsix
 
         private void OnShortcutRequested(object? sender, string command) =>
             PostMessage(DesignerProtocol.HostCommand(command));
+
+        private ToolBarTray CreateToolbar()
+        {
+            var toolbar = new ToolBar
+            {
+                Band = 0,
+                BandIndex = 0
+            };
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Undo, "Undo (Ctrl+Z)", "undo"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Redo, "Redo (Ctrl+Y)", "redo"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Cut, "Cut (Ctrl+X)", "cut"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Copy, "Copy (Ctrl+C)", "copy"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Paste, "Paste (Ctrl+V)", "paste"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Copy, "Duplicate (Ctrl+D)", "duplicate"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Delete, "Delete", "delete"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.ZoomOut, "Zoom out", "zoomOut"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.ZoomIn, "Zoom in", "zoomIn"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.ZoomToFit, "Fit canvas", "zoomFit"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Zoom, "Actual size", "zoomReset"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.SnapToGrid, "Toggle snapping", "toggleSnap"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Grid, "Toggle grid", "toggleGrid"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Ruler, "Toggle rulers", "toggleRulers"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.OpenFile, "Load custom controls", "loadControls"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Run, "Run preview", "runPreview"));
+
+            var tray = new ToolBarTray
+            {
+                IsLocked = true
+            };
+            tray.ToolBars.Add(toolbar);
+            return tray;
+        }
+
+        private Button CreateToolbarButton(
+            ImageMoniker moniker,
+            string tooltip,
+            string command)
+        {
+            var button = new Button
+            {
+                Width = 28,
+                Height = 26,
+                Padding = new Thickness(4),
+                ToolTip = tooltip,
+                Content = new CrispImage
+                {
+                    Moniker = moniker,
+                    Width = 16,
+                    Height = 16
+                }
+            };
+            System.Windows.Automation.AutomationProperties.SetName(button, tooltip);
+            button.Click += (_, _) => PostMessage(DesignerProtocol.HostCommand(command));
+            _commandButtons[command] = button;
+            return button;
+        }
+
+        public void UpdateCommandState(DesignerSelectionSnapshot selection)
+        {
+            SetCommandEnabled("undo", selection.CanUndo);
+            SetCommandEnabled("redo", selection.CanRedo);
+            SetCommandEnabled("copy", selection.CanCopy);
+            SetCommandEnabled("cut", selection.CanCut);
+            SetCommandEnabled("paste", selection.CanPaste);
+            SetCommandEnabled("duplicate", selection.CanDuplicate);
+            SetCommandEnabled("delete", selection.CanDelete);
+        }
+
+        private void SetCommandEnabled(string command, bool enabled)
+        {
+            if (_commandButtons.TryGetValue(command, out Button? button))
+            {
+                button.IsEnabled = enabled;
+            }
+        }
 
         public async Task InitializeAsync(string executablePath)
         {

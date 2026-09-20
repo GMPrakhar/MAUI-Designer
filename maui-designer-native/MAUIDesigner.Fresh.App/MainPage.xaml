@@ -8,6 +8,7 @@
 
     <Grid x:Name="ApplicationGrid" RowDefinitions="64,*,Auto">
         <Border
+            x:Name="ApplicationToolbar"
             Grid.Row="0"
             Padding="18,0"
             BackgroundColor="{StaticResource Surface}"
@@ -137,8 +138,9 @@
                 SemanticProperties.Description="Resize or double-click to collapse the elements sidebar"
                 ToggleRequested="OnLeftSidebarToggleRequested" />
 
-            <Grid Grid.Column="2" RowDefinitions="88,*">
+            <Grid x:Name="CanvasColumn" Grid.Column="2" RowDefinitions="88,*">
                 <Border
+                    x:Name="CanvasToolbar"
                     Padding="16,0"
                     BackgroundColor="{StaticResource Surface}"
                     Stroke="{StaticResource Border}"
