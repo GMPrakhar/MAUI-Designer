@@ -117,6 +117,12 @@ public sealed class ControlMaterializer
 
         try
         {
+            View layoutTarget = _chromes.GetValueOrDefault(elementId) ?? view;
+            if (TryApplyGridPlacement(layoutTarget, propertyName, designerValue))
+            {
+                return true;
+            }
+
             return TryApplyPropertyValue(view, descriptor, propertyName, designerValue);
         }
         catch (Exception exception) when (IsRecoverableMaterializationFailure(exception))
@@ -731,6 +737,40 @@ public sealed class ControlMaterializer
 
         property.SetValue(view, value);
         return true;
+    }
+
+    private static bool TryApplyGridPlacement(
+        View view,
+        string propertyName,
+        DesignerValue designerValue)
+    {
+        if (designerValue.Kind != DesignerValueKind.Literal ||
+            !int.TryParse(
+                designerValue.Text,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out int value))
+        {
+            return false;
+        }
+
+        switch (propertyName)
+        {
+            case "Grid.Row" when value >= 0:
+                Grid.SetRow(view, value);
+                return true;
+            case "Grid.Column" when value >= 0:
+                Grid.SetColumn(view, value);
+                return true;
+            case "Grid.RowSpan" when value >= 1:
+                Grid.SetRowSpan(view, value);
+                return true;
+            case "Grid.ColumnSpan" when value >= 1:
+                Grid.SetColumnSpan(view, value);
+                return true;
+            default:
+                return false;
+        }
     }
 
     private static IReadOnlyDictionary<string, PropertyInfo> GetWritableProperties(

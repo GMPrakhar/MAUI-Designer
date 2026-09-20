@@ -21,8 +21,18 @@ namespace MauiDesigner.Core.Tests
         private IEnumerable<DesignerMessage> Posted() =>
             _posted.Select(DesignerProtocol.Parse).Where(message => message is not null)!;
 
-        private static string FromDesigner(string type, string? xaml = null, string? message = null) =>
-            DesignerProtocol.Serialize(new DesignerMessage { Type = type, Xaml = xaml, Message = message });
+        private static string FromDesigner(
+            string type,
+            string? xaml = null,
+            string? message = null,
+            long? revision = null) =>
+            DesignerProtocol.Serialize(new DesignerMessage
+            {
+                Type = type,
+                Xaml = xaml,
+                Message = message,
+                Revision = revision
+            });
 
         [Fact]
         public void Opening_a_document_before_the_designer_is_ready_replays_it()
@@ -140,9 +150,88 @@ namespace MauiDesigner.Core.Tests
 
             session.HandleMessage(FromDesigner(MessageTypes.DocumentChanged, "<ContentPage><Label /></ContentPage>"));
 
+            Assert.Single(changes);
+            Assert.False(session.IsDirty);
+            session.AcceptDesignerEdit(new DocumentChangedEventArgs(changes[0]));
             Assert.True(session.IsDirty);
             Assert.Equal("<ContentPage><Label /></ContentPage>", session.CurrentXaml);
-            Assert.Single(changes);
+        }
+
+        [Fact]
+        public void Designer_edit_is_acknowledged_only_after_the_host_accepts_it()
+        {
+            var session = CreateSession();
+            session.OpenDocument("<Grid />", "MainPage.xaml");
+            session.HandleMessage(FromDesigner(MessageTypes.DesignerReady));
+            _posted.Clear();
+            DocumentChangedEventArgs? edit = null;
+            session.DocumentChanged += (_, args) => edit = args;
+
+            session.HandleMessage(
+                FromDesigner(
+                    MessageTypes.DocumentChanged,
+                    "<Grid><Label /></Grid>",
+                    revision: 42));
+
+            Assert.NotNull(edit);
+            Assert.Equal("<Grid />", session.CurrentXaml);
+            Assert.Empty(_posted);
+
+            session.AcceptDesignerEdit(edit!);
+
+            Assert.Equal("<Grid><Label /></Grid>", session.CurrentXaml);
+            DesignerMessage acknowledgment = Assert.Single(Posted());
+            Assert.Equal(MessageTypes.DocumentApplied, acknowledgment.Type);
+            Assert.Equal(42, acknowledgment.Revision);
+        }
+
+        [Fact]
+        public void Retried_current_designer_edit_is_acknowledged_without_reapplying()
+        {
+            var session = CreateSession();
+            session.OpenDocument("<Grid />", "MainPage.xaml");
+            _posted.Clear();
+            int changes = 0;
+            session.DocumentChanged += (_, _) => changes++;
+
+            session.HandleMessage(
+                FromDesigner(MessageTypes.DocumentChanged, "<Grid />", revision: 7));
+
+            Assert.Equal(0, changes);
+            DesignerMessage acknowledgment = Assert.Single(Posted());
+            Assert.Equal(MessageTypes.DocumentApplied, acknowledgment.Type);
+            Assert.Equal(7, acknowledgment.Revision);
+        }
+
+        [Fact]
+        public void Newer_host_edit_supersedes_an_unaccepted_designer_edit()
+        {
+            var session = CreateSession();
+            session.OpenDocument("<Grid />", "MainPage.xaml");
+            session.HandleMessage(FromDesigner(MessageTypes.DesignerReady));
+            _posted.Clear();
+            DocumentChangedEventArgs? pendingDesignerEdit = null;
+            session.DocumentChanged += (_, args) => pendingDesignerEdit = args;
+            session.HandleMessage(
+                FromDesigner(
+                    MessageTypes.DocumentChanged,
+                    "<Grid><Label /></Grid>",
+                    revision: 11));
+
+            session.OpenDocument("<Grid><Button /></Grid>", "MainPage.xaml");
+            Assert.False(session.CanAcceptDesignerEdit(pendingDesignerEdit!));
+            bool accepted = session.AcceptDesignerEdit(pendingDesignerEdit!);
+
+            Assert.False(accepted);
+            Assert.Equal("<Grid><Button /></Grid>", session.CurrentXaml);
+            Assert.DoesNotContain(
+                Posted(),
+                message => message.Type == MessageTypes.DocumentApplied);
+            Assert.Contains(
+                Posted(),
+                message =>
+                    message.Type == MessageTypes.DocumentLoad &&
+                    message.Xaml == "<Grid><Button /></Grid>");
         }
 
         [Fact]
@@ -165,7 +254,8 @@ namespace MauiDesigner.Core.Tests
         {
             var session = CreateSession();
             session.OpenDocument("<ContentPage />", "MainPage.xaml");
-            session.HandleMessage(FromDesigner(MessageTypes.DocumentChanged, "<Grid />"));
+            var edit = new DocumentChangedEventArgs("<Grid />");
+            session.AcceptDesignerEdit(edit);
 
             DocumentSaveRequestedEventArgs? request = null;
             session.SaveRequested += (_, args) => request = args;

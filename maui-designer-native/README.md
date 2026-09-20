@@ -18,13 +18,14 @@ and keeps edits in an immutable document model that supports undo and redo.
 - Matches the web designer's viewport workflow with device presets, 25%-300%
   focal-point zoom, fit/reset, Ctrl+wheel zoom, middle-button or Space+drag
   panning, configurable snap/grid controls, rulers, and a light-only workspace.
-- Provides specialized Grid row/column collection editors, dotted track
-  boundaries, and a separate real-MAUI runtime preview window.
+- Provides specialized Grid row/column collection editors, direct child
+  row/column/row-span/column-span editing, dotted track boundaries, and a
+  separate real-MAUI runtime preview window.
 - Uses extensible layout adapters for `AbsoluteLayout`, measured Grid cells,
   stack insertion positions, generic layouts, and single-content containers.
 - Preserves resources, namespaces, markup extensions, attached properties,
-  custom-control namespaces, and unknown property elements during XAML
-  round-trips.
+  styles, templates, visual states, custom-control namespaces, custom
+  attributes, and unknown property elements during XAML round-trips.
 - Uses binding `FallbackValue` values for design-time previews while retaining
   the original binding expression in generated XAML.
 - Loads custom-control assemblies and their adjacent dependencies at runtime.

@@ -19,6 +19,7 @@ namespace MauiDesigner.Core.Protocol
         public const string DocumentSaved = "document.saved";
         public const string HostClose = "host.close";
         public const string HostCommand = "host.command";
+        public const string DocumentApplied = "document.applied";
 
         // Designer -> host
         public const string DesignerReady = "designer.ready";
@@ -55,6 +56,10 @@ namespace MauiDesigner.Core.Protocol
         [JsonPropertyName("requestId")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? RequestId { get; set; }
+
+        [JsonPropertyName("revision")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public long? Revision { get; set; }
 
         [JsonPropertyName("command")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -97,6 +102,13 @@ namespace MauiDesigner.Core.Protocol
 
         public static string HostCommand(string command) =>
             Serialize(new DesignerMessage { Type = MessageTypes.HostCommand, Command = command });
+
+        public static string DocumentApplied(long revision) =>
+            Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DocumentApplied,
+                Revision = revision
+            });
 
         public static string DesignerFocusChanged(bool textInputFocused) =>
             Serialize(new DesignerMessage

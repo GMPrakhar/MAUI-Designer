@@ -12,6 +12,9 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
     private readonly ConcurrentQueue<string> _outgoing = new();
     private readonly SemaphoreSlim _outgoingSignal = new(0);
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly object _documentChangeGate = new();
+    private BridgeMessage? _unacknowledgedDocumentChange;
+    private long _documentRevision;
     private int _started;
 
     public NamedPipeHostedDesignerBridge(string? pipeName = null)
@@ -50,8 +53,19 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         _ = Task.Run(RunAsync);
     }
 
-    public void SendDocumentChanged(string xaml) =>
-        Enqueue(new BridgeMessage("document.changed", xaml));
+    public void SendDocumentChanged(string xaml)
+    {
+        var message = new BridgeMessage(
+            "document.changed",
+            xaml,
+            Revision: Interlocked.Increment(ref _documentRevision));
+        lock (_documentChangeGate)
+        {
+            _unacknowledgedDocumentChange = message;
+        }
+
+        Enqueue(message);
+    }
 
     public void SendTextInputFocusChanged(bool textInputFocused) =>
         Enqueue(new BridgeMessage(
@@ -63,34 +77,62 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
 
     private async Task RunAsync()
     {
+        while (!_shutdown.IsCancellationRequested)
+        {
+            try
+            {
+                await RunConnectionAsync();
+            }
+            catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception) when (
+                exception is IOException or TimeoutException or JsonException)
+            {
+                ErrorReported?.Invoke(this, $"Visual Studio connection failed: {exception.Message}");
+            }
+
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(1), _shutdown.Token);
+            }
+            catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+            {
+                return;
+            }
+        }
+    }
+
+    private async Task RunConnectionAsync()
+    {
+        using var pipe = new NamedPipeClientStream(
+            ".",
+            _pipeName!,
+            PipeDirection.InOut,
+            PipeOptions.Asynchronous);
+        await pipe.ConnectAsync(15_000, _shutdown.Token);
+        using var reader = new StreamReader(pipe);
+        using var writer = new StreamWriter(pipe);
+        using var connectionLifetime =
+            CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
+
+        await writer.WriteLineAsync(JsonSerializer.Serialize(new BridgeMessage("designer.ready")));
+        await writer.FlushAsync(connectionLifetime.Token);
+        Task read = ReadMessagesAsync(reader, connectionLifetime.Token);
+        Task write = WriteMessagesAsync(writer, connectionLifetime.Token);
+        Task retry = RetryDocumentChangesAsync(connectionLifetime.Token);
+        Task completed = await Task.WhenAny(read, write, retry);
+        connectionLifetime.Cancel();
         try
         {
-            using var pipe = new NamedPipeClientStream(
-                ".",
-                _pipeName!,
-                PipeDirection.InOut,
-                PipeOptions.Asynchronous);
-            await pipe.ConnectAsync(15_000, _shutdown.Token);
-            using var reader = new StreamReader(pipe);
-            using var writer = new StreamWriter(pipe) { AutoFlush = true };
-            using var connectionLifetime =
-                CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
+            await Task.WhenAll(read, write, retry);
+        }
+        catch (OperationCanceledException) when (connectionLifetime.IsCancellationRequested)
+        {
+        }
 
-            Enqueue(new BridgeMessage("designer.ready"));
-            Task read = ReadMessagesAsync(reader, connectionLifetime.Token);
-            Task write = WriteMessagesAsync(writer, connectionLifetime.Token);
-            await Task.WhenAny(read, write);
-            connectionLifetime.Cancel();
-            await Task.WhenAll(read, write);
-        }
-        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
-        {
-        }
-        catch (Exception exception) when (
-            exception is IOException or TimeoutException or JsonException)
-        {
-            ErrorReported?.Invoke(this, $"Visual Studio connection failed: {exception.Message}");
-        }
+        await completed;
     }
 
     private async Task ReadMessagesAsync(
@@ -108,7 +150,23 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             BridgeMessage? message = JsonSerializer.Deserialize<BridgeMessage>(json);
             if (message?.Type == "document.load" && message.Xaml is not null)
             {
+                lock (_documentChangeGate)
+                {
+                    _unacknowledgedDocumentChange = null;
+                }
+
                 DocumentLoadRequested?.Invoke(this, message.Xaml);
+            }
+            else if (message?.Type == "document.applied" &&
+                     message.Revision is long revision)
+            {
+                lock (_documentChangeGate)
+                {
+                    if (_unacknowledgedDocumentChange?.Revision <= revision)
+                    {
+                        _unacknowledgedDocumentChange = null;
+                    }
+                }
             }
             else if (message?.Type == "host.close" &&
                      !string.IsNullOrWhiteSpace(message.RequestId))
@@ -133,6 +191,25 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             while (_outgoing.TryDequeue(out string? json))
             {
                 await writer.WriteLineAsync(json.AsMemory(), cancellationToken);
+                await writer.FlushAsync(cancellationToken);
+            }
+        }
+    }
+
+    private async Task RetryDocumentChangesAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        while (await timer.WaitForNextTickAsync(cancellationToken))
+        {
+            BridgeMessage? pending;
+            lock (_documentChangeGate)
+            {
+                pending = _unacknowledgedDocumentChange;
+            }
+
+            if (pending is not null)
+            {
+                Enqueue(pending);
             }
         }
     }
@@ -160,6 +237,8 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         string? Xaml = null,
         [property: JsonPropertyName("requestId")]
         string? RequestId = null,
+        [property: JsonPropertyName("revision")]
+        long? Revision = null,
         [property: JsonPropertyName("command")]
         string? Command = null,
         [property: JsonPropertyName("textInputFocused")]

@@ -79,6 +79,39 @@ namespace MauiDesigner.Core.Protocol
             _post(DesignerProtocol.DocumentSaved());
         }
 
+        public bool AcceptDesignerEdit(DocumentChangedEventArgs edit)
+        {
+            if (edit == null)
+            {
+                throw new ArgumentNullException(nameof(edit));
+            }
+
+            if (!CanAcceptDesignerEdit(edit))
+            {
+                return false;
+            }
+
+            CurrentXaml = edit.Xaml;
+            IsDirty = true;
+            if (edit.Revision is long revision)
+            {
+                _post(DesignerProtocol.DocumentApplied(revision));
+            }
+
+            return true;
+        }
+
+        public bool CanAcceptDesignerEdit(DocumentChangedEventArgs edit)
+        {
+            if (edit == null)
+            {
+                throw new ArgumentNullException(nameof(edit));
+            }
+
+            return edit.HostXamlAtReceipt is null ||
+                string.Equals(CurrentXaml, edit.HostXamlAtReceipt, StringComparison.Ordinal);
+        }
+
         /// <summary>
         /// Prevents the designer's close response from replacing a newer host edit
         /// that has not crossed the debounced transport boundary yet.
@@ -127,12 +160,17 @@ namespace MauiDesigner.Core.Protocol
                 case MessageTypes.DocumentChanged:
                     if (message.Xaml is null || message.Xaml == CurrentXaml)
                     {
+                        if (message.Revision is long currentRevision)
+                        {
+                            _post(DesignerProtocol.DocumentApplied(currentRevision));
+                        }
+
                         break;
                     }
 
-                    CurrentXaml = message.Xaml;
-                    IsDirty = true;
-                    DocumentChanged?.Invoke(this, new DocumentChangedEventArgs(message.Xaml));
+                    DocumentChanged?.Invoke(
+                        this,
+                        new DocumentChangedEventArgs(message.Xaml, message.Revision, CurrentXaml));
                     break;
 
                 case MessageTypes.DocumentSave:
@@ -155,9 +193,21 @@ namespace MauiDesigner.Core.Protocol
 
     public sealed class DocumentChangedEventArgs : EventArgs
     {
-        public DocumentChangedEventArgs(string xaml) => Xaml = xaml;
+        public DocumentChangedEventArgs(
+            string xaml,
+            long? revision = null,
+            string? hostXamlAtReceipt = null)
+        {
+            Xaml = xaml;
+            Revision = revision;
+            HostXamlAtReceipt = hostXamlAtReceipt;
+        }
 
         public string Xaml { get; }
+
+        public long? Revision { get; }
+
+        public string? HostXamlAtReceipt { get; }
     }
 
     public sealed class DocumentSaveRequestedEventArgs : EventArgs

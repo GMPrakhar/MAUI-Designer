@@ -14,6 +14,8 @@ public sealed record DesignerDocument(
 
     public DesignerNode? Find(ElementId id) => Root.Find(id);
 
+    public DesignerNode? FindParent(ElementId id) => FindParent(Root, id);
+
     public void Validate()
     {
         ArgumentNullException.ThrowIfNull(Root);
@@ -40,5 +42,24 @@ public sealed record DesignerDocument(
 
             ValidateNode(child, ids);
         }
+    }
+
+    private static DesignerNode? FindParent(DesignerNode parent, ElementId id)
+    {
+        foreach (DesignerNode child in parent.Children)
+        {
+            if (child.Id == id)
+            {
+                return parent;
+            }
+
+            DesignerNode? match = FindParent(child, id);
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 }

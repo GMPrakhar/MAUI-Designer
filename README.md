@@ -12,9 +12,11 @@ and targets **Windows with .NET 10**.
 - Reflection-based toolbox for MAUI, CommunityToolkit and custom-control assemblies.
 - Native layout, drag/drop, resizing, reparenting and hierarchy navigation.
 - Multi-selection, clipboard actions, keyboard commands and undo/redo.
-- Grouped property editing and specialized Grid row/column editors.
+- Grouped property editing, Grid track editors, and direct row/column/span placement.
 - Device presets, zoom, pan, snap/grid controls and rulers in a light workspace.
-- Live XAML editing that preserves resources, namespaces and markup extensions.
+- Revision-acknowledged live XAML sync that reconnects after transport interruptions.
+- XAML round-trips preserve resources, styles, templates, visual states, namespaces,
+  custom attributes, and markup extensions.
 - A separate real-MAUI runtime preview and DevFlow inspection in Debug builds.
 
 ## Getting started

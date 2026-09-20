@@ -44,6 +44,40 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         using JsonDocument changed = JsonDocument.Parse(changedJson);
         Assert.Equal("document.changed", changed.RootElement.GetProperty("type").GetString());
         Assert.Equal(changedXaml, changed.RootElement.GetProperty("xaml").GetString());
+        long revision = changed.RootElement.GetProperty("revision").GetInt64();
+        await writer.WriteLineAsync(
+            $$"""{"type":"document.applied","revision":{{revision}}}""");
+    }
+
+    [Fact]
+    public async Task Unacknowledged_document_change_is_retried_until_applied()
+    {
+        string pipeName = $"MauiDesigner.Test.{Guid.NewGuid():N}";
+        using var server = new NamedPipeServerStream(
+            pipeName,
+            PipeDirection.InOut,
+            1,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous);
+        using var bridge = new NamedPipeHostedDesignerBridge(pipeName);
+        bridge.Start();
+        await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        using var reader = new StreamReader(server);
+        using var writer = new StreamWriter(server) { AutoFlush = true };
+        _ = await ReadLineAsync(reader);
+
+        bridge.SendDocumentChanged("<Grid><Button /></Grid>");
+        using JsonDocument first = JsonDocument.Parse(await ReadLineAsync(reader));
+        using JsonDocument retry = JsonDocument.Parse(await ReadLineAsync(reader));
+        long revision = first.RootElement.GetProperty("revision").GetInt64();
+
+        Assert.Equal(revision, retry.RootElement.GetProperty("revision").GetInt64());
+        Assert.Equal(
+            first.RootElement.GetProperty("xaml").GetString(),
+            retry.RootElement.GetProperty("xaml").GetString());
+
+        await writer.WriteLineAsync(
+            $$"""{"type":"document.applied","revision":{{revision}}}""");
     }
 
     [Fact]
@@ -72,6 +106,37 @@ public sealed class NamedPipeHostedDesignerBridgeTests
 
         string message = await error.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Contains("closed the designer connection", message);
+    }
+
+    [Fact]
+    public async Task Bridge_reconnects_and_replays_an_unacknowledged_document()
+    {
+        string pipeName = $"MauiDesigner.Test.{Guid.NewGuid():N}";
+        using var bridge = new NamedPipeHostedDesignerBridge(pipeName);
+        bridge.Start();
+
+        long revision;
+        using (var firstServer = CreateServer(pipeName))
+        {
+            await firstServer.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+            using var firstReader = new StreamReader(firstServer);
+            Assert.Equal("designer.ready", MessageType(await ReadLineAsync(firstReader)));
+            bridge.SendDocumentChanged("<Grid><Label /></Grid>");
+            using JsonDocument changed = JsonDocument.Parse(await ReadLineAsync(firstReader));
+            revision = changed.RootElement.GetProperty("revision").GetInt64();
+        }
+
+        using var secondServer = CreateServer(pipeName);
+        await secondServer.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        using var secondReader = new StreamReader(secondServer);
+        using var secondWriter = new StreamWriter(secondServer) { AutoFlush = true };
+        Assert.Equal("designer.ready", MessageType(await ReadLineAsync(secondReader)));
+        using JsonDocument replay = JsonDocument.Parse(await ReadLineAsync(secondReader));
+        Assert.Equal("document.changed", replay.RootElement.GetProperty("type").GetString());
+        Assert.Equal(revision, replay.RootElement.GetProperty("revision").GetInt64());
+        Assert.Equal("<Grid><Label /></Grid>", replay.RootElement.GetProperty("xaml").GetString());
+        await secondWriter.WriteLineAsync(
+            $$"""{"type":"document.applied","revision":{{revision}}}""");
     }
 
     [Fact]
@@ -107,6 +172,14 @@ public sealed class NamedPipeHostedDesignerBridgeTests
     private static async Task<string> ReadLineAsync(StreamReader reader) =>
         await reader.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(5)) ??
         throw new EndOfStreamException();
+
+    private static NamedPipeServerStream CreateServer(string pipeName) =>
+        new(
+            pipeName,
+            PipeDirection.InOut,
+            1,
+            PipeTransmissionMode.Byte,
+            PipeOptions.Asynchronous);
 
     private static string? MessageType(string json)
     {

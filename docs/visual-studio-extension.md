@@ -62,7 +62,10 @@ The manifest format documented in the README is deliberately the contract for ex
 
 ### Main risks
 - Synchronising native designer state, the `IVsTextBuffer`, and VS's undo stack
-  remains the hardest boundary; messages are ordered over one duplex pipe.
+  remains the hardest boundary. Messages use one ordered write pump; native
+  document revisions are retried until Visual Studio acknowledges buffer
+  application. Both endpoints reconnect on a broken pipe and replay the latest
+  unacknowledged revision.
 - Pane shutdown uses a bounded, request-correlated `host.close` /
   `designer.closed` handshake so the final canvas state reaches the shared
   buffer before Visual Studio's save decision. Irreversible process cleanup
