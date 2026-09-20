@@ -55,7 +55,7 @@ namespace MauiDesigner.Core.Tests
         [Fact]
         public void Grid_definitions_expose_the_visual_studio_modal_editor()
         {
-            const string editorType = "MauiDesigner.Vsix.GridDefinitionsEditor, MauiDesigner.Vsix";
+            string? changedValue = null;
             var snapshot = new DesignerSelectionSnapshot
             {
                 SelectionCount = 1,
@@ -72,13 +72,41 @@ namespace MauiDesigner.Core.Tests
                     }
                 }
             };
-            var proxy = new DesignerSelectionProxy(snapshot, (_, _) => { }, editorType);
+            var proxy = new DesignerSelectionProxy(
+                snapshot,
+                (_, value) => changedValue = value,
+                typeof(FakeGridDefinitionsEditor));
 
             PropertyDescriptor property = Assert.Single(
                 ((ICustomTypeDescriptor)proxy).GetProperties().Cast<PropertyDescriptor>());
             var editor = (EditorAttribute)property.Attributes[typeof(EditorAttribute)]!;
 
-            Assert.Equal(editorType, editor.EditorTypeName);
+            Assert.Equal(
+                typeof(FakeGridDefinitionsEditor).AssemblyQualifiedName,
+                editor.EditorTypeName);
+            Assert.Equal(typeof(DesignerGridDefinitionValue), property.PropertyType);
+            Assert.Equal("(Collection)", property.GetValue(proxy)!.ToString());
+            Assert.IsType<FakeGridDefinitionsEditor>(
+                property.GetEditor(typeof(FakeEditorBase)));
+            Assert.Null(property.GetEditor(typeof(UnrelatedEditorBase)));
+
+            property.SetValue(
+                proxy,
+                new DesignerGridDefinitionValue("1*,Auto"));
+
+            Assert.Equal("1*,Auto", changedValue);
+        }
+
+        private abstract class FakeEditorBase
+        {
+        }
+
+        private sealed class FakeGridDefinitionsEditor : FakeEditorBase
+        {
+        }
+
+        private abstract class UnrelatedEditorBase
+        {
         }
     }
 }

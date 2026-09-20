@@ -204,6 +204,8 @@
                     PanRequested="OnCanvasPanRequested"
                     MarqueeRequested="OnCanvasMarqueeRequested"
                     SizeChanged="OnCanvasViewportSizeChanged"
+                    ToolboxDropFailed="OnCanvasToolboxDropFailed"
+                    ToolboxDropRequested="OnCanvasToolboxDropRequested"
                     ZoomRequested="OnCanvasZoomRequested">
                     <Grid
                         x:Name="CanvasTransformHost"

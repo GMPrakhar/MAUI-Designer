@@ -28,8 +28,15 @@ namespace MauiDesigner.Vsix
             }
 
             string propertyName = context?.PropertyDescriptor?.Name ?? "Grid definitions";
+            string? serializedValue = value switch
+            {
+                DesignerGridDefinitionValue definitions =>
+                    definitions.SerializedValue,
+                string text => text,
+                _ => null
+            };
             if (!DesignerGridDefinitions.TryParse(
-                    value as string,
+                    serializedValue,
                     out IReadOnlyList<DesignerGridTrack> tracks))
             {
                 Forms.MessageBox.Show(
@@ -42,7 +49,7 @@ namespace MauiDesigner.Vsix
 
             using var dialog = new GridDefinitionsDialog(propertyName, tracks);
             return editorService.ShowDialog(dialog) == Forms.DialogResult.OK
-                ? dialog.SerializedValue
+                ? new DesignerGridDefinitionValue(dialog.SerializedValue)
                 : value;
         }
     }

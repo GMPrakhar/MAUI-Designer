@@ -6,6 +6,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -184,7 +185,10 @@ namespace MauiDesigner.Vsix
                         var data = new OleDataObject();
                         data.SetData(
                             DesignerToolboxPayload.DataFormat,
-                            item.ControlType);
+                            autoConvert: false,
+                            new MemoryStream(
+                                Encoding.UTF8.GetBytes(item.ControlType),
+                                writable: false));
                         _toolboxDataObjects.Add(data);
                         var itemInfo = new[]
                         {
@@ -213,13 +217,15 @@ namespace MauiDesigner.Vsix
 
             if (!_toolWindowsShown)
             {
-                ShowToolWindow(new Guid(ToolWindowGuids80.Toolbox));
+                ShowToolWindow(
+                    new Guid(ToolWindowGuids80.Toolbox),
+                    dock: true);
                 ShowToolWindow(new Guid(ToolWindowGuids.PropertyBrowser));
                 _toolWindowsShown = true;
             }
         }
 
-        private void ShowToolWindow(Guid persistenceSlot)
+        private void ShowToolWindow(Guid persistenceSlot, bool dock = false)
         {
             ThreadHelper.ThrowIfNotOnUIThread();
             if (GetService(typeof(SVsUIShell)) is not IVsUIShell shell)
@@ -232,6 +238,14 @@ namespace MauiDesigner.Vsix
                 ref persistenceSlot,
                 out IVsWindowFrame frame));
             ErrorHandler.ThrowOnFailure(frame.ShowNoActivate());
+            if (dock &&
+                ErrorHandler.Failed(frame.SetProperty(
+                    (int)__VSFPROPID.VSFPROPID_FrameMode,
+                    (int)VSFRAMEMODE.VSFM_Dock)))
+            {
+                WriteToOutput(
+                    "Visual Studio could not dock the Toolbox; use its pin button to reserve canvas space.");
+            }
         }
 
         private void OnSelectionChanged(object sender, DesignerSelectionSnapshot selection)
@@ -271,7 +285,7 @@ namespace MauiDesigner.Vsix
                                 value));
                         }
                     },
-                    typeof(GridDefinitionsEditor).AssemblyQualifiedName));
+                    typeof(GridDefinitionsEditor)));
             }
 
             _selectionContainer = new SelectionContainer(true, false)
@@ -310,7 +324,15 @@ namespace MauiDesigner.Vsix
                 return false;
             }
 
-            controlType = managed.GetData(DesignerToolboxPayload.DataFormat) as string;
+            object? payload = managed.GetData(
+                DesignerToolboxPayload.DataFormat,
+                autoConvert: false);
+            controlType = payload switch
+            {
+                string text => text,
+                Stream stream => DesignerToolboxPayload.Decode(stream),
+                _ => null
+            };
             return !string.IsNullOrWhiteSpace(controlType);
         }
 

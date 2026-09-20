@@ -6,6 +6,43 @@ using System.Linq;
 
 namespace MauiDesigner.Core.Protocol
 {
+    [TypeConverter(typeof(DesignerGridDefinitionValueConverter))]
+    public sealed class DesignerGridDefinitionValue
+    {
+        public DesignerGridDefinitionValue(string? serializedValue)
+        {
+            SerializedValue = serializedValue;
+        }
+
+        public string? SerializedValue { get; }
+
+        public override string ToString() => "(Collection)";
+    }
+
+    public sealed class DesignerGridDefinitionValueConverter : TypeConverter
+    {
+        public override bool CanConvertTo(
+            ITypeDescriptorContext? context,
+            Type? destinationType) =>
+            destinationType == typeof(string) ||
+            base.CanConvertTo(context, destinationType);
+
+        public override object? ConvertTo(
+            ITypeDescriptorContext? context,
+            CultureInfo? culture,
+            object? value,
+            Type destinationType)
+        {
+            if (destinationType == typeof(string) &&
+                value is DesignerGridDefinitionValue)
+            {
+                return "(Collection)";
+            }
+
+            return base.ConvertTo(context, culture, value, destinationType);
+        }
+    }
+
     public sealed class DesignerSelectionProxy : ICustomTypeDescriptor
     {
         private readonly PropertyDescriptorCollection _properties;
@@ -13,7 +50,7 @@ namespace MauiDesigner.Core.Protocol
         public DesignerSelectionProxy(
             DesignerSelectionSnapshot snapshot,
             Action<string, string?> propertyChanged,
-            string? gridDefinitionsEditorTypeName = null)
+            Type? gridDefinitionsEditorType = null)
         {
             Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
             if (propertyChanged == null)
@@ -26,7 +63,7 @@ namespace MauiDesigner.Core.Protocol
                     .Select(property => new DesignerRemotePropertyDescriptor(
                         property,
                         propertyChanged,
-                        gridDefinitionsEditorTypeName))
+                        gridDefinitionsEditorType))
                     .ToArray(),
                 readOnly: true);
         }
@@ -75,21 +112,27 @@ namespace MauiDesigner.Core.Protocol
                 };
 
             private readonly Action<string, string?> _propertyChanged;
+            private readonly Type? _editorType;
             private string? _value;
 
             public DesignerRemotePropertyDescriptor(
                 DesignerPropertySnapshot property,
                 Action<string, string?> propertyChanged,
-                string? gridDefinitionsEditorTypeName)
+                Type? gridDefinitionsEditorType)
                 : base(
                     property.Name,
-                    CreateAttributes(property, gridDefinitionsEditorTypeName))
+                    CreateAttributes(property, gridDefinitionsEditorType))
             {
                 _propertyChanged = propertyChanged;
+                _editorType = IsGridDefinitionsProperty(property)
+                    ? gridDefinitionsEditorType
+                    : null;
                 _value = property.Value;
-                PropertyType = SupportedTypes.TryGetValue(property.ValueType, out Type? type)
-                    ? type
-                    : typeof(string);
+                PropertyType = _editorType is not null
+                    ? typeof(DesignerGridDefinitionValue)
+                    : SupportedTypes.TryGetValue(property.ValueType, out Type? type)
+                        ? type
+                        : typeof(string);
             }
 
             public override Type ComponentType => typeof(DesignerSelectionProxy);
@@ -100,10 +143,26 @@ namespace MauiDesigner.Core.Protocol
 
             public override Type PropertyType { get; }
 
+            public override object? GetEditor(Type editorBaseType)
+            {
+                if (_editorType is not null &&
+                    editorBaseType.IsAssignableFrom(_editorType))
+                {
+                    return Activator.CreateInstance(_editorType);
+                }
+
+                return base.GetEditor(editorBaseType);
+            }
+
             public override bool CanResetValue(object component) => !IsReadOnly && _value is not null;
 
             public override object? GetValue(object? component)
             {
+                if (PropertyType == typeof(DesignerGridDefinitionValue))
+                {
+                    return new DesignerGridDefinitionValue(_value);
+                }
+
                 if (_value is null || PropertyType == typeof(string))
                 {
                     return _value;
@@ -136,6 +195,8 @@ namespace MauiDesigner.Core.Protocol
                 {
                     null => null,
                     string text => text,
+                    DesignerGridDefinitionValue definitions =>
+                        definitions.SerializedValue,
                     IFormattable formattable => formattable.ToString(
                         null,
                         CultureInfo.InvariantCulture),
@@ -151,7 +212,7 @@ namespace MauiDesigner.Core.Protocol
 
             private static Attribute[] CreateAttributes(
                 DesignerPropertySnapshot property,
-                string? gridDefinitionsEditorTypeName)
+                Type? gridDefinitionsEditorType)
             {
                 var attributes = new List<Attribute>
                 {
@@ -159,17 +220,21 @@ namespace MauiDesigner.Core.Protocol
                     new DisplayNameAttribute(property.Name),
                     new ReadOnlyAttribute(property.IsReadOnly)
                 };
-                if (!string.IsNullOrWhiteSpace(gridDefinitionsEditorTypeName) &&
-                    (property.Name == "RowDefinitions" ||
-                     property.Name == "ColumnDefinitions"))
+                if (gridDefinitionsEditorType is not null &&
+                    IsGridDefinitionsProperty(property))
                 {
                     attributes.Add(new EditorAttribute(
-                        gridDefinitionsEditorTypeName,
+                        gridDefinitionsEditorType.AssemblyQualifiedName!,
                         "System.Drawing.Design.UITypeEditor, System.Drawing"));
                 }
 
                 return attributes.ToArray();
             }
+
+            private static bool IsGridDefinitionsProperty(
+                DesignerPropertySnapshot property) =>
+                property.Name == "RowDefinitions" ||
+                property.Name == "ColumnDefinitions";
         }
     }
 }

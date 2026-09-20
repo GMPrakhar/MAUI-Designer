@@ -702,7 +702,9 @@ public partial class MainPage : ContentPage
             ExecuteDesignerCommand(command.Name);
         });
 
-    private void InsertHostedControl(string? controlType)
+    private void InsertHostedControl(
+        string? controlType,
+        LayoutPlacement? placement = null)
     {
         ControlDescriptor? descriptor = _catalog.Controls.FirstOrDefault(
             candidate => candidate.Id.FullName == controlType);
@@ -712,8 +714,34 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        _workspace.Add(descriptor);
+        _workspace.Add(descriptor, placement: placement);
     }
+
+    private void OnCanvasToolboxDropRequested(
+        object? sender,
+        CanvasToolboxDropEventArgs e)
+    {
+        if (_hostBridge.IsHosted)
+        {
+            InsertHostedControl(
+                e.ControlType,
+                new LayoutPlacement(
+                    Bounds: new MAUIDesigner.Fresh.Core.Geometry.RectD(
+                        Math.Max(
+                            0,
+                            (e.X - _viewport.PanX) / _viewport.Zoom),
+                        Math.Max(
+                            0,
+                            (e.Y - _viewport.PanY) / _viewport.Zoom),
+                        0,
+                        0)));
+        }
+    }
+
+    private void OnCanvasToolboxDropFailed(
+        object? sender,
+        CanvasToolboxDropFailedEventArgs e) =>
+        ShowPropertyError($"The Toolbox item could not be dropped: {e.Message}");
 
     private void SetHostedProperty(HostedDesignerCommand command)
     {

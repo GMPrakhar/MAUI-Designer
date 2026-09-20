@@ -193,12 +193,16 @@ in Visual Studio's Toolbox, with category glyphs for quick scanning. The
 selected element is published through
 `ITrackSelection` so Visual Studio's standard Properties window provides
 categorized, typed editors. Activating a Toolbox item with Enter or a
-double-click inserts it into the selected layout.
+double-click inserts it into the selected layout. Toolbox items can also be
+dragged onto the hosted canvas through a Windows cross-process data payload.
+The Toolbox is switched from auto-hide to docked mode when the designer first
+opens so it reserves editor space instead of covering the canvas.
 
 Grid `RowDefinitions` and `ColumnDefinitions` expose a modal collection editor
 from the Properties window. It supports adding, removing, and reordering tracks
 and choosing Auto, Star, or Absolute sizing without manually composing the XAML
-collection string.
+collection string. These properties appear as `(Collection)` rather than as
+editable serialized text.
 
 The compact editor-local toolbar uses Visual Studio `KnownMonikers`, so its
 icons follow the active theme and DPI. It provides undo, redo, clipboard,
@@ -224,10 +228,6 @@ owned by that pane, so canceling the prompt leaves the designer usable.
   expose custom document editors or arbitrary native child-window hosting.
 * Win32 cross-process parenting requires compatible DPI-awareness modes. The
   extension and MAUI backend both use per-monitor-aware Windows UI stacks.
-* Toolbox items support keyboard and double-click activation. Dragging directly
-  from Visual Studio's Toolbox into the out-of-process MAUI child window is not
-  supported because Win32 child-window airspace does not participate in WPF
-  drag/drop routing.
 * Manifest generation reads compile-time metadata, so a control's runtime
   defaults are not known — the designer falls back to its own defaults.
 
