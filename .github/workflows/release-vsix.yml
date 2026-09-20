@@ -10,12 +10,22 @@ on:
         required: false
         default: ''
   push:
+    branches:
+      - main
     tags:
       - 'vsix-v*'
-  pull_request:
     paths:
       - 'extension/**'
       - 'maui-designer-native/**'
+      - 'vs-publish.json'
+      - '.github/workflows/release-vsix.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'extension/**'
+      - 'maui-designer-native/**'
+      - 'vs-publish.json'
       - '.github/workflows/release-vsix.yml'
 
 permissions:
@@ -31,18 +41,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Require a commit from main before publishing
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+      - name: Require a commit from main before deployment
+        if: startsWith(github.ref, 'refs/tags/vsix-v') || github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         shell: pwsh
         run: |
           git fetch origin main
           git merge-base --is-ancestor $env:GITHUB_SHA origin/main
           if ($LASTEXITCODE -ne 0) {
-            throw 'VSIX releases must be built from a commit already merged into main.'
+            throw 'VSIX deployments must be built from a commit already merged into main.'
           }
 
       - name: Stamp the VSIX release version
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
+        if: startsWith(github.ref, 'refs/tags/vsix-v') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
         shell: pwsh
         env:
           RELEASE_TAG: ${{ inputs.tag != '' && inputs.tag || github.ref_name }}
@@ -50,6 +60,33 @@ jobs:
           $version = & .\extension\scripts\Set-VsixReleaseVersion.ps1 -Tag $env:RELEASE_TAG
           "VSIX_VERSION=$version" | Out-File $env:GITHUB_ENV -Append
           Write-Host "Building VSIX version $version from $env:RELEASE_TAG."
+
+      - name: Stamp the main build version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: main_version
+        uses: madskristensen/vsix-version-stamp@v2
+        with:
+          manifest-file: extension\src\MauiDesigner.Vsix\source.extension.vsixmanifest
+          version-number: 1.0.${{ github.run_number }}.${{ github.run_attempt }}
+
+      - name: Synchronize the assembly version
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          BUILD_VERSION: ${{ steps.main_version.outputs.version-number }}
+        run: |
+          $path = 'extension\src\MauiDesigner.Vsix\Properties\AssemblyInfo.cs'
+          $content = [IO.File]::ReadAllText($path)
+          foreach ($attribute in @('AssemblyVersion', 'AssemblyFileVersion')) {
+            $pattern = "(\[assembly:\s*$attribute\(`")[^`"]+(`"\)\])"
+            $content = [regex]::Replace(
+              $content,
+              $pattern,
+              "`${1}$env:BUILD_VERSION`${2}")
+          }
+          [IO.File]::WriteAllText($path, $content, [Text.UTF8Encoding]::new($false))
+          "VSIX_VERSION=$env:BUILD_VERSION" | Out-File $env:GITHUB_ENV -Append
+          Write-Host "Building main VSIX version $env:BUILD_VERSION."
 
       - uses: actions/setup-dotnet@v5
         with:
@@ -429,7 +466,7 @@ jobs:
     name: Publish the pre-release
     # Only ship something that has been shown to install into a real IDE.
     needs: [package, install-check]
-    if: github.event_name == 'push' || inputs.tag != ''
+    if: startsWith(github.ref, 'refs/tags/vsix-v') || inputs.tag != ''
     runs-on: ubuntu-latest
 
     steps:
@@ -475,3 +512,25 @@ jobs:
           # available under its own version tag.
           gh release delete vsix-latest --yes --cleanup-tag 2>/dev/null || true
           publish "vsix-latest" "Latest beta build ($TAG)"
+
+  marketplace:
+    name: Publish to Visual Studio Marketplace
+    needs: [package, install-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: MauiDesigner-vsix
+
+      - name: Publish extension to Marketplace
+        uses: madskristensen/publish-marketplace@v2
+        with:
+          extension-file: MauiDesigner.vsix
+          publish-manifest-file: vs-publish.json
+          personal-access-code: ${{ secrets.VS_PUBLISHER_ACCESS_TOKEN }}

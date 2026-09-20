@@ -6,11 +6,15 @@
 2. Test the integrated `develop` branch.
 3. After explicit approval, open a pull request from `develop` to `main`.
 4. Merge the pull request only after its required checks pass.
-5. Create `native-v*` and `vsix-v*` release tags from the resulting `main` commit.
+5. The verified VSIX publishes to the Visual Studio Marketplace automatically
+   from the resulting `main` build.
+6. Create `native-v*` or `vsix-v*` tags from that `main` commit when a matching
+   GitHub release artifact is required.
 
 Do not commit feature work directly to `main`, create a release tag from
 `develop`, or publish release artifacts before the `develop` changes have been
 approved and promoted through a pull request.
 
-Both release workflows verify that their tagged commit is reachable from
-`origin/main` before building or publishing an artifact.
+Release workflows verify that deployable commits are reachable from
+`origin/main`; Marketplace deployment is additionally restricted to a direct
+`refs/heads/main` push.

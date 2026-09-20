@@ -160,10 +160,17 @@ native backend and packages it under `native\`. Set
 
 You do not need a Windows machine to get an installer, though —
 `.github/workflows/release-vsix.yml` packages the VSIX on a `windows-latest`
-runner. It runs on every pull request that touches `extension/`, unzips the
-result and asserts that `native/MAUIDesigner.exe` and both assemblies are actually
-inside, then uploads it as a build artifact. Pushing a `vsix-v*` tag publishes
-the same file as a pre-release asset named `MauiDesigner.vsix`, which is what the
+runner. It validates pull requests targeting `main`, unzips the result, asserts
+that `native/MAUIDesigner.exe` and both assemblies are present, installs into
+real Visual Studio 2022 and 2026 runners, and uploads the verified artifact.
+
+After a commit reaches `main`, the workflow stamps a unique build version and
+publishes the install-checked package to the Visual Studio Marketplace with
+`madskristensen/publish-marketplace`. Repository administrators must configure
+the `VS_PUBLISHER_ACCESS_TOKEN` Actions secret with Marketplace **Acquire +
+Manage** permission. No pull-request or feature-branch build can publish.
+Pushing a `vsix-v*` tag from a `main` commit additionally publishes the same file
+as a GitHub pre-release asset named `MauiDesigner.vsix`, which is what the
 website's download link points at.
 
 ## How it works inside Visual Studio
