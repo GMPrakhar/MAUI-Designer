@@ -82,6 +82,49 @@ public sealed class XamlRoundTripTests
     }
 
     [Fact]
+    public void Styles_templates_shapes_and_visual_states_survive()
+    {
+        const string source = """
+            <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+                         xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
+              <ContentPage.Resources>
+                <ControlTemplate x:Key="CardTemplate">
+                  <Border BackgroundColor="{TemplateBinding BackgroundColor}" />
+                </ControlTemplate>
+                <Style TargetType="Border">
+                  <Setter Property="Padding" Value="12" />
+                </Style>
+              </ContentPage.Resources>
+              <Border ControlTemplate="{StaticResource CardTemplate}">
+                <Border.StrokeShape>
+                  <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <VisualStateManager.VisualStateGroups>
+                  <VisualStateGroup Name="CommonStates">
+                    <VisualState Name="Normal" />
+                  </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+              </Border>
+            </ContentPage>
+            """;
+
+        XamlReadResult parsed = new DesignerXamlReader().Read(source, _resolver);
+
+        Assert.True(parsed.Success, string.Join(Environment.NewLine, parsed.Diagnostics));
+        string generated = new DesignerXamlWriter().Write(parsed.Document!);
+        Assert.Contains("ControlTemplate x:Key=\"CardTemplate\"", generated);
+        Assert.Contains("TemplateBinding BackgroundColor", generated);
+        Assert.Contains("Style TargetType=\"Border\"", generated);
+        Assert.Contains("Border.StrokeShape", generated);
+        Assert.Contains("RoundRectangle CornerRadius=\"12\"", generated);
+        Assert.Contains("VisualStateManager.VisualStateGroups", generated);
+        Assert.Contains("VisualState Name=\"Normal\"", generated);
+
+        XamlReadResult reparsed = new DesignerXamlReader().Read(generated, _resolver);
+        Assert.True(reparsed.Success, string.Join(Environment.NewLine, reparsed.Diagnostics));
+    }
+
+    [Fact]
     public void Unknown_control_is_rejected_with_its_source_location()
     {
         XamlReadResult result = new DesignerXamlReader().Read(
@@ -175,7 +218,8 @@ public sealed class XamlRoundTripTests
             string localName,
             out XamlTypeResolution? resolution)
         {
-            bool known = localName is "ContentPage" or "Grid" or "Label" or "Button" or "AvatarView" or "Expander";
+            bool known = localName is "ContentPage" or "Grid" or "Label" or "Button" or
+                "AvatarView" or "Expander" or "Border";
             if (!known)
             {
                 resolution = null;

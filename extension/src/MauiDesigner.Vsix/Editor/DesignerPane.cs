@@ -166,7 +166,13 @@ namespace MauiDesigner.Vsix
                     return;
                 }
 
+                if (!_session.CanAcceptDesignerEdit(args))
+                {
+                    return;
+                }
+
                 WriteBuffer(args.Xaml);
+                _session.AcceptDesignerEdit(args);
             }).FileAndForget("vs/mauidesigner/documentchanged");
         }
 

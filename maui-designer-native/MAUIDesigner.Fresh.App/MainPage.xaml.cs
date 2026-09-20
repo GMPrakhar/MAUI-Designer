@@ -34,10 +34,7 @@ public partial class MainPage : ContentPage
     private bool _nextDocumentChangeIsIncremental;
     private bool _applyingLiveXaml;
     private bool _renderScheduled;
-    private bool _pendingDocumentChange;
-    private bool _pendingFullRebuild;
-    private bool _pendingSelectionRefresh;
-    private bool _pendingSuppressXamlWriteback;
+    private readonly PendingXamlRenderBatch _pendingRender = new();
     private bool _hierarchyDirty = true;
     private bool _hostDocumentLoaded;
     private readonly HashSet<ElementId> _collapsedHierarchyNodes = [];
@@ -478,6 +475,12 @@ public partial class MainPage : ContentPage
 
             _applyingLiveXaml = true;
             _workspace.ReplaceDocument(result.Document);
+            _lastSerializedXaml = XamlTextIdentity.Normalize(source);
+            if (_hostDocumentLoaded)
+            {
+                _hostBridge.SendDocumentChanged(source);
+            }
+
             parseStopwatch.Stop();
             ReportPerformance("live-xaml-parse-and-command", parseStopwatch.Elapsed, 100);
             _xamlDirty = false;
@@ -534,9 +537,7 @@ public partial class MainPage : ContentPage
         bool incremental = _nextDocumentChangeIsIncremental;
         bool suppressXamlWriteback = _applyingLiveXaml;
         _nextDocumentChangeIsIncremental = false;
-        _pendingDocumentChange = true;
-        _pendingFullRebuild |= !incremental;
-        _pendingSuppressXamlWriteback |= suppressXamlWriteback;
+        _pendingRender.RecordDocumentChange(incremental, suppressXamlWriteback);
         if (_busyOperations == 0)
         {
             SetBusy(true, incremental ? "Applying property..." : "Rendering design...");
@@ -1246,14 +1247,15 @@ public partial class MainPage : ContentPage
 
         SelectionLabel.Text = $"{descriptor.DisplayName}  /  {selected.Id}";
         string filter = PropertySearch.Text?.Trim() ?? string.Empty;
-        IEnumerable<IGrouping<string, PropertyDescriptor>> groups = descriptor.Properties
+        DesignerNode? parent = _workspace.Session.Current.FindParent(selected.Id);
+        IEnumerable<IGrouping<string, PropertyDescriptor>> groups =
+            PropertyInspectorDescriptorSource.Compose(descriptor, selected, parent)
             .Where(IsEditableProperty)
             .Where(property =>
                 filter.Length == 0 ||
                 property.Name.Contains(filter, StringComparison.OrdinalIgnoreCase))
             .OrderBy(PropertyPriority)
             .ThenBy(property => property.Name, StringComparer.Ordinal)
-            .Take(80)
             .GroupBy(PropertyGroup);
         foreach (IGrouping<string, PropertyDescriptor> group in groups)
         {
@@ -1269,7 +1271,7 @@ public partial class MainPage : ContentPage
             {
                 string? value = selected.Properties.TryGetValue(property.Name, out DesignerValue? designerValue)
                     ? designerValue.Text
-                    : null;
+                    : PropertyInspectorDescriptorSource.DefaultValue(property.Name);
                 var context = new PropertyEditorContext(
                     property,
                     value,
@@ -1315,8 +1317,18 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (!PropertyInspectorDescriptorSource.TryNormalize(
+                property,
+                text,
+                out string? normalized,
+                out string? error))
+        {
+            ShowPropertyError(error!);
+            return;
+        }
+
         DesignerValue? oldValue = selected.Properties.GetValueOrDefault(property.Name);
-        DesignerValue? newValue = string.IsNullOrWhiteSpace(text) ? null : DesignerValue.Literal(text);
+        DesignerValue? newValue = normalized is null ? null : DesignerValue.Literal(normalized);
         if (oldValue == newValue)
         {
             return;
@@ -1407,7 +1419,7 @@ public partial class MainPage : ContentPage
 
     private void ScheduleSelectionRefresh()
     {
-        _pendingSelectionRefresh = true;
+        _pendingRender.RecordSelectionChange();
         ScheduleRender();
     }
 
@@ -1422,30 +1434,25 @@ public partial class MainPage : ContentPage
         MainThread.BeginInvokeOnMainThread(() =>
         {
             _renderScheduled = false;
-            bool documentChanged = _pendingDocumentChange;
-            bool fullRebuild = _pendingFullRebuild;
-            bool selectionChanged = _pendingSelectionRefresh;
-            bool suppressXamlWriteback = _pendingSuppressXamlWriteback;
-            _pendingDocumentChange = false;
-            _pendingFullRebuild = false;
-            _pendingSelectionRefresh = false;
-            _pendingSuppressXamlWriteback = false;
+            PendingXamlRenderState pending = _pendingRender.Consume();
             try
             {
                 UndoButton.IsEnabled = _workspace.Session.CanUndo;
                 RedoButton.IsEnabled = _workspace.Session.CanRedo;
-                if (fullRebuild)
+                if (pending.FullRebuild)
                 {
-                    RebuildDesigner(suppressXamlWriteback);
+                    RebuildDesigner(pending.SuppressXamlWriteback);
                 }
                 else
                 {
-                    if (documentChanged && !_xamlDirty && !suppressXamlWriteback)
+                    if (pending.DocumentChanged &&
+                        !_xamlDirty &&
+                        !pending.SuppressXamlWriteback)
                     {
                         RefreshXaml();
                     }
 
-                    if (selectionChanged)
+                    if (pending.SelectionChanged)
                     {
                         var stopwatch = Stopwatch.StartNew();
                         _materializer.UpdateInteraction();
@@ -1475,7 +1482,7 @@ public partial class MainPage : ContentPage
             }
             finally
             {
-                if (documentChanged)
+                if (pending.DocumentChanged)
                 {
                     SetBusy(false);
                 }
@@ -1672,6 +1679,7 @@ public partial class MainPage : ContentPage
         property.Name switch
         {
             "Text" or "Content" or "Source" or "ItemsSource" => 0,
+            "Grid.Row" or "Grid.Column" or "Grid.RowSpan" or "Grid.ColumnSpan" => 5,
             "WidthRequest" or "HeightRequest" or "Margin" or "Padding" => 10,
             "HorizontalOptions" or "VerticalOptions" or "RowDefinitions" or "ColumnDefinitions" => 20,
             "Background" or "BackgroundColor" or "TextColor" or "FontSize" or "FontAttributes" => 30,
@@ -1682,6 +1690,7 @@ public partial class MainPage : ContentPage
     private static string PropertyGroup(PropertyDescriptor property) =>
         property.Name switch
         {
+            "Grid.Row" or "Grid.Column" or "Grid.RowSpan" or "Grid.ColumnSpan" => "Grid placement",
             "Text" or "Content" or "Source" or "ItemsSource" or "Placeholder" => "Content",
             "WidthRequest" or "HeightRequest" or "MinimumWidthRequest" or "MinimumHeightRequest" or
                 "MaximumWidthRequest" or "MaximumHeightRequest" or "Margin" or "Padding" or

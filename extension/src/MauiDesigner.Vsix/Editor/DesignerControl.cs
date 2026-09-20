@@ -25,7 +25,7 @@ namespace MauiDesigner.Vsix
         private readonly JoinableTaskFactory _joinableTaskFactory;
         private readonly NativeDesignerHost _nativeHost;
         private readonly TextBlock _status;
-        private readonly List<string> _pending = new List<string>();
+        private readonly LinkedList<string> _pending = new LinkedList<string>();
         private readonly SemaphoreSlim _writeGate = new SemaphoreSlim(1, 1);
         private readonly object _closeGate = new object();
         private NamedPipeServerStream? _pipe;
@@ -36,6 +36,7 @@ namespace MauiDesigner.Vsix
         private ManualResetEventSlim? _pendingCloseResponse;
         private string? _pendingFinalXaml;
         private bool _isConnected;
+        private bool _writePumpRunning;
         private bool _disposed;
 
         public DesignerControl(JoinableTaskFactory joinableTaskFactory)
@@ -98,8 +99,7 @@ namespace MauiDesigner.Vsix
                     _pipe,
                     connection,
                     TimeSpan.FromSeconds(20));
-                _reader = new StreamReader(_pipe);
-                _writer = new StreamWriter(_pipe) { AutoFlush = true };
+                CreatePipeStreams();
                 _isConnected = true;
                 _status.Visibility = Visibility.Collapsed;
                 FlushPending();
@@ -123,6 +123,7 @@ namespace MauiDesigner.Vsix
 
         public void PostMessage(string json)
         {
+            bool startWriter = false;
             if (_disposed)
             {
                 return;
@@ -130,14 +131,18 @@ namespace MauiDesigner.Vsix
 
             lock (_pending)
             {
-                if (!_isConnected)
+                _pending.AddLast(json);
+                if (_isConnected && !_writePumpRunning)
                 {
-                    _pending.Add(json);
-                    return;
+                    _writePumpRunning = true;
+                    startWriter = true;
                 }
             }
 
-            QueueWrite(json);
+            if (startWriter)
+            {
+                StartWritePump();
+            }
         }
 
         private static Process StartDesigner(string executablePath, string pipeName)
@@ -210,87 +215,224 @@ namespace MauiDesigner.Vsix
 
         private async Task ReadMessagesAsync()
         {
-            try
+            while (!_disposed)
             {
-                while (!_disposed && _reader is not null)
+                try
                 {
-                    string? json = await _reader.ReadLineAsync().ConfigureAwait(false);
-                    if (json is null)
+                    while (!_disposed && _reader is not null)
                     {
-                        break;
-                    }
-
-                    DesignerMessage? message = DesignerProtocol.Parse(json);
-                    if (message?.Type == MessageTypes.DesignerFocusChanged)
-                    {
-                        _nativeHost.TextInputFocused = message.TextInputFocused == true;
-                        continue;
-                    }
-
-                    if (message?.Type == MessageTypes.DesignerClosed)
-                    {
-                        lock (_closeGate)
+                        string? json = await _reader.ReadLineAsync().ConfigureAwait(false);
+                        if (json is null)
                         {
-                            if (_pendingCloseRequestId is not null &&
-                                DesignerProtocol.IsCloseResponseFor(
-                                    message,
-                                    _pendingCloseRequestId))
-                            {
-                                _pendingFinalXaml = message.Xaml;
-                                _pendingCloseResponse?.Set();
-                            }
+                            break;
                         }
 
-                        continue;
-                    }
+                        DesignerMessage? message = DesignerProtocol.Parse(json);
+                        if (message?.Type == MessageTypes.DesignerFocusChanged)
+                        {
+                            _nativeHost.TextInputFocused = message.TextInputFocused == true;
+                            continue;
+                        }
 
-                    MessageReceived?.Invoke(this, json);
+                        if (message?.Type == MessageTypes.DesignerClosed)
+                        {
+                            lock (_closeGate)
+                            {
+                                if (_pendingCloseRequestId is not null &&
+                                    DesignerProtocol.IsCloseResponseFor(
+                                        message,
+                                        _pendingCloseRequestId))
+                                {
+                                    _pendingFinalXaml = message.Xaml;
+                                    _pendingCloseResponse?.Set();
+                                }
+                            }
+
+                            continue;
+                        }
+
+                        MessageReceived?.Invoke(this, json);
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                catch (ObjectDisposedException) when (_disposed)
+                {
+                    return;
+                }
+
+                if (_disposed || !await ReconnectAsync())
+                {
+                    return;
                 }
             }
-            catch (IOException) when (_disposed)
+        }
+
+        private async Task<bool> ReconnectAsync()
+        {
+            NamedPipeServerStream? pipe = _pipe;
+            if (_disposed || pipe is null)
             {
+                return false;
             }
 
-            if (!_disposed)
+            lock (_pending)
             {
-                await _joinableTaskFactory.SwitchToMainThreadAsync();
-                ShowStatus("The native MAUI Designer disconnected.");
+                _isConnected = false;
             }
+
+            await _joinableTaskFactory.SwitchToMainThreadAsync();
+            ShowStatus("The native MAUI Designer disconnected. Reconnecting...");
+
+            await _writeGate.WaitAsync();
+            try
+            {
+                _reader?.Dispose();
+                _writer?.Dispose();
+                _reader = null;
+                _writer = null;
+                if (pipe.IsConnected)
+                {
+                    pipe.Disconnect();
+                }
+
+                Task connection = Task.Factory.FromAsync(
+                    pipe.BeginWaitForConnection,
+                    pipe.EndWaitForConnection,
+                    null);
+                await connection.ConfigureAwait(false);
+                if (_disposed)
+                {
+                    return false;
+                }
+
+                CreatePipeStreams();
+                lock (_pending)
+                {
+                    _isConnected = true;
+                }
+            }
+            catch (Exception error) when (
+                error is IOException or InvalidOperationException or ObjectDisposedException)
+            {
+                return false;
+            }
+            finally
+            {
+                _writeGate.Release();
+            }
+
+            await _joinableTaskFactory.SwitchToMainThreadAsync();
+            _status.Visibility = Visibility.Collapsed;
+            FlushPending();
+            return true;
+        }
+
+        private void CreatePipeStreams()
+        {
+            if (_pipe is null)
+            {
+                throw new InvalidOperationException("The designer pipe is unavailable.");
+            }
+
+            _reader = new StreamReader(
+                _pipe,
+                System.Text.Encoding.UTF8,
+                true,
+                1024,
+                leaveOpen: true);
+            _writer = new StreamWriter(
+                _pipe,
+                System.Text.Encoding.UTF8,
+                1024,
+                leaveOpen: true);
         }
 
         private void FlushPending()
         {
-            List<string> messages;
+            bool startWriter = false;
             lock (_pending)
             {
-                messages = new List<string>(_pending);
-                _pending.Clear();
+                if (_pending.Count > 0 && !_writePumpRunning)
+                {
+                    _writePumpRunning = true;
+                    startWriter = true;
+                }
             }
 
-            foreach (string message in messages)
+            if (startWriter)
             {
-                QueueWrite(message);
+                StartWritePump();
             }
         }
 
-        private void QueueWrite(string json)
+        private void StartWritePump()
         {
             _joinableTaskFactory.RunAsync(async () =>
             {
-                await _writeGate.WaitAsync();
-                try
+                while (true)
                 {
-                    if (!_disposed && _writer is not null)
+                    string json;
+                    lock (_pending)
                     {
-                        await _writer.WriteLineAsync(json);
+                        if (_disposed || !_isConnected || _pending.First is null)
+                        {
+                            _writePumpRunning = false;
+                            return;
+                        }
+
+                        json = _pending.First.Value;
+                        _pending.RemoveFirst();
                     }
-                }
-                catch (IOException) when (_disposed)
-                {
-                }
-                finally
-                {
-                    _writeGate.Release();
+
+                    await _writeGate.WaitAsync();
+                    try
+                    {
+                        if (_disposed || _writer is null)
+                        {
+                            lock (_pending)
+                            {
+                                if (!_disposed)
+                                {
+                                    _pending.AddFirst(json);
+                                }
+
+                                _writePumpRunning = false;
+                            }
+
+                            return;
+                        }
+
+                        await _writer.WriteLineAsync(json);
+                        await _writer.FlushAsync();
+                    }
+                    catch (Exception error) when (
+                        error is IOException or InvalidOperationException or ObjectDisposedException)
+                    {
+                        lock (_pending)
+                        {
+                            if (!_disposed)
+                            {
+                                _pending.AddFirst(json);
+                                _isConnected = false;
+                            }
+
+                            _writePumpRunning = false;
+                        }
+
+                        if (!_disposed)
+                        {
+                            await _joinableTaskFactory.SwitchToMainThreadAsync();
+                            ShowStatus("The native MAUI Designer connection was interrupted. Reconnecting...");
+                        }
+
+                        return;
+                    }
+                    finally
+                    {
+                        _writeGate.Release();
+                    }
                 }
             }).FileAndForget("vs/mauidesigner/native-write");
         }
@@ -323,26 +465,7 @@ namespace MauiDesigner.Vsix
             }
 
             var stopwatch = Stopwatch.StartNew();
-            if (!_writeGate.Wait(timeout))
-            {
-                ClearCloseRequest(requestId);
-                return null;
-            }
-
-            try
-            {
-                _writer.WriteLine(DesignerProtocol.HostClose(requestId));
-                _writer.Flush();
-            }
-            catch (IOException)
-            {
-                ClearCloseRequest(requestId);
-                return null;
-            }
-            finally
-            {
-                _writeGate.Release();
-            }
+            PostMessage(DesignerProtocol.HostClose(requestId));
 
             TimeSpan remaining = timeout - stopwatch.Elapsed;
             if (remaining > TimeSpan.Zero)
@@ -401,7 +524,6 @@ namespace MauiDesigner.Vsix
             DisposeProcess();
             _nativeHost.ShortcutRequested -= OnShortcutRequested;
             _nativeHost.Dispose();
-            _writeGate.Dispose();
         }
 
         private void DisposeProcess()
