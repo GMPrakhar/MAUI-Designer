@@ -12,7 +12,8 @@ namespace MauiDesigner.Core.Protocol
 
         public DesignerSelectionProxy(
             DesignerSelectionSnapshot snapshot,
-            Action<string, string?> propertyChanged)
+            Action<string, string?> propertyChanged,
+            string? gridDefinitionsEditorTypeName = null)
         {
             Snapshot = snapshot ?? throw new ArgumentNullException(nameof(snapshot));
             if (propertyChanged == null)
@@ -24,7 +25,8 @@ namespace MauiDesigner.Core.Protocol
                 snapshot.Properties
                     .Select(property => new DesignerRemotePropertyDescriptor(
                         property,
-                        propertyChanged))
+                        propertyChanged,
+                        gridDefinitionsEditorTypeName))
                     .ToArray(),
                 readOnly: true);
         }
@@ -77,15 +79,11 @@ namespace MauiDesigner.Core.Protocol
 
             public DesignerRemotePropertyDescriptor(
                 DesignerPropertySnapshot property,
-                Action<string, string?> propertyChanged)
+                Action<string, string?> propertyChanged,
+                string? gridDefinitionsEditorTypeName)
                 : base(
                     property.Name,
-                    new Attribute[]
-                    {
-                        new CategoryAttribute(property.Category),
-                        new DisplayNameAttribute(property.Name),
-                        new ReadOnlyAttribute(property.IsReadOnly)
-                    })
+                    CreateAttributes(property, gridDefinitionsEditorTypeName))
             {
                 _propertyChanged = propertyChanged;
                 _value = property.Value;
@@ -150,6 +148,28 @@ namespace MauiDesigner.Core.Protocol
             }
 
             public override bool ShouldSerializeValue(object component) => false;
+
+            private static Attribute[] CreateAttributes(
+                DesignerPropertySnapshot property,
+                string? gridDefinitionsEditorTypeName)
+            {
+                var attributes = new List<Attribute>
+                {
+                    new CategoryAttribute(property.Category),
+                    new DisplayNameAttribute(property.Name),
+                    new ReadOnlyAttribute(property.IsReadOnly)
+                };
+                if (!string.IsNullOrWhiteSpace(gridDefinitionsEditorTypeName) &&
+                    (property.Name == "RowDefinitions" ||
+                     property.Name == "ColumnDefinitions"))
+                {
+                    attributes.Add(new EditorAttribute(
+                        gridDefinitionsEditorTypeName,
+                        "System.Drawing.Design.UITypeEditor, System.Drawing"));
+                }
+
+                return attributes.ToArray();
+            }
         }
     }
 }

@@ -8,11 +8,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
 using MauiDesigner.Core.Protocol;
 
 using Microsoft.VisualStudio.Imaging;
 using Microsoft.VisualStudio.Imaging.Interop;
+using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Threading;
 
@@ -82,6 +84,9 @@ namespace MauiDesigner.Vsix
                 Band = 0,
                 BandIndex = 0
             };
+            toolbar.SetResourceReference(
+                Control.BackgroundProperty,
+                EnvironmentColors.CommandBarGradientBrushKey);
             toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Undo, "Undo (Ctrl+Z)", "undo"));
             toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Redo, "Redo (Ctrl+Y)", "redo"));
             toolbar.Items.Add(new Separator());
@@ -107,6 +112,9 @@ namespace MauiDesigner.Vsix
             {
                 IsLocked = true
             };
+            tray.SetResourceReference(
+                ToolBarTray.BackgroundProperty,
+                EnvironmentColors.CommandBarGradientBrushKey);
             tray.ToolBars.Add(toolbar);
             return tray;
         }
@@ -116,18 +124,32 @@ namespace MauiDesigner.Vsix
             string tooltip,
             string command)
         {
+            var image = new CrispImage
+            {
+                Moniker = moniker,
+                Width = 16,
+                Height = 16,
+                SnapsToDevicePixels = true
+            };
+            var imageHolder = new ContentControl
+            {
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Content = image,
+                Height = 20,
+                Width = 20
+            };
+            imageHolder.SetResourceReference(
+                ImageThemingUtilities.ImageBackgroundColorProperty,
+                EnvironmentColors.CommandBarGradientBeginColorKey);
+
             var button = new Button
             {
                 Width = 28,
                 Height = 26,
                 Padding = new Thickness(4),
                 ToolTip = tooltip,
-                Content = new CrispImage
-                {
-                    Moniker = moniker,
-                    Width = 16,
-                    Height = 16
-                }
+                Content = imageHolder
             };
             System.Windows.Automation.AutomationProperties.SetName(button, tooltip);
             button.Click += (_, _) => PostMessage(DesignerProtocol.HostCommand(command));

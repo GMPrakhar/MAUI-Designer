@@ -187,11 +187,18 @@ pipeline.
 
 When hosted by Visual Studio, the native app removes its duplicate header,
 toolbox, hierarchy, properties panel, and canvas toolbar so the document pane is
-dedicated to the design surface. Controls are exposed in a **MAUI Designer** tab
-in Visual Studio's Toolbox, and the selected element is published through
+dedicated to the design surface. Controls are grouped into **MAUI - Layouts**,
+**MAUI - Input**, **MAUI - Display**, and **MAUI - Data and collections** tabs
+in Visual Studio's Toolbox, with category glyphs for quick scanning. The
+selected element is published through
 `ITrackSelection` so Visual Studio's standard Properties window provides
 categorized, typed editors. Activating a Toolbox item with Enter or a
 double-click inserts it into the selected layout.
+
+Grid `RowDefinitions` and `ColumnDefinitions` expose a modal collection editor
+from the Properties window. It supports adding, removing, and reordering tracks
+and choosing Auto, Star, or Absolute sizing without manually composing the XAML
+collection string.
 
 The compact editor-local toolbar uses Visual Studio `KnownMonikers`, so its
 icons follow the active theme and DPI. It provides undo, redo, clipboard,

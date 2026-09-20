@@ -51,5 +51,34 @@ namespace MauiDesigner.Core.Tests
             Assert.Equal("False", changedValue);
             Assert.Equal(false, property.GetValue(proxy));
         }
+
+        [Fact]
+        public void Grid_definitions_expose_the_visual_studio_modal_editor()
+        {
+            const string editorType = "MauiDesigner.Vsix.GridDefinitionsEditor, MauiDesigner.Vsix";
+            var snapshot = new DesignerSelectionSnapshot
+            {
+                SelectionCount = 1,
+                ElementId = "grid-1",
+                DisplayName = "Grid",
+                Properties =
+                {
+                    new DesignerPropertySnapshot
+                    {
+                        Name = "RowDefinitions",
+                        Value = "Auto,*",
+                        ValueType = "Microsoft.Maui.Controls.RowDefinitionCollection",
+                        Category = "Layout"
+                    }
+                }
+            };
+            var proxy = new DesignerSelectionProxy(snapshot, (_, _) => { }, editorType);
+
+            PropertyDescriptor property = Assert.Single(
+                ((ICustomTypeDescriptor)proxy).GetProperties().Cast<PropertyDescriptor>());
+            var editor = (EditorAttribute)property.Attributes[typeof(EditorAttribute)]!;
+
+            Assert.Equal(editorType, editor.EditorTypeName);
+        }
     }
 }

@@ -1,7 +1,10 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,7 +36,10 @@ namespace MauiDesigner.Vsix
         IVsWindowFrameNotify3,
         IVsToolboxUser
     {
-        private const string ToolboxTabName = "MAUI Designer";
+        private const string LegacyToolboxTabName = "MAUI Designer";
+        private static readonly HashSet<string> ToolboxTabNames =
+            new HashSet<string>(StringComparer.Ordinal);
+        private static WeakReference<DesignerPane>? s_toolboxOwner;
         private readonly IVsTextLines _textLines;
         private readonly string _documentMoniker;
         private readonly IVsHierarchy _hierarchy;
@@ -46,6 +52,7 @@ namespace MauiDesigner.Vsix
         private SelectionContainer? _selectionContainer;
         private DesignerSelectionSnapshot? _lastSelection;
         private IReadOnlyList<DesignerToolboxItem>? _lastToolboxItems;
+        private IReadOnlyList<DesignerToolboxItem>? _populatedToolboxItems;
         private bool _toolWindowsShown;
 
         /// <summary>
@@ -138,27 +145,70 @@ namespace MauiDesigner.Vsix
                 return;
             }
 
-            toolbox.RemoveTab(ToolboxTabName);
-            ErrorHandler.ThrowOnFailure(toolbox.AddTab(ToolboxTabName));
-            _toolboxDataObjects.Clear();
-            foreach (DesignerToolboxItem item in items)
+            if (s_toolboxOwner is not null &&
+                s_toolboxOwner.TryGetTarget(out DesignerPane? owner) &&
+                ReferenceEquals(owner, this) &&
+                ReferenceEquals(items, _populatedToolboxItems))
             {
-                var data = new OleDataObject();
-                data.SetData(
-                    DesignerToolboxPayload.DataFormat,
-                    item.ControlType);
-                _toolboxDataObjects.Add(data);
-                var itemInfo = new[]
+                return;
+            }
+
+            foreach (string tabName in ToolboxTabNames)
+            {
+                toolbox.RemoveTab(tabName);
+            }
+
+            toolbox.RemoveTab(LegacyToolboxTabName);
+            ToolboxTabNames.Clear();
+            _toolboxDataObjects.Clear();
+            _populatedToolboxItems = null;
+            s_toolboxOwner = new WeakReference<DesignerPane>(this);
+            var iconHandles = new Dictionary<string, IntPtr>(StringComparer.Ordinal);
+            try
+            {
+                foreach (IGrouping<string, DesignerToolboxItem> category in items
+                             .GroupBy(item => DesignerToolboxCategories.Normalize(item.Category))
+                             .OrderBy(group => DesignerToolboxCategories.Order(group.Key))
+                             .ThenBy(group => group.Key, StringComparer.Ordinal))
                 {
-                    new TBXITEMINFO
+                    string tabName = DesignerToolboxCategories.TabName(category.Key);
+                    ErrorHandler.ThrowOnFailure(toolbox.AddTab(tabName));
+                    ToolboxTabNames.Add(tabName);
+                    IntPtr icon = CreateToolboxIcon(category.Key);
+                    iconHandles.Add(category.Key, icon);
+
+                    foreach (DesignerToolboxItem item in category.OrderBy(
+                                 candidate => candidate.DisplayName,
+                                 StringComparer.Ordinal))
                     {
-                        bstrText = item.DisplayName,
-                        hBmp = IntPtr.Zero,
-                        dwFlags = (uint)__TBXITEMINFOFLAGS.TBXIF_DONTPERSIST
+                        var data = new OleDataObject();
+                        data.SetData(
+                            DesignerToolboxPayload.DataFormat,
+                            item.ControlType);
+                        _toolboxDataObjects.Add(data);
+                        var itemInfo = new[]
+                        {
+                            new TBXITEMINFO
+                            {
+                                bstrText = item.DisplayName,
+                                hBmp = icon,
+                                clrTransparent = (uint)ColorTranslator.ToWin32(Color.Magenta),
+                                dwFlags = (uint)__TBXITEMINFOFLAGS.TBXIF_DONTPERSIST
+                            }
+                        };
+                        ErrorHandler.ThrowOnFailure(
+                            toolbox.AddItem(data, itemInfo, tabName));
                     }
-                };
-                ErrorHandler.ThrowOnFailure(
-                    toolbox.AddItem(data, itemInfo, ToolboxTabName));
+                }
+
+                _populatedToolboxItems = items;
+            }
+            finally
+            {
+                foreach (IntPtr icon in iconHandles.Values)
+                {
+                    DeleteObject(icon);
+                }
             }
 
             if (!_toolWindowsShown)
@@ -220,7 +270,8 @@ namespace MauiDesigner.Vsix
                                 name,
                                 value));
                         }
-                    }));
+                    },
+                    typeof(GridDefinitionsEditor).AssemblyQualifiedName));
             }
 
             _selectionContainer = new SelectionContainer(true, false)
@@ -262,6 +313,47 @@ namespace MauiDesigner.Vsix
             controlType = managed.GetData(DesignerToolboxPayload.DataFormat) as string;
             return !string.IsNullOrWhiteSpace(controlType);
         }
+
+        private static IntPtr CreateToolboxIcon(string category)
+        {
+            using var bitmap = new Bitmap(16, 16);
+            using Graphics graphics = Graphics.FromImage(bitmap);
+            graphics.Clear(Color.Magenta);
+            graphics.SmoothingMode = SmoothingMode.None;
+            using var pen = new Pen(Color.FromArgb(109, 91, 208), 1.8f);
+            using var brush = new SolidBrush(Color.FromArgb(109, 91, 208));
+
+            switch (category)
+            {
+                case "Layouts":
+                    graphics.DrawRectangle(pen, 2, 2, 5, 5);
+                    graphics.DrawRectangle(pen, 9, 2, 5, 5);
+                    graphics.DrawRectangle(pen, 2, 9, 5, 5);
+                    graphics.DrawRectangle(pen, 9, 9, 5, 5);
+                    break;
+                case "Input":
+                    graphics.DrawRectangle(pen, 1.5f, 4, 13, 8);
+                    graphics.DrawLine(pen, 4, 8, 11, 8);
+                    break;
+                case "Data and collections":
+                    for (int row = 0; row < 3; row++)
+                    {
+                        graphics.FillEllipse(brush, 2, 3 + row * 4, 2, 2);
+                        graphics.DrawLine(pen, 6, 4 + row * 4, 14, 4 + row * 4);
+                    }
+                    break;
+                default:
+                    graphics.DrawRectangle(pen, 2, 2, 12, 12);
+                    graphics.FillEllipse(brush, 5, 5, 6, 6);
+                    break;
+            }
+
+            return bitmap.GetHbitmap(Color.Magenta);
+        }
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteObject(IntPtr objectHandle);
 
         private void RegisterFrameNotifications()
         {
@@ -513,14 +605,19 @@ namespace MauiDesigner.Vsix
             {
                 DisposeResources();
             }
-            else if (_lastSelection is not null)
+            else if (show == (int)__FRAMESHOW.FRAMESHOW_WinShown ||
+                     show == (int)__FRAMESHOW.FRAMESHOW_TabActivated ||
+                     show == (int)__FRAMESHOW.FRAMESHOW_WinRestored)
             {
                 if (_lastToolboxItems is not null)
                 {
                     PopulateToolbox(_lastToolboxItems);
                 }
 
-                PublishSelection(_lastSelection);
+                if (_lastSelection is not null)
+                {
+                    PublishSelection(_lastSelection);
+                }
             }
 
             return VSConstants.S_OK;
@@ -615,6 +712,21 @@ namespace MauiDesigner.Vsix
                 _textBuffer = null;
             }
 
+            if (s_toolboxOwner is not null &&
+                s_toolboxOwner.TryGetTarget(out DesignerPane? owner) &&
+                ReferenceEquals(owner, this) &&
+                GetService(typeof(SVsToolbox)) is IVsToolbox toolbox)
+            {
+                foreach (string tabName in ToolboxTabNames)
+                {
+                    toolbox.RemoveTab(tabName);
+                }
+
+                ToolboxTabNames.Clear();
+                s_toolboxOwner = null;
+            }
+
+            _populatedToolboxItems = null;
             _registeredFrame = null;
             _control.Dispose();
         }
