@@ -43,9 +43,76 @@ namespace MauiDesigner.Core.Protocol
         }
     }
 
-    public sealed class DesignerSelectionProxy : ICustomTypeDescriptor
+    public sealed class DesignerEnumValue
+    {
+        public DesignerEnumValue(string? value)
+        {
+            Value = value;
+        }
+
+        public string? Value { get; }
+
+        public override string ToString() => Value ?? string.Empty;
+    }
+
+    internal sealed class DesignerEnumValueConverter : TypeConverter
+    {
+        private readonly StandardValuesCollection _values;
+
+        public DesignerEnumValueConverter(IEnumerable<string> values)
+        {
+            _values = new StandardValuesCollection(
+                values.Select(value => new DesignerEnumValue(value)).ToArray());
+        }
+
+        public override bool CanConvertFrom(
+            ITypeDescriptorContext? context,
+            Type sourceType) =>
+            sourceType == typeof(string) ||
+            base.CanConvertFrom(context, sourceType);
+
+        public override bool CanConvertTo(
+            ITypeDescriptorContext? context,
+            Type? destinationType) =>
+            destinationType == typeof(string) ||
+            base.CanConvertTo(context, destinationType);
+
+        public override object? ConvertFrom(
+            ITypeDescriptorContext? context,
+            CultureInfo? culture,
+            object value) =>
+            value is string text
+                ? new DesignerEnumValue(text)
+                : base.ConvertFrom(context, culture, value);
+
+        public override object? ConvertTo(
+            ITypeDescriptorContext? context,
+            CultureInfo? culture,
+            object? value,
+            Type destinationType) =>
+            destinationType == typeof(string) && value is DesignerEnumValue enumValue
+                ? enumValue.Value ?? string.Empty
+                : base.ConvertTo(context, culture, value, destinationType);
+
+        public override StandardValuesCollection GetStandardValues(
+            ITypeDescriptorContext? context) =>
+            _values;
+
+        public override bool GetStandardValuesExclusive(
+            ITypeDescriptorContext? context) =>
+            true;
+
+        public override bool GetStandardValuesSupported(
+            ITypeDescriptorContext? context) =>
+            true;
+    }
+
+    public class DesignerSelectionProxy : ICustomTypeDescriptor
     {
         private readonly PropertyDescriptorCollection _properties;
+        private readonly Action<string, string?> _propertyChanged;
+        private string? _rowDefinitions;
+        private string? _columnDefinitions;
 
         public DesignerSelectionProxy(
             DesignerSelectionSnapshot snapshot,
@@ -58,17 +125,66 @@ namespace MauiDesigner.Core.Protocol
                 throw new ArgumentNullException(nameof(propertyChanged));
             }
 
+            _propertyChanged = propertyChanged;
+            bool useClrGridProperties = gridDefinitionsEditorType is not null;
+            var properties = snapshot.Properties
+                .Where(property =>
+                    !useClrGridProperties ||
+                    !DesignerRemotePropertyDescriptor.IsGridDefinitionsProperty(property))
+                .Select(property => (PropertyDescriptor)new DesignerRemotePropertyDescriptor(
+                    property,
+                    propertyChanged,
+                    gridDefinitionsEditorType))
+                .ToList();
+            if (useClrGridProperties)
+            {
+                PropertyDescriptorCollection reflected =
+                    TypeDescriptor.GetProperties(GetType());
+                foreach (DesignerPropertySnapshot property in snapshot.Properties)
+                {
+                    if (property.Name == nameof(RowDefinitions))
+                    {
+                        _rowDefinitions = property.Value;
+                        properties.Add(reflected[nameof(RowDefinitions)]!);
+                    }
+                    else if (property.Name == nameof(ColumnDefinitions))
+                    {
+                        _columnDefinitions = property.Value;
+                        properties.Add(reflected[nameof(ColumnDefinitions)]!);
+                    }
+                }
+            }
+
             _properties = new PropertyDescriptorCollection(
-                snapshot.Properties
-                    .Select(property => new DesignerRemotePropertyDescriptor(
-                        property,
-                        propertyChanged,
-                        gridDefinitionsEditorType))
-                    .ToArray(),
+                properties.ToArray(),
                 readOnly: true);
         }
 
         public DesignerSelectionSnapshot Snapshot { get; }
+
+        [Category("Layout")]
+        [DisplayName(nameof(RowDefinitions))]
+        public virtual DesignerGridDefinitionValue RowDefinitions
+        {
+            get => new DesignerGridDefinitionValue(_rowDefinitions);
+            set
+            {
+                _rowDefinitions = value?.SerializedValue;
+                _propertyChanged(nameof(RowDefinitions), _rowDefinitions);
+            }
+        }
+
+        [Category("Layout")]
+        [DisplayName(nameof(ColumnDefinitions))]
+        public virtual DesignerGridDefinitionValue ColumnDefinitions
+        {
+            get => new DesignerGridDefinitionValue(_columnDefinitions);
+            set
+            {
+                _columnDefinitions = value?.SerializedValue;
+                _propertyChanged(nameof(ColumnDefinitions), _columnDefinitions);
+            }
+        }
 
         public AttributeCollection GetAttributes() => AttributeCollection.Empty;
 
@@ -113,6 +229,7 @@ namespace MauiDesigner.Core.Protocol
 
             private readonly Action<string, string?> _propertyChanged;
             private readonly Type? _editorType;
+            private readonly TypeConverter? _converter;
             private string? _value;
 
             public DesignerRemotePropertyDescriptor(
@@ -127,9 +244,14 @@ namespace MauiDesigner.Core.Protocol
                 _editorType = IsGridDefinitionsProperty(property)
                     ? gridDefinitionsEditorType
                     : null;
+                _converter = property.EnumValues is { Count: > 0 }
+                    ? new DesignerEnumValueConverter(property.EnumValues)
+                    : null;
                 _value = property.Value;
                 PropertyType = _editorType is not null
                     ? typeof(DesignerGridDefinitionValue)
+                    : _converter is not null
+                        ? typeof(DesignerEnumValue)
                     : SupportedTypes.TryGetValue(property.ValueType, out Type? type)
                         ? type
                         : typeof(string);
@@ -142,6 +264,9 @@ namespace MauiDesigner.Core.Protocol
                 attribute.IsReadOnly;
 
             public override Type PropertyType { get; }
+
+            public override TypeConverter Converter =>
+                _converter ?? base.Converter;
 
             public override object? GetEditor(Type editorBaseType)
             {
@@ -161,6 +286,11 @@ namespace MauiDesigner.Core.Protocol
                 if (PropertyType == typeof(DesignerGridDefinitionValue))
                 {
                     return new DesignerGridDefinitionValue(_value);
+                }
+
+                if (PropertyType == typeof(DesignerEnumValue))
+                {
+                    return new DesignerEnumValue(_value);
                 }
 
                 if (_value is null || PropertyType == typeof(string))
@@ -197,6 +327,7 @@ namespace MauiDesigner.Core.Protocol
                     string text => text,
                     DesignerGridDefinitionValue definitions =>
                         definitions.SerializedValue,
+                    DesignerEnumValue enumValue => enumValue.Value,
                     IFormattable formattable => formattable.ToString(
                         null,
                         CultureInfo.InvariantCulture),
@@ -231,7 +362,7 @@ namespace MauiDesigner.Core.Protocol
                 return attributes.ToArray();
             }
 
-            private static bool IsGridDefinitionsProperty(
+            internal static bool IsGridDefinitionsProperty(
                 DesignerPropertySnapshot property) =>
                 property.Name == "RowDefinitions" ||
                 property.Name == "ColumnDefinitions";

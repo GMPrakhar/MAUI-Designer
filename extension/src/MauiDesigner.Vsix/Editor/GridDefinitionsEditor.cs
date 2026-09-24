@@ -21,12 +21,6 @@ namespace MauiDesigner.Vsix
             IServiceProvider provider,
             object? value)
         {
-            if (provider?.GetService(typeof(Forms.Design.IWindowsFormsEditorService))
-                    is not Forms.Design.IWindowsFormsEditorService editorService)
-            {
-                return value;
-            }
-
             string propertyName = context?.PropertyDescriptor?.Name ?? "Grid definitions";
             string? serializedValue = value switch
             {
@@ -48,7 +42,7 @@ namespace MauiDesigner.Vsix
             }
 
             using var dialog = new GridDefinitionsDialog(propertyName, tracks);
-            return editorService.ShowDialog(dialog) == Forms.DialogResult.OK
+            return dialog.ShowDialog() == Forms.DialogResult.OK
                 ? new DesignerGridDefinitionValue(dialog.SerializedValue)
                 : value;
         }

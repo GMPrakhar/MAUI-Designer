@@ -157,7 +157,8 @@ namespace MauiDesigner.Core.Tests
                             Name = "Text",
                             Value = "Save",
                             ValueType = typeof(string).FullName!,
-                            Category = "Common"
+                            Category = "Common",
+                            EnumValues = new List<string> { "One", "Two" }
                         }
                     }
                 }
@@ -167,6 +168,9 @@ namespace MauiDesigner.Core.Tests
             Assert.Equal("Button", item.DisplayName);
             Assert.Equal("button-1", selection!.ElementId);
             Assert.Equal("Save", Assert.Single(selection.Properties).Value);
+            Assert.Equal(
+                new[] { "One", "Two" },
+                Assert.Single(selection.Properties).EnumValues);
         }
 
         [Theory]

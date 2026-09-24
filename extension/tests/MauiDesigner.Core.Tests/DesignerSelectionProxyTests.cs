@@ -75,20 +75,13 @@ namespace MauiDesigner.Core.Tests
             var proxy = new DesignerSelectionProxy(
                 snapshot,
                 (_, value) => changedValue = value,
-                typeof(FakeGridDefinitionsEditor));
+                typeof(object));
 
             PropertyDescriptor property = Assert.Single(
                 ((ICustomTypeDescriptor)proxy).GetProperties().Cast<PropertyDescriptor>());
-            var editor = (EditorAttribute)property.Attributes[typeof(EditorAttribute)]!;
-
-            Assert.Equal(
-                typeof(FakeGridDefinitionsEditor).AssemblyQualifiedName,
-                editor.EditorTypeName);
+            Assert.Equal(typeof(DesignerSelectionProxy), property.ComponentType);
             Assert.Equal(typeof(DesignerGridDefinitionValue), property.PropertyType);
             Assert.Equal("(Collection)", property.GetValue(proxy)!.ToString());
-            Assert.IsType<FakeGridDefinitionsEditor>(
-                property.GetEditor(typeof(FakeEditorBase)));
-            Assert.Null(property.GetEditor(typeof(UnrelatedEditorBase)));
 
             property.SetValue(
                 proxy,
@@ -97,16 +90,46 @@ namespace MauiDesigner.Core.Tests
             Assert.Equal("1*,Auto", changedValue);
         }
 
-        private abstract class FakeEditorBase
+        [Fact]
+        public void Enum_properties_expose_an_exclusive_dropdown_and_forward_selection()
         {
-        }
+            string? changedValue = null;
+            var snapshot = new DesignerSelectionSnapshot
+            {
+                SelectionCount = 1,
+                ElementId = "label-1",
+                DisplayName = "Label",
+                Properties =
+                {
+                    new DesignerPropertySnapshot
+                    {
+                        Name = "HorizontalOptions",
+                        Value = "Fill",
+                        ValueType = "Microsoft.Maui.Controls.LayoutOptions",
+                        Category = "Layout",
+                        EnumValues = new() { "Start", "Center", "End", "Fill" }
+                    }
+                }
+            };
+            var proxy = new DesignerSelectionProxy(
+                snapshot,
+                (_, value) => changedValue = value);
 
-        private sealed class FakeGridDefinitionsEditor : FakeEditorBase
-        {
-        }
+            PropertyDescriptor property = Assert.Single(
+                ((ICustomTypeDescriptor)proxy).GetProperties().Cast<PropertyDescriptor>());
+            TypeConverter converter = property.Converter;
 
-        private abstract class UnrelatedEditorBase
-        {
+            Assert.True(converter.GetStandardValuesSupported());
+            Assert.True(converter.GetStandardValuesExclusive());
+            Assert.Equal(
+                new[] { "Start", "Center", "End", "Fill" },
+                converter.GetStandardValues()!
+                    .Cast<DesignerEnumValue>()
+                    .Select(value => value.Value));
+
+            property.SetValue(proxy, new DesignerEnumValue("Center"));
+
+            Assert.Equal("Center", changedValue);
         }
     }
 }

@@ -855,7 +855,8 @@ public partial class MainPage : ContentPage
                     : PropertyInspectorDescriptorSource.DefaultValue(property.Name),
                 property.ValueType.FullName ?? typeof(string).FullName!,
                 PropertyGroup(property),
-                property.IsReadOnly))
+                property.IsReadOnly,
+                StandardValues(property.ValueType)))
             .ToArray();
         _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
             1,
@@ -869,6 +870,19 @@ public partial class MainPage : ContentPage
             _workspace.CanPaste,
             _workspace.CanDuplicate,
             _workspace.SelectionCount > 0));
+    }
+
+    private static IReadOnlyList<string>? StandardValues(Type valueType)
+    {
+        Type effectiveType = Nullable.GetUnderlyingType(valueType) ?? valueType;
+        if (effectiveType.IsEnum)
+        {
+            return Enum.GetNames(effectiveType);
+        }
+
+        return effectiveType == typeof(LayoutOptions)
+            ? ["Start", "Center", "End", "Fill"]
+            : null;
     }
 
     private void ExecuteDesignerCommand(string command)

@@ -20,7 +20,9 @@ public sealed record HostedPropertySnapshot(
     [property: JsonPropertyName("category")]
     string Category,
     [property: JsonPropertyName("isReadOnly")]
-    bool IsReadOnly);
+    bool IsReadOnly,
+    [property: JsonPropertyName("enumValues")]
+    IReadOnlyList<string>? EnumValues = null);
 
 public sealed record HostedSelectionSnapshot(
     [property: JsonPropertyName("selectionCount")]

@@ -258,5 +258,8 @@ namespace MauiDesigner.Core.Protocol
 
         [JsonPropertyName("isReadOnly")]
         public bool IsReadOnly { get; set; }
+
+        [JsonPropertyName("enumValues")]
+        public List<string>? EnumValues { get; set; }
     }
 }

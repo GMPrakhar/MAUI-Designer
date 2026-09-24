@@ -204,6 +204,11 @@ and choosing Auto, Star, or Absolute sizing without manually composing the XAML
 collection string. These properties appear as `(Collection)` rather than as
 editable serialized text.
 
+Enum properties use exclusive dropdowns in the Properties window. MAUI
+`LayoutOptions` values such as `HorizontalOptions` and `VerticalOptions` also
+offer the supported Start, Center, End, and Fill choices instead of requiring
+manual text entry.
+
 The compact editor-local toolbar uses Visual Studio `KnownMonikers`, so its
 icons follow the active theme and DPI. It provides undo, redo, clipboard,
 duplicate, delete, zoom, fit, actual-size, snapping, grid, rulers, custom-control

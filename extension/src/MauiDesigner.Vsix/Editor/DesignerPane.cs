@@ -273,7 +273,7 @@ namespace MauiDesigner.Vsix
             var selected = new ArrayList();
             if (selection.SelectionCount > 0)
             {
-                selected.Add(new DesignerSelectionProxy(
+                selected.Add(new VisualStudioDesignerSelectionProxy(
                     selection,
                     (name, value) =>
                     {
@@ -284,8 +284,7 @@ namespace MauiDesigner.Vsix
                                 name,
                                 value));
                         }
-                    },
-                    typeof(GridDefinitionsEditor)));
+                    }));
             }
 
             _selectionContainer = new SelectionContainer(true, false)
