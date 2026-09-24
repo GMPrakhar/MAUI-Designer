@@ -98,13 +98,16 @@ With… → MAUI Designer** appears, and validating the embedded native window.
 ## What the core library does
 
 * **`Projects/ProjectAssetsReader`** — reads `obj/project.assets.json` (written by
-  every NuGet restore) to find which packages a project references and where
-  their assemblies live in the global packages folder.
+  every NuGet restore), selects the restored MAUI Windows `win-x64` target rather
+  than the first mobile target, and records compile references, runtime assets,
+  and the package dependency graph.
 * **`Manifests/ControlManifestGenerator`** — inspects those assemblies with
   `MetadataLoadContext` (metadata only, no code is executed), finds public
   concrete types deriving from `Microsoft.Maui.Controls.View`, reads their
   `public static readonly BindableProperty XxxProperty` fields and emits the same
-  manifest JSON the designer already consumes for custom controls.
+  manifest JSON the designer already consumes for custom controls. The VSIX
+  supplies the target .NET reference pack explicitly, which is required because
+  Visual Studio runs the extension on .NET Framework 4.7.2.
 * **`Protocol/DesignerSession`** — the host half of the message contract in
   `src/app/services/host-bridge.ts`, free of any Visual Studio types so it can be
   unit tested anywhere.
@@ -115,7 +118,7 @@ With… → MAUI Designer** appears, and validating the embedded native window.
 | --- | --- | --- |
 | host → designer | `host.ready` | which IDE is hosting, and the open file |
 | host → designer | `document.load` | XAML to edit |
-| host → designer | `manifests.push` | controls found in the project's packages |
+| host → designer | `manifests.push` | controls, Windows runtime dependency closure, startup adapters, and discovery diagnostics |
 | host → designer | `document.saved` | the document reached disk |
 | host → designer | `host.close` | flush final valid XAML for a correlated close attempt |
 | designer → host | `designer.ready` | the native process connected |
@@ -127,6 +130,29 @@ With… → MAUI Designer** appears, and validating the embedded native window.
 
 Both sides ignore malformed payloads, so a protocol mismatch degrades to "the
 designer does nothing" rather than taking down the IDE.
+
+### Third-party runtime controls
+
+Before the native process starts, the VSIX writes a per-session startup
+descriptor under the user's local application-data directory. The descriptor
+contains only restored local assembly paths and metadata; package binaries are
+not copied into the repository. The native host loads root control assemblies
+in an isolated `AssemblyLoadContext`, resolves their transitive package
+dependencies by assembly identity, and registers the resulting real MAUI
+`View` types in the runtime catalog. The same payload is requested again over
+the named pipe so restore/discovery diagnostics are visible and the catalog can
+be refreshed.
+
+Some component suites require a `MauiAppBuilder` registration call before
+`Build()`. Startup adapters describe a public static builder method by assembly,
+type, and method name. Syncfusion packages are mapped to
+`ConfigureSyncfusionCore` without referencing or redistributing the commercial
+package. Additional suites can add equivalent metadata mappings without adding
+a binary dependency to the designer.
+
+If a package is missing, incompatible, or cannot be initialized, its XAML is
+still round-tripped. The canvas shows an `Unavailable: <control>` placeholder
+and the failure is reported rather than silently dropping the element.
 
 ## Building and running the tests
 
@@ -235,6 +261,11 @@ owned by that pane, so canceling the prompt leaves the designer usable.
   extension and MAUI backend both use per-monitor-aware Windows UI stacks.
 * Manifest generation reads compile-time metadata, so a control's runtime
   defaults are not known — the designer falls back to its own defaults.
+* Runtime support is Windows-only and requires the package to expose compatible
+  `net10.0-windows` assets. Packages that require proprietary services beyond a
+  public builder registration method may still need a dedicated startup adapter.
+  Licensing remains the application's responsibility; the designer does not
+  register licence keys.
 
 ## Licence
 

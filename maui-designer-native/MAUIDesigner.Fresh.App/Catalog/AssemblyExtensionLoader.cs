@@ -1,19 +1,94 @@
 using System.Reflection;
 using System.Runtime.Loader;
+using System.Text.Json;
+using MAUIDesigner.Fresh.App.Hosting;
+using Microsoft.Maui.Hosting;
 
 namespace MAUIDesigner.Fresh.App.Catalog;
 
-public sealed class AssemblyExtensionLoader
+public sealed class DesignerPackageRuntime
 {
-    private readonly IControlCatalog _catalog;
-    private readonly List<AssemblyLoadContext> _contexts = [];
+    private const string StartupManifestArgument = "--designer-startup-manifest";
+    private readonly PackageLoadContext _context = new();
+    private readonly Dictionary<string, Assembly> _assemblies =
+        new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _diagnostics = [];
 
-    public AssemblyExtensionLoader(IControlCatalog catalog)
+    public IReadOnlyCollection<Assembly> Assemblies => _assemblies.Values;
+
+    public IReadOnlyList<string> Diagnostics => _diagnostics;
+
+    public static (DesignerPackageRuntime Runtime, HostedProjectControls? ProjectControls)
+        FromCommandLine()
     {
-        _catalog = catalog;
+        var runtime = new DesignerPackageRuntime();
+        string[] arguments = Environment.GetCommandLineArgs();
+        int index = Array.IndexOf(arguments, StartupManifestArgument);
+        if (index < 0 || index + 1 >= arguments.Length)
+        {
+            return (runtime, null);
+        }
+
+        string path = arguments[index + 1];
+        if (!File.Exists(path))
+        {
+            return (runtime, null);
+        }
+
+        var controls = JsonSerializer.Deserialize<HostedProjectControls>(
+            File.ReadAllText(path),
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        if (controls is not null)
+        {
+            try
+            {
+                runtime.Load(controls);
+            }
+            catch (Exception exception) when (
+                exception is FileNotFoundException or
+                FileLoadException or
+                BadImageFormatException or
+                TypeLoadException)
+            {
+                runtime._diagnostics.Add(
+                    "Third-party control loading failed: " +
+                    (exception.InnerException?.Message ?? exception.Message));
+            }
+        }
+
+        return (runtime, controls);
     }
 
-    public ExtensionLoadResult Load(string assemblyPath)
+    public IReadOnlyList<Assembly> Load(HostedProjectControls projectControls)
+    {
+        _context.Add(projectControls.Assemblies.Select(assembly => assembly.Path));
+        var roots = projectControls.Assemblies
+            .Where(assembly => assembly.IsRoot)
+            .Select(assembly => assembly.Path)
+            .Concat(projectControls.StartupMethods.Select(method =>
+                projectControls.Assemblies.FirstOrDefault(assembly =>
+                    string.Equals(
+                        Path.GetFileNameWithoutExtension(assembly.Path),
+                        method.Assembly,
+                        StringComparison.OrdinalIgnoreCase))?.Path))
+            .Where(path => path is not null)
+            .Cast<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        var loaded = new List<Assembly>();
+        foreach (string path in roots)
+        {
+            Assembly assembly = LoadAssembly(path);
+            if (loaded.All(candidate => candidate != assembly))
+            {
+                loaded.Add(assembly);
+            }
+        }
+
+        return loaded;
+    }
+
+    public Assembly LoadAssembly(string assemblyPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(assemblyPath);
         string fullPath = Path.GetFullPath(assemblyPath);
@@ -22,24 +97,81 @@ public sealed class AssemblyExtensionLoader
             throw new FileNotFoundException("Control assembly was not found.", fullPath);
         }
 
-        int before = _catalog.Controls.Length;
-        var context = new DesignerExtensionLoadContext(fullPath);
-        Assembly assembly = context.LoadFromAssemblyPath(fullPath);
-        _catalog.RegisterAssembly(assembly);
-        _contexts.Add(context);
-        return new ExtensionLoadResult(
-            assembly.GetName().Name ?? Path.GetFileNameWithoutExtension(fullPath),
-            _catalog.Controls.Length - before);
+        _context.Add([fullPath]);
+        string name = AssemblyName.GetAssemblyName(fullPath).Name
+            ?? Path.GetFileNameWithoutExtension(fullPath);
+        if (_assemblies.TryGetValue(name, out Assembly? existing))
+        {
+            return existing;
+        }
+
+        Assembly assembly = _context.LoadFromAssemblyPath(fullPath);
+        _assemblies[name] = assembly;
+        return assembly;
     }
 
-    private sealed class DesignerExtensionLoadContext : AssemblyLoadContext
+    public void Configure(MauiAppBuilder builder, HostedProjectControls? projectControls)
     {
-        private readonly AssemblyDependencyResolver _resolver;
-
-        public DesignerExtensionLoadContext(string componentAssemblyPath)
-            : base($"MAUIDesigner:{Path.GetFileNameWithoutExtension(componentAssemblyPath)}")
+        if (projectControls is null)
         {
-            _resolver = new AssemblyDependencyResolver(componentAssemblyPath);
+            return;
+        }
+
+        foreach (HostedStartupMethod startup in projectControls.StartupMethods)
+        {
+            try
+            {
+                if (!_assemblies.TryGetValue(startup.Assembly, out Assembly? assembly))
+                {
+                    throw new InvalidOperationException(
+                        $"Startup assembly '{startup.Assembly}' was not loaded.");
+                }
+
+                Type type = assembly.GetType(startup.Type, throwOnError: true)!;
+                MethodInfo method = type.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .SingleOrDefault(candidate =>
+                    {
+                        ParameterInfo[] parameters = candidate.GetParameters();
+                        return candidate.Name == startup.Method &&
+                            parameters.Length == 1 &&
+                            parameters[0].ParameterType.IsAssignableFrom(typeof(MauiAppBuilder));
+                    })
+                    ?? throw new MissingMethodException(startup.Type, startup.Method);
+                method.Invoke(null, [builder]);
+            }
+            catch (Exception exception)
+            {
+                _diagnostics.Add(
+                    $"{startup.Package} startup registration failed: " +
+                    $"{exception.InnerException?.Message ?? exception.Message}");
+            }
+        }
+    }
+
+    private sealed class PackageLoadContext : AssemblyLoadContext
+    {
+        private readonly object _gate = new();
+        private readonly Dictionary<string, string> _paths =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public PackageLoadContext()
+            : base("MAUIDesigner:project-controls")
+        {
+        }
+
+        public void Add(IEnumerable<string> paths)
+        {
+            lock (_gate)
+            {
+                foreach (string path in paths.Where(File.Exists))
+                {
+                    string? name = AssemblyName.GetAssemblyName(path).Name;
+                    if (!string.IsNullOrWhiteSpace(name))
+                    {
+                        _paths[name] = Path.GetFullPath(path);
+                    }
+                }
+            }
         }
 
         protected override Assembly? Load(AssemblyName assemblyName)
@@ -51,9 +183,58 @@ public sealed class AssemblyExtensionLoader
                 return shared;
             }
 
-            string? path = _resolver.ResolveAssemblyToPath(assemblyName);
-            return path is null ? null : LoadFromAssemblyPath(path);
+            lock (_gate)
+            {
+                return assemblyName.Name is not null &&
+                    _paths.TryGetValue(assemblyName.Name, out string? path)
+                        ? LoadFromAssemblyPath(path)
+                        : null;
+            }
         }
+    }
+}
+
+public sealed class AssemblyExtensionLoader
+{
+    private readonly IControlCatalog _catalog;
+    private readonly DesignerPackageRuntime _runtime;
+
+    public AssemblyExtensionLoader(IControlCatalog catalog, DesignerPackageRuntime runtime)
+    {
+        _catalog = catalog;
+        _runtime = runtime;
+    }
+
+    public AssemblyExtensionLoader(IControlCatalog catalog)
+        : this(catalog, new DesignerPackageRuntime())
+    {
+    }
+
+    public IReadOnlyList<string> Diagnostics => _runtime.Diagnostics;
+
+    public ExtensionLoadResult Load(string assemblyPath)
+    {
+        int before = _catalog.Controls.Length;
+        Assembly assembly = _runtime.LoadAssembly(assemblyPath);
+        _catalog.RegisterAssembly(assembly);
+        return new ExtensionLoadResult(
+            assembly.GetName().Name ?? Path.GetFileNameWithoutExtension(assemblyPath),
+            _catalog.Controls.Length - before);
+    }
+
+    public IReadOnlyList<ExtensionLoadResult> Load(HostedProjectControls projectControls)
+    {
+        var results = new List<ExtensionLoadResult>();
+        foreach (Assembly assembly in _runtime.Load(projectControls))
+        {
+            int before = _catalog.Controls.Length;
+            _catalog.RegisterAssembly(assembly);
+            results.Add(new ExtensionLoadResult(
+                assembly.GetName().Name ?? string.Empty,
+                _catalog.Controls.Length - before));
+        }
+
+        return results;
     }
 }
 

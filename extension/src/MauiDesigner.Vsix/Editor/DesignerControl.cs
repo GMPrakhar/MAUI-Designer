@@ -4,12 +4,14 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 
+using MauiDesigner.Core.Manifests;
 using MauiDesigner.Core.Protocol;
 
 using Microsoft.VisualStudio.Imaging;
@@ -38,6 +40,7 @@ namespace MauiDesigner.Vsix
         private StreamReader? _reader;
         private StreamWriter? _writer;
         private Process? _process;
+        private string? _startupManifestPath;
         private string? _pendingCloseRequestId;
         private ManualResetEventSlim? _pendingCloseResponse;
         private string? _pendingFinalXaml;
@@ -176,7 +179,9 @@ namespace MauiDesigner.Vsix
             }
         }
 
-        public async Task InitializeAsync(string executablePath)
+        public async Task InitializeAsync(
+            string executablePath,
+            ProjectControlManifest projectControls)
         {
             if (!File.Exists(executablePath))
             {
@@ -187,6 +192,7 @@ namespace MauiDesigner.Vsix
             try
             {
                 string pipeName = $"MauiDesigner.{Process.GetCurrentProcess().Id}.{Guid.NewGuid():N}";
+                _startupManifestPath = WriteStartupManifest(projectControls);
                 _pipe = new NamedPipeServerStream(
                     pipeName,
                     PipeDirection.InOut,
@@ -199,7 +205,7 @@ namespace MauiDesigner.Vsix
                     _pipe.EndWaitForConnection,
                     null);
                 IntPtr hostHandle = await _nativeHost.WaitForHandleAsync();
-                _process = StartDesigner(executablePath, pipeName);
+                _process = StartDesigner(executablePath, pipeName, _startupManifestPath);
                 IntPtr designerHandle = await WaitForMainWindowAsync(_process, TimeSpan.FromSeconds(20));
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
                 if (_disposed)
@@ -258,17 +264,33 @@ namespace MauiDesigner.Vsix
             }
         }
 
-        private static Process StartDesigner(string executablePath, string pipeName)
+        private static Process StartDesigner(
+            string executablePath,
+            string pipeName,
+            string startupManifestPath)
         {
             var process = Process.Start(new ProcessStartInfo
             {
                 FileName = executablePath,
-                Arguments = $"--designer-pipe \"{pipeName}\"",
+                Arguments =
+                    $"--designer-pipe \"{pipeName}\" --designer-startup-manifest \"{startupManifestPath}\"",
                 UseShellExecute = false,
                 WorkingDirectory = Path.GetDirectoryName(executablePath)
             });
             return process ?? throw new InvalidOperationException(
                 "Windows did not create the MAUI Designer process.");
+        }
+
+        private static string WriteStartupManifest(ProjectControlManifest projectControls)
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MauiDesigner",
+                "Startup");
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".json");
+            File.WriteAllText(path, ManifestJson.Serialize(projectControls), Encoding.UTF8);
+            return path;
         }
 
         private static async Task<IntPtr> WaitForMainWindowAsync(
@@ -635,6 +657,22 @@ namespace MauiDesigner.Vsix
             _writer?.Dispose();
             _pipe?.Dispose();
             DisposeProcess();
+            if (_startupManifestPath is not null)
+            {
+                try
+                {
+                    File.Delete(_startupManifestPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+
+                _startupManifestPath = null;
+            }
+
             _nativeHost.ShortcutRequested -= OnShortcutRequested;
             _nativeHost.Dispose();
         }

@@ -76,6 +76,11 @@ namespace MauiDesigner.Core.Protocol
             _post(DesignerProtocol.ManifestsPush(manifests));
         }
 
+        public void PushManifests(ProjectControlManifest projectControls)
+        {
+            _post(DesignerProtocol.ManifestsPush(projectControls));
+        }
+
         /// <summary>Tells the designer the document reached disk.</summary>
         public void NotifySaved()
         {

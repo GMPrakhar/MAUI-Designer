@@ -16,6 +16,7 @@ public sealed class ControlMaterializer
     private readonly Dictionary<ElementId, Grid> _chromes = [];
     private readonly Dictionary<ElementId, View> _moveHandles = [];
     private readonly Dictionary<ElementId, View> _resizeHandles = [];
+    private readonly Dictionary<ElementId, GraphicsView> _gridTrackOverlays = [];
     private readonly Dictionary<ElementId, (View View, ILayoutAdapter Adapter)> _targets = [];
     private readonly List<Action> _gridTrackUpdates = [];
     private readonly ConditionalWeakTable<Microsoft.UI.Xaml.FrameworkElement, object>
@@ -43,6 +44,7 @@ public sealed class ControlMaterializer
         _chromes.Clear();
         _moveHandles.Clear();
         _resizeHandles.Clear();
+        _gridTrackOverlays.Clear();
         _targets.Clear();
         _gridTrackUpdates.Clear();
         _activeDropPreview = null;
@@ -61,6 +63,11 @@ public sealed class ControlMaterializer
     public void UpdateInteraction()
     {
         RemoveActiveDropPreview();
+        foreach ((ElementId id, GraphicsView overlay) in _gridTrackOverlays)
+        {
+            overlay.IsVisible = id == _workspace.SelectedId;
+        }
+
         foreach ((ElementId id, Grid chrome) in _chromes)
         {
             bool selected = _workspace.SelectedIds.Contains(id);
@@ -278,7 +285,7 @@ public sealed class ControlMaterializer
             if (isRoot)
             {
                 return view is Grid rootGrid
-                    ? CreateGridTrackSurface(rootGrid)
+                    ? CreateGridTrackSurface(rootGrid, node.Id)
                     : view;
             }
 
@@ -302,7 +309,7 @@ public sealed class ControlMaterializer
         chrome.Add(content);
         if (content is Grid gridContent)
         {
-            AddGridTrackOverlay(chrome, gridContent);
+            AddGridTrackOverlay(chrome, gridContent, node.Id);
         }
 
         var tap = new TapGestureRecognizer();
@@ -414,21 +421,25 @@ public sealed class ControlMaterializer
         }
     }
 
-    private Grid CreateGridTrackSurface(Grid content)
+    private Grid CreateGridTrackSurface(Grid content, ElementId elementId)
     {
         var surface = new Grid();
         surface.Add(content);
-        AddGridTrackOverlay(surface, content);
+        AddGridTrackOverlay(surface, content, elementId);
         return surface;
     }
 
-    private void AddGridTrackOverlay(Grid surface, Grid content)
+    private void AddGridTrackOverlay(
+        Grid surface,
+        Grid content,
+        ElementId elementId)
     {
         var drawable = new GridTrackOverlayDrawable();
         var overlay = new GraphicsView
         {
             InputTransparent = true,
-            Drawable = drawable
+            Drawable = drawable,
+            IsVisible = false
         };
         void UpdateTracks()
         {
@@ -442,6 +453,7 @@ public sealed class ControlMaterializer
         content.SizeChanged += (_, _) => UpdateTracks();
         overlay.Loaded += (_, _) => UpdateTracks();
         _gridTrackUpdates.Add(UpdateTracks);
+        _gridTrackOverlays[elementId] = overlay;
         surface.Add(overlay);
     }
 

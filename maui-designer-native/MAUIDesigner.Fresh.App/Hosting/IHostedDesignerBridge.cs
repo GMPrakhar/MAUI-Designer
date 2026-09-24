@@ -12,6 +12,8 @@ public interface IHostedDesignerBridge : IDisposable
 
     event EventHandler<HostedDesignerCommand>? CommandRequested;
 
+    event EventHandler<HostedProjectControls>? ProjectControlsReceived;
+
     void Start();
 
     void SendDocumentChanged(string xaml);

@@ -75,6 +75,22 @@ namespace MauiDesigner.Core.Protocol
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<CustomControlManifest>? Manifests { get; set; }
 
+        [JsonPropertyName("target")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? Target { get; set; }
+
+        [JsonPropertyName("assemblies")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<RuntimeAssemblyDefinition>? Assemblies { get; set; }
+
+        [JsonPropertyName("startupMethods")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<PackageStartupMethod>? StartupMethods { get; set; }
+
+        [JsonPropertyName("diagnostics")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<ManifestDiagnostic>? Diagnostics { get; set; }
+
         [JsonPropertyName("toolboxItems")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<DesignerToolboxItem>? ToolboxItems { get; set; }
@@ -119,6 +135,17 @@ namespace MauiDesigner.Core.Protocol
             {
                 Type = MessageTypes.ManifestsPush,
                 Manifests = new List<CustomControlManifest>(manifests)
+            });
+
+        public static string ManifestsPush(ProjectControlManifest projectControls) =>
+            Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.ManifestsPush,
+                Target = projectControls.Target,
+                Manifests = projectControls.Manifests,
+                Assemblies = projectControls.Assemblies,
+                StartupMethods = projectControls.StartupMethods,
+                Diagnostics = projectControls.Diagnostics
             });
 
         public static string DocumentSaved() => Serialize(new DesignerMessage { Type = MessageTypes.DocumentSaved });

@@ -54,3 +54,49 @@ public sealed record HostedDesignerCommand(
     string? ElementId = null,
     string? PropertyName = null,
     string? Value = null);
+
+public sealed record HostedProjectControls(
+    [property: JsonPropertyName("target")]
+    string Target,
+    [property: JsonPropertyName("manifests")]
+    IReadOnlyList<HostedControlManifest> Manifests,
+    [property: JsonPropertyName("assemblies")]
+    IReadOnlyList<HostedRuntimeAssembly> Assemblies,
+    [property: JsonPropertyName("startupMethods")]
+    IReadOnlyList<HostedStartupMethod> StartupMethods,
+    [property: JsonPropertyName("diagnostics")]
+    IReadOnlyList<HostedManifestDiagnostic> Diagnostics);
+
+public sealed record HostedControlManifest(
+    [property: JsonPropertyName("package")]
+    string Package,
+    [property: JsonPropertyName("xmlns")]
+    HostedControlNamespace Xmlns);
+
+public sealed record HostedControlNamespace(
+    [property: JsonPropertyName("uri")]
+    string Uri);
+
+public sealed record HostedRuntimeAssembly(
+    [property: JsonPropertyName("path")]
+    string Path,
+    [property: JsonPropertyName("package")]
+    string Package,
+    [property: JsonPropertyName("isRoot")]
+    bool IsRoot);
+
+public sealed record HostedStartupMethod(
+    [property: JsonPropertyName("package")]
+    string Package,
+    [property: JsonPropertyName("assembly")]
+    string Assembly,
+    [property: JsonPropertyName("type")]
+    string Type,
+    [property: JsonPropertyName("method")]
+    string Method);
+
+public sealed record HostedManifestDiagnostic(
+    [property: JsonPropertyName("package")]
+    string Package,
+    [property: JsonPropertyName("message")]
+    string Message);

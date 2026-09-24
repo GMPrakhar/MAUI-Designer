@@ -19,8 +19,10 @@ and keeps edits in an immutable document model that supports undo and redo.
   focal-point zoom, fit/reset, Ctrl+wheel zoom, middle-button or Space+drag
   panning, configurable snap/grid controls, rulers, and a light-only workspace.
 - Provides specialized Grid row/column collection editors, direct child
-  row/column/row-span/column-span editing, dotted track boundaries, and a
-  separate real-MAUI runtime preview window.
+  row/column/row-span/column-span editing, selection-only dotted track
+  boundaries, and a separate real-MAUI runtime preview window.
+- Anchors zoom-aware horizontal and vertical rulers to the transformed device
+  frame rather than the viewport edges, with legible major/minor tick spacing.
 - Uses extensible layout adapters for `AbsoluteLayout`, measured Grid cells,
   stack insertion positions, generic layouts, and single-content containers.
 - Preserves resources, namespaces, markup extensions, attached properties,

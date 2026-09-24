@@ -54,6 +54,7 @@ namespace MauiDesigner.Vsix
         private DesignerSelectionSnapshot? _lastSelection;
         private IReadOnlyList<DesignerToolboxItem>? _lastToolboxItems;
         private IReadOnlyList<DesignerToolboxItem>? _populatedToolboxItems;
+        private ProjectControlManifest _projectControls = new ProjectControlManifest();
         private bool _toolWindowsShown;
 
         /// <summary>
@@ -110,13 +111,30 @@ namespace MauiDesigner.Vsix
 
             _joinableTaskFactory.RunAsync(async () =>
             {
-                await _control.InitializeAsync(NativeDesignerLocator.ExecutablePath);
+                var projectFile = ProjectManifestProvider.FindProjectFile(
+                    _hierarchy,
+                    _documentMoniker);
+                await TaskScheduler.Default;
+                _projectControls = ProjectManifestProvider.ForProject(projectFile);
+
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
                 if (Volatile.Read(ref _disposed) != 0)
                 {
                     return;
                 }
 
+                foreach (var diagnostic in _projectControls.Diagnostics)
+                {
+                    var package = string.IsNullOrWhiteSpace(diagnostic.Package)
+                        ? string.Empty
+                        : diagnostic.Package + ": ";
+                    WriteToOutput($"Third-party control discovery: {package}{diagnostic.Message}");
+                }
+
+                await _control.InitializeAsync(
+                    NativeDesignerLocator.ExecutablePath,
+                    _projectControls);
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
                 RegisterFrameNotifications();
                 SubscribeToBufferChanges();
                 _session.OpenDocument(ReadBuffer(), _documentMoniker);
@@ -492,22 +510,7 @@ namespace MauiDesigner.Vsix
             _joinableTaskFactory.RunAsync(async () =>
             {
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
-                var projectFile = ProjectManifestProvider.FindProjectFile(_hierarchy, _documentMoniker);
-
-                await TaskScheduler.Default;
-                IReadOnlyList<CustomControlManifest> manifests;
-                try
-                {
-                    manifests = ProjectManifestProvider.ForProject(projectFile);
-                }
-                catch (Exception error)
-                {
-                    WriteToOutput($"Could not read the project's NuGet controls: {error.Message}");
-                    return;
-                }
-
-                await _joinableTaskFactory.SwitchToMainThreadAsync();
-                _session.PushManifests(manifests);
+                _session.PushManifests(_projectControls);
             }).FileAndForget("vs/mauidesigner/manifests");
         }
 

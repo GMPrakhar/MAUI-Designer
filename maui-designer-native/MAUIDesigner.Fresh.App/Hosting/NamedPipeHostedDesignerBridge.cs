@@ -43,6 +43,8 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
 
     public event EventHandler<HostedDesignerCommand>? CommandRequested;
 
+    public event EventHandler<HostedProjectControls>? ProjectControlsReceived;
+
     public void Start()
     {
         if (!IsHosted || Interlocked.Exchange(ref _started, 1) != 0)
@@ -128,6 +130,7 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
 
         await writer.WriteLineAsync(JsonSerializer.Serialize(new BridgeMessage("designer.ready")));
+        await writer.WriteLineAsync(JsonSerializer.Serialize(new BridgeMessage("manifests.request")));
         await writer.FlushAsync(connectionLifetime.Token);
         Task read = ReadMessagesAsync(reader, connectionLifetime.Token);
         Task write = WriteMessagesAsync(writer, connectionLifetime.Token);
@@ -194,6 +197,17 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
                         message.ElementId,
                         message.PropertyName,
                         message.Value));
+            }
+            else if (message?.Type == "manifests.push")
+            {
+                ProjectControlsReceived?.Invoke(
+                    this,
+                    new HostedProjectControls(
+                        message.Target ?? string.Empty,
+                        message.Manifests ?? [],
+                        message.Assemblies ?? [],
+                        message.StartupMethods ?? [],
+                        message.Diagnostics ?? []));
             }
         }
     }
@@ -271,5 +285,15 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         [property: JsonPropertyName("propertyName")]
         string? PropertyName = null,
         [property: JsonPropertyName("value")]
-        string? Value = null);
+        string? Value = null,
+        [property: JsonPropertyName("target")]
+        string? Target = null,
+        [property: JsonPropertyName("manifests")]
+        IReadOnlyList<HostedControlManifest>? Manifests = null,
+        [property: JsonPropertyName("assemblies")]
+        IReadOnlyList<HostedRuntimeAssembly>? Assemblies = null,
+        [property: JsonPropertyName("startupMethods")]
+        IReadOnlyList<HostedStartupMethod>? StartupMethods = null,
+        [property: JsonPropertyName("diagnostics")]
+        IReadOnlyList<HostedManifestDiagnostic>? Diagnostics = null);
 }

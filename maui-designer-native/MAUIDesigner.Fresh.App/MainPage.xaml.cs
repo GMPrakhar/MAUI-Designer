@@ -92,6 +92,7 @@ public partial class MainPage : ContentPage
         _hostBridge.CloseRequested += OnHostedCloseRequested;
         _hostBridge.ErrorReported += OnHostedErrorReported;
         _hostBridge.CommandRequested += OnHostedCommandRequested;
+        _hostBridge.ProjectControlsReceived += OnProjectControlsReceived;
         _gridDrawable = new CanvasGridDrawable(viewport);
         _rulerDrawable = new CanvasRulerDrawable(viewport);
         CanvasGridOverlay.Drawable = _gridDrawable;
@@ -112,6 +113,10 @@ public partial class MainPage : ContentPage
         PublishToolboxSnapshot();
         PublishSelectionSnapshot();
         _hostBridge.Start();
+        if (_extensionLoader.Diagnostics.Count > 0)
+        {
+            ShowPropertyError(string.Join(Environment.NewLine, _extensionLoader.Diagnostics));
+        }
     }
 
     private void ConfigureHostedLayout()
@@ -700,6 +705,36 @@ public partial class MainPage : ContentPage
             }
 #endif
             ExecuteDesignerCommand(command.Name);
+        });
+
+    private void OnProjectControlsReceived(object? sender, HostedProjectControls projectControls) =>
+        Dispatcher.Dispatch(() =>
+        {
+            foreach (HostedManifestDiagnostic diagnostic in projectControls.Diagnostics)
+            {
+                string package = string.IsNullOrWhiteSpace(diagnostic.Package)
+                    ? string.Empty
+                    : diagnostic.Package + ": ";
+                ShowPropertyError($"Third-party control discovery: {package}{diagnostic.Message}");
+            }
+
+            try
+            {
+                _extensionLoader.Load(projectControls);
+                ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty);
+                PublishToolboxSnapshot();
+                RebuildDesigner();
+            }
+            catch (Exception exception) when (
+                exception is FileNotFoundException or
+                FileLoadException or
+                BadImageFormatException or
+                TypeLoadException)
+            {
+                ShowPropertyError(
+                    $"Third-party controls could not be loaded: " +
+                    $"{exception.InnerException?.Message ?? exception.Message}");
+            }
         });
 
     private void InsertHostedControl(

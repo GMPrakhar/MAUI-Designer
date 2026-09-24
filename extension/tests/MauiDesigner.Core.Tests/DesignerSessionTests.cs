@@ -391,6 +391,40 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Project_control_payload_carries_runtime_and_startup_information()
+        {
+            var session = CreateSession();
+            session.PushManifests(new ProjectControlManifest
+            {
+                Target = "net10.0-windows10.0.19041.0/win-x64",
+                Assemblies =
+                {
+                    new RuntimeAssemblyDefinition
+                    {
+                        Path = @"C:\packages\Syncfusion.Maui.Buttons.dll",
+                        Package = "Syncfusion.Maui.Buttons",
+                        IsRoot = true
+                    }
+                },
+                StartupMethods =
+                {
+                    new PackageStartupMethod
+                    {
+                        Package = "Syncfusion.Maui.Core",
+                        Assembly = "Syncfusion.Maui.Core",
+                        Type = "Syncfusion.Maui.Core.Hosting.AppHostBuilderExtensions",
+                        Method = "ConfigureSyncfusionCore"
+                    }
+                }
+            });
+
+            var message = Assert.Single(Posted());
+            Assert.Equal("net10.0-windows10.0.19041.0/win-x64", message.Target);
+            Assert.True(message.Assemblies!.Single().IsRoot);
+            Assert.Equal("ConfigureSyncfusionCore", message.StartupMethods!.Single().Method);
+        }
+
+        [Fact]
         public void Designer_errors_are_surfaced_to_the_host()
         {
             var session = CreateSession();

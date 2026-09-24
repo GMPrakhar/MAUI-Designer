@@ -115,6 +115,63 @@ namespace MauiDesigner.Core.Manifests
         public bool? Bindable { get; set; }
     }
 
+    public sealed class ProjectControlManifest
+    {
+        [JsonPropertyName("target")]
+        public string Target { get; set; } = string.Empty;
+
+        [JsonPropertyName("manifests")]
+        public List<CustomControlManifest> Manifests { get; set; } = new List<CustomControlManifest>();
+
+        [JsonPropertyName("assemblies")]
+        public List<RuntimeAssemblyDefinition> Assemblies { get; set; } =
+            new List<RuntimeAssemblyDefinition>();
+
+        [JsonPropertyName("startupMethods")]
+        public List<PackageStartupMethod> StartupMethods { get; set; } =
+            new List<PackageStartupMethod>();
+
+        [JsonPropertyName("diagnostics")]
+        public List<ManifestDiagnostic> Diagnostics { get; set; } =
+            new List<ManifestDiagnostic>();
+    }
+
+    public sealed class RuntimeAssemblyDefinition
+    {
+        [JsonPropertyName("path")]
+        public string Path { get; set; } = string.Empty;
+
+        [JsonPropertyName("package")]
+        public string Package { get; set; } = string.Empty;
+
+        [JsonPropertyName("isRoot")]
+        public bool IsRoot { get; set; }
+    }
+
+    public sealed class PackageStartupMethod
+    {
+        [JsonPropertyName("package")]
+        public string Package { get; set; } = string.Empty;
+
+        [JsonPropertyName("assembly")]
+        public string Assembly { get; set; } = string.Empty;
+
+        [JsonPropertyName("type")]
+        public string Type { get; set; } = string.Empty;
+
+        [JsonPropertyName("method")]
+        public string Method { get; set; } = string.Empty;
+    }
+
+    public sealed class ManifestDiagnostic
+    {
+        [JsonPropertyName("package")]
+        public string Package { get; set; } = string.Empty;
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
+    }
+
     /// <summary>Shared serializer options so the host and the designer agree on casing.</summary>
     public static class ManifestJson
     {
