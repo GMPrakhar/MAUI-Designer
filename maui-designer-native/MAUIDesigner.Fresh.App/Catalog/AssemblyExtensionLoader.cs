@@ -9,6 +9,7 @@ namespace MAUIDesigner.Fresh.App.Catalog;
 public sealed class DesignerPackageRuntime
 {
     private const string StartupManifestArgument = "--designer-startup-manifest";
+    private const string SyncfusionPackage = "Syncfusion.Maui.Core";
     private readonly PackageLoadContext _context = new();
     private readonly Dictionary<string, Assembly> _assemblies =
         new(StringComparer.OrdinalIgnoreCase);
@@ -137,13 +138,47 @@ public sealed class DesignerPackageRuntime
                             parameters[0].ParameterType.IsAssignableFrom(typeof(MauiAppBuilder));
                     })
                     ?? throw new MissingMethodException(startup.Type, startup.Method);
+                int serviceCount = builder.Services.Count;
                 method.Invoke(null, [builder]);
+                RemoveUnsupportedDesignerInitializers(
+                    builder,
+                    startup,
+                    assembly,
+                    serviceCount);
             }
             catch (Exception exception)
             {
                 _diagnostics.Add(
                     $"{startup.Package} startup registration failed: " +
                     $"{exception.InnerException?.Message ?? exception.Message}");
+            }
+        }
+    }
+
+    private static void RemoveUnsupportedDesignerInitializers(
+        MauiAppBuilder builder,
+        HostedStartupMethod startup,
+        Assembly assembly,
+        int serviceCount)
+    {
+        if (!string.Equals(
+                startup.Package,
+                SyncfusionPackage,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        // Syncfusion's Windows initializer loads a package-relative XAML resource
+        // through ms-appx. Project controls are loaded from the NuGet cache rather
+        // than compiled into the designer package, so WinUI terminates the process
+        // while resolving that URI. Its handler and font registrations remain valid.
+        for (int index = builder.Services.Count - 1; index >= serviceCount; index--)
+        {
+            if (builder.Services[index].ServiceType == typeof(IMauiInitializeScopedService) &&
+                builder.Services[index].ImplementationType?.Assembly == assembly)
+            {
+                builder.Services.RemoveAt(index);
             }
         }
     }

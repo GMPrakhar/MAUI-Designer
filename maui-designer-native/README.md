@@ -79,6 +79,9 @@ selection, property editing, rendering, save, and reopen behavior.
 
 Vendor startup adapters are used only when a package requires configuration
 before `MauiAppBuilder.Build()`; they do not define which controls appear.
+Syncfusion's handler and font registrations are retained, while its private
+Windows package-resource initializer is omitted because dynamically restored
+assemblies are not compiled into the designer's `ms-appx` package graph.
 
 ## XAML workflow
 

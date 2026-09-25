@@ -108,6 +108,34 @@ public sealed class ThirdPartyControlPipelineTests
     }
 
     [Fact]
+    public void Syncfusion_startup_keeps_handlers_but_removes_the_package_resource_initializer()
+    {
+        string controlsPath = Path.Combine(AppContext.BaseDirectory, "DesignerFixture.Controls.dll");
+        var payload = new HostedProjectControls(
+            "net10.0-windows10.0.19041.0/win-x64",
+            [],
+            [new HostedRuntimeAssembly(controlsPath, "Syncfusion.Maui.Core", true)],
+            [
+                new HostedStartupMethod(
+                    "Syncfusion.Maui.Core",
+                    "DesignerFixture.Controls",
+                    "Syncfusion.Maui.Core.Hosting.AppHostBuilderExtensions",
+                    "ConfigureSyncfusionCore")
+            ],
+            []);
+        var runtime = new DesignerPackageRuntime();
+        var builder = MauiApp.CreateBuilder();
+
+        runtime.Load(payload);
+        runtime.Configure(builder, payload);
+
+        Assert.DoesNotContain(
+            builder.Services,
+            service => service.ImplementationType?.FullName ==
+                "Syncfusion.Maui.Core.Hosting.AppHostBuilderExtensions+MauiControlsInitializer");
+    }
+
+    [Fact]
     public void Unresolved_clr_control_preserves_xaml_and_materializes_a_clear_placeholder()
     {
         var catalog = new ReflectionControlCatalog(
