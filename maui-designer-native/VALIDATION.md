@@ -118,11 +118,33 @@ reparent fixed the failure, while undo restores it from the immutable snapshot.
 ## Runtime extension assembly compatibility
 
 The Windows integration suite loads its own compiled assembly through the same
-collectible dependency-resolving context used by the UI. The fixture publishes
+isolated dependency-resolving context used by the UI. The fixture publishes
 an official `XmlnsDefinition`, exposes a bindable numeric property, accepts
 visual content, and is then parsed from XAML through the refreshed catalog.
 This covers the same runtime boundary used by third-party NuGet control packs
 without adding a product-specific control registration.
+
+## Syncfusion package pipeline instrument check
+
+Prediction written before measurement:
+
+1. Selecting the first restored target will choose Android Syncfusion assets
+   and fail on `Mono.Android` in the Windows designer.
+2. Loading only `Syncfusion.Maui.Buttons.dll` will fail to resolve
+   `Syncfusion.Maui.Core`.
+3. Registering controls after `MauiAppBuilder.Build()` will leave Syncfusion's
+   handlers unavailable.
+4. Passing native `runtimeTargets` through managed assembly loading must make a
+   focused asset-selection test fail.
+
+The real `Syncfusion.Maui.Buttons` 34.2.9 package now selects
+`net10.0-windows10.0.19041/win-x64`, produces seven control definitions, and
+loads its four-package runtime closure. The startup adapter invokes
+`ConfigureSyncfusionCore()` before `Build()`. A Windows MAUI harness then
+constructed `Syncfusion.Maui.Buttons.SfButton` and attached the real
+`Syncfusion.Maui.Core.SfViewHandler` with no loader diagnostics. The native
+asset fixture first failed by returning both managed and native DLLs, then
+passed after filtering `runtimeTargets` by `assetType`.
 
 ## Modern MAUI control identity instrument check
 
@@ -195,7 +217,11 @@ Observed results:
 8. Invalid visual trees are rejected transactionally: non-container controls
    cannot receive visual children, and named visual slots cannot receive more
    than one child.
-9. Absolute-layout bounds survive write/reparse, stale attached bounds are
+9. Rulers are anchored immediately above and left of the transformed device
+   frame, and their major tick spacing remains readable from 25% through 300%
+   zoom. Grid track boundaries stay hidden until the corresponding Grid is
+   selected, so they cannot be mistaken for canvas rulers on initial load.
+10. Absolute-layout bounds survive write/reparse, stale attached bounds are
    removed when reparenting, descendant namespace declarations are promoted
    safely for export, and runtime control construction/content-setter failures
    render a visible unavailable-control placeholder.

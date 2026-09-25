@@ -19,8 +19,10 @@ and keeps edits in an immutable document model that supports undo and redo.
   focal-point zoom, fit/reset, Ctrl+wheel zoom, middle-button or Space+drag
   panning, configurable snap/grid controls, rulers, and a light-only workspace.
 - Provides specialized Grid row/column collection editors, direct child
-  row/column/row-span/column-span editing, dotted track boundaries, and a
-  separate real-MAUI runtime preview window.
+  row/column/row-span/column-span editing, selection-only dotted track
+  boundaries, and a separate real-MAUI runtime preview window.
+- Anchors zoom-aware horizontal and vertical rulers to the transformed device
+  frame rather than the viewport edges, with legible major/minor tick spacing.
 - Uses extensible layout adapters for `AbsoluteLayout`, measured Grid cells,
   stack insertion positions, generic layouts, and single-content containers.
 - Preserves resources, namespaces, markup extensions, attached properties,
@@ -29,6 +31,8 @@ and keeps edits in an immutable document model that supports undo and redo.
 - Uses binding `FallbackValue` values for design-time previews while retaining
   the original binding expression in generated XAML.
 - Loads custom-control assemblies and their adjacent dependencies at runtime.
+- Discovers third-party controls directly from restored assemblies; ordinary
+  MAUI control libraries need no package-specific registration or control list.
 
 ## Requirements
 
@@ -68,6 +72,16 @@ dependencies from the assembly directory, registers all constructible public
 
 Controls requiring constructor arguments can be registered through
 `IControlCatalog.RegisterFactory<TView>`.
+
+`Samples\SyncfusionButtonsPage.xaml` is a ready-to-open third-party-control
+document for validating Syncfusion Toolbox discovery, hierarchy projection,
+selection, property editing, rendering, save, and reopen behavior.
+
+Vendor startup adapters are used only when a package requires configuration
+before `MauiAppBuilder.Build()`; they do not define which controls appear.
+Syncfusion's handler and font registrations are retained, while its private
+Windows package-resource initializer is omitted because dynamically restored
+assemblies are not compiled into the designer's `ms-appx` package graph.
 
 ## XAML workflow
 

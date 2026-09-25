@@ -83,10 +83,16 @@ public partial class MainPage : ContentPage
         _viewport = viewport;
         _runtimePreview = runtimePreview;
         _hostBridge = hostBridge;
+        if (_hostBridge.IsHosted)
+        {
+            ConfigureHostedLayout();
+        }
+
         _hostBridge.DocumentLoadRequested += OnHostedDocumentLoadRequested;
         _hostBridge.CloseRequested += OnHostedCloseRequested;
         _hostBridge.ErrorReported += OnHostedErrorReported;
         _hostBridge.CommandRequested += OnHostedCommandRequested;
+        _hostBridge.ProjectControlsReceived += OnProjectControlsReceived;
         _gridDrawable = new CanvasGridDrawable(viewport);
         _rulerDrawable = new CanvasRulerDrawable(viewport);
         CanvasGridOverlay.Drawable = _gridDrawable;
@@ -104,7 +110,30 @@ public partial class MainPage : ContentPage
         RebuildDesigner();
         RefreshXaml();
         UpdateViewportVisuals();
+        PublishToolboxSnapshot();
+        PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
         _hostBridge.Start();
+        if (_extensionLoader.Diagnostics.Count > 0)
+        {
+            ShowPropertyError(string.Join(Environment.NewLine, _extensionLoader.Diagnostics));
+        }
+    }
+
+    private void ConfigureHostedLayout()
+    {
+        ApplicationToolbar.IsVisible = false;
+        ApplicationGrid.RowDefinitions[0].Height = new GridLength(0);
+        ElementsSidebar.IsVisible = false;
+        LeftSidebarResizeHandle.IsVisible = false;
+        PropertiesSidebar.IsVisible = false;
+        RightSidebarResizeHandle.IsVisible = false;
+        DesignerBody.ColumnDefinitions[0].Width = new GridLength(0);
+        DesignerBody.ColumnDefinitions[1].Width = new GridLength(0);
+        DesignerBody.ColumnDefinitions[3].Width = new GridLength(0);
+        DesignerBody.ColumnDefinitions[4].Width = new GridLength(0);
+        CanvasToolbar.IsVisible = false;
+        CanvasColumn.RowDefinitions[0].Height = new GridLength(0);
     }
 
     protected override void OnHandlerChanged()
@@ -543,17 +572,29 @@ public partial class MainPage : ContentPage
             SetBusy(true, incremental ? "Applying property..." : "Rendering design...");
         }
 
+        PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
         ScheduleRender();
     }
 
-    private void OnSelectionChanged(object? sender, EventArgs e) =>
+    private void OnSelectionChanged(object? sender, EventArgs e)
+    {
+        PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
         ScheduleSelectionRefresh();
+    }
 
     private void OnInteractionChanged(object? sender, EventArgs e) =>
         MainThread.BeginInvokeOnMainThread(_materializer.UpdateInteraction);
 
     private void OnCatalogChanged(object? sender, EventArgs e) =>
-        MainThread.BeginInvokeOnMainThread(() => ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty));
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty);
+            PublishToolboxSnapshot();
+            PublishSelectionSnapshot();
+            PublishHierarchySnapshot();
+        });
 
     private void ApplyToolboxFilter(string search)
     {
@@ -568,7 +609,7 @@ public partial class MainPage : ContentPage
         ControlDescriptor[] visible = matches.ToArray();
         ToolboxItemsHost.Clear();
         foreach (IGrouping<string, ControlDescriptor> category in visible
-                     .GroupBy(descriptor => descriptor.Category)
+                     .GroupBy(ControlToolboxCategory.For)
                      .OrderBy(group => CategoryOrder(group.Key))
                      .ThenBy(group => group.Key, StringComparer.Ordinal))
         {
@@ -646,17 +687,323 @@ public partial class MainPage : ContentPage
             _hostBridge.SendClosed(requestId, xaml);
         });
 
-    private void OnHostedCommandRequested(object? sender, string command) =>
+    private void OnHostedCommandRequested(object? sender, HostedDesignerCommand command) =>
         Dispatcher.Dispatch(() =>
         {
+            if (command.Name == "insertControl")
+            {
+                InsertHostedControl(command.ControlType);
+                return;
+            }
+
+            if (command.Name == "setProperty")
+            {
+                SetHostedProperty(command);
+                return;
+            }
+
+            if (command.Name is "selectElement" or "reparentElement")
+            {
+                ExecuteHierarchyCommand(command);
+                return;
+            }
+
 #if WINDOWS
             if (IsTextInputFocused())
             {
                 return;
             }
 #endif
-            ExecuteDesignerCommand(command);
+            ExecuteDesignerCommand(command.Name);
         });
+
+    private void OnProjectControlsReceived(object? sender, HostedProjectControls projectControls) =>
+        Dispatcher.Dispatch(() =>
+        {
+            foreach (HostedManifestDiagnostic diagnostic in projectControls.Diagnostics)
+            {
+                string package = string.IsNullOrWhiteSpace(diagnostic.Package)
+                    ? string.Empty
+                    : diagnostic.Package + ": ";
+                ShowPropertyError($"Third-party control discovery: {package}{diagnostic.Message}");
+            }
+
+            try
+            {
+                _extensionLoader.Load(projectControls);
+                ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty);
+                PublishToolboxSnapshot();
+                RebuildDesigner();
+            }
+            catch (Exception exception) when (
+                exception is FileNotFoundException or
+                FileLoadException or
+                BadImageFormatException or
+                TypeLoadException)
+            {
+                ShowPropertyError(
+                    $"Third-party controls could not be loaded: " +
+                    $"{exception.InnerException?.Message ?? exception.Message}");
+            }
+        });
+
+    private void InsertHostedControl(
+        string? controlType,
+        LayoutPlacement? placement = null)
+    {
+        ControlDescriptor? descriptor = _catalog.Controls.FirstOrDefault(
+            candidate => candidate.Id.FullName == controlType);
+        if (descriptor is null)
+        {
+            ShowPropertyError($"The toolbox control '{controlType}' is unavailable.");
+            return;
+        }
+
+        _workspace.Add(descriptor, placement: placement);
+    }
+
+    private void OnCanvasToolboxDropRequested(
+        object? sender,
+        CanvasToolboxDropEventArgs e)
+    {
+        if (_hostBridge.IsHosted)
+        {
+            InsertHostedControl(
+                e.ControlType,
+                new LayoutPlacement(
+                    Bounds: new MAUIDesigner.Fresh.Core.Geometry.RectD(
+                        Math.Max(
+                            0,
+                            (e.X - _viewport.PanX) / _viewport.Zoom),
+                        Math.Max(
+                            0,
+                            (e.Y - _viewport.PanY) / _viewport.Zoom),
+                        0,
+                        0)));
+        }
+    }
+
+    private void OnCanvasToolboxDropFailed(
+        object? sender,
+        CanvasToolboxDropFailedEventArgs e) =>
+        ShowPropertyError($"The Toolbox item could not be dropped: {e.Message}");
+
+    private void SetHostedProperty(HostedDesignerCommand command)
+    {
+        if (string.IsNullOrWhiteSpace(command.ElementId) ||
+            string.IsNullOrWhiteSpace(command.PropertyName))
+        {
+            ShowPropertyError("Visual Studio sent an incomplete property update.");
+            return;
+        }
+
+        var elementId = new ElementId(command.ElementId);
+        DesignerNode? selected = _workspace.Session.Current.Find(elementId);
+        if (selected is null ||
+            !_catalog.TryGet(selected.ControlType, out ControlDescriptor? descriptor) ||
+            descriptor is null)
+        {
+            ShowPropertyError($"Element '{command.ElementId}' is no longer available.");
+            PublishSelectionSnapshot();
+            return;
+        }
+
+        DesignerNode? parent = _workspace.Session.Current.FindParent(elementId);
+        PropertyDescriptor? property = PropertyInspectorDescriptorSource
+            .Compose(descriptor, selected, parent)
+            .FirstOrDefault(candidate =>
+                candidate.Name == command.PropertyName &&
+                IsEditableProperty(candidate));
+        if (property is null)
+        {
+            ShowPropertyError($"Property '{command.PropertyName}' is not editable.");
+            PublishSelectionSnapshot();
+            return;
+        }
+
+        CommitProperty(elementId, property, command.Value);
+    }
+
+    private void PublishToolboxSnapshot()
+    {
+        if (!_hostBridge.IsHosted)
+        {
+            return;
+        }
+
+        HostedToolboxItem[] items = _catalog.Controls
+            .OrderBy(descriptor => CategoryOrder(descriptor.Category))
+            .ThenBy(descriptor => descriptor.Category, StringComparer.Ordinal)
+            .ThenBy(descriptor => descriptor.DisplayName, StringComparer.Ordinal)
+            .Select(descriptor => new HostedToolboxItem(
+                descriptor.Id.FullName,
+                descriptor.DisplayName,
+                ControlToolboxCategory.For(descriptor)))
+            .ToArray();
+        _hostBridge.SendToolboxSnapshot(items);
+    }
+
+    private void PublishSelectionSnapshot()
+    {
+        if (!_hostBridge.IsHosted)
+        {
+            return;
+        }
+
+        if (_workspace.SelectionCount != 1)
+        {
+            _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+                _workspace.SelectionCount,
+                null,
+                $"{_workspace.SelectionCount} controls selected",
+                [],
+                _workspace.Session.CanUndo,
+                _workspace.Session.CanRedo,
+                _workspace.CanCopy,
+                _workspace.CanCut,
+                _workspace.CanPaste,
+                _workspace.CanDuplicate,
+                _workspace.SelectionCount > 0));
+            return;
+        }
+
+        DesignerNode? selected = _workspace.Session.Current.Find(_workspace.SelectedId);
+        if (selected is null ||
+            !_catalog.TryGet(selected.ControlType, out ControlDescriptor? descriptor) ||
+            descriptor is null)
+        {
+            _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+                0,
+                null,
+                "No selection",
+                [],
+                _workspace.Session.CanUndo,
+                _workspace.Session.CanRedo,
+                _workspace.CanCopy,
+                _workspace.CanCut,
+                _workspace.CanPaste,
+                _workspace.CanDuplicate,
+                false));
+            return;
+        }
+
+        DesignerNode? parent = _workspace.Session.Current.FindParent(selected.Id);
+        HostedPropertySnapshot[] properties = PropertyInspectorDescriptorSource
+            .Compose(descriptor, selected, parent)
+            .Where(IsEditableProperty)
+            .OrderBy(PropertyPriority)
+            .ThenBy(property => property.Name, StringComparer.Ordinal)
+            .Select(property => new HostedPropertySnapshot(
+                property.Name,
+                selected.Properties.TryGetValue(property.Name, out DesignerValue? value)
+                    ? value.Text
+                    : PropertyInspectorDescriptorSource.DefaultValue(property.Name),
+                property.ValueType.FullName ?? typeof(string).FullName!,
+                PropertyGroup(property),
+                property.IsReadOnly,
+                StandardValues(property.ValueType)))
+            .ToArray();
+        _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+            1,
+            selected.Id.Value,
+            descriptor.DisplayName,
+            properties,
+            _workspace.Session.CanUndo,
+            _workspace.Session.CanRedo,
+            _workspace.CanCopy,
+            _workspace.CanCut,
+            _workspace.CanPaste,
+            _workspace.CanDuplicate,
+            _workspace.SelectionCount > 0));
+    }
+
+    private void PublishHierarchySnapshot()
+    {
+        if (!_hostBridge.IsHosted)
+        {
+            return;
+        }
+
+        DesignerNode root = _workspace.Session.Current.Root;
+        IReadOnlyList<HierarchyItem> projection = HierarchyProjection.Build(
+            root,
+            new HashSet<ElementId>());
+        HostedHierarchyItem[] items = projection.Select(item =>
+        {
+            DesignerNode node = item.Node;
+            DesignerNode? parent = _workspace.Session.Current.FindParent(node.Id);
+            int index = parent is null ? -1 : parent.Children.IndexOf(node);
+            string displayName = _catalog.TryGet(
+                node.ControlType,
+                out ControlDescriptor? descriptor)
+                ? descriptor?.DisplayName ?? node.ControlType.XamlName
+                : node.ControlType.XamlName;
+            return new HostedHierarchyItem(
+                node.Id.Value,
+                parent?.Id.Value,
+                displayName,
+                item.Depth,
+                node.Children.Length,
+                _workspace.SelectedIds.Contains(node.Id),
+                index > 0,
+                parent is not null && index >= 0 && index < parent.Children.Length - 1,
+                parent is not null);
+        }).ToArray();
+        _hostBridge.SendHierarchySnapshot(items);
+    }
+
+    private void ExecuteHierarchyCommand(HostedDesignerCommand command)
+    {
+        if (string.IsNullOrWhiteSpace(command.ElementId))
+        {
+            ShowPropertyError("Visual Studio sent an incomplete hierarchy command.");
+            return;
+        }
+
+        var elementId = new ElementId(command.ElementId);
+        if (_workspace.Session.Current.Find(elementId) is null)
+        {
+            ShowPropertyError($"Element '{command.ElementId}' is no longer available.");
+            PublishHierarchySnapshot();
+            return;
+        }
+
+        if (command.Name == "selectElement")
+        {
+            _workspace.Select(elementId);
+            FocusCanvasElement(elementId);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(command.Value))
+        {
+            ShowPropertyError("Visual Studio did not specify the hierarchy destination.");
+            return;
+        }
+
+        try
+        {
+            _workspace.Reparent(elementId, new ElementId(command.Value));
+        }
+        catch (InvalidOperationException exception)
+        {
+            ShowPropertyError(exception.Message);
+            PublishHierarchySnapshot();
+        }
+    }
+
+    private static IReadOnlyList<string>? StandardValues(Type valueType)
+    {
+        Type effectiveType = Nullable.GetUnderlyingType(valueType) ?? valueType;
+        if (effectiveType.IsEnum)
+        {
+            return Enum.GetNames(effectiveType);
+        }
+
+        return effectiveType == typeof(LayoutOptions)
+            ? ["Start", "Center", "End", "Fill"]
+            : null;
+    }
 
     private void ExecuteDesignerCommand(string command)
     {
@@ -692,7 +1039,37 @@ public partial class MainPage : ContentPage
             case "delete":
                 _workspace.DeleteSelection();
                 break;
+            case "zoomOut":
+                OnZoomOutClicked(null, EventArgs.Empty);
+                break;
+            case "zoomIn":
+                OnZoomInClicked(null, EventArgs.Empty);
+                break;
+            case "zoomFit":
+                OnZoomFitClicked(null, EventArgs.Empty);
+                break;
+            case "zoomReset":
+                OnZoomResetClicked(null, EventArgs.Empty);
+                break;
+            case "toggleSnap":
+                OnSnapClicked(null, EventArgs.Empty);
+                break;
+            case "toggleGrid":
+                OnGridClicked(null, EventArgs.Empty);
+                break;
+            case "toggleRulers":
+                OnRulersClicked(null, EventArgs.Empty);
+                break;
+            case "loadControls":
+                OnLoadControlsClicked(null, EventArgs.Empty);
+                break;
+            case "runPreview":
+                OnRunPreviewClicked(null, EventArgs.Empty);
+                break;
         }
+
+        PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
     }
 
     private void LoadHostedDocument(string xaml)
@@ -1314,6 +1691,7 @@ public partial class MainPage : ContentPage
         DesignerNode? selected = _workspace.Session.Current.Find(elementId);
         if (selected is null)
         {
+            PublishSelectionSnapshot();
             return;
         }
 
@@ -1324,6 +1702,7 @@ public partial class MainPage : ContentPage
                 out string? error))
         {
             ShowPropertyError(error!);
+            PublishSelectionSnapshot();
             return;
         }
 
@@ -1331,6 +1710,7 @@ public partial class MainPage : ContentPage
         DesignerValue? newValue = normalized is null ? null : DesignerValue.Literal(normalized);
         if (oldValue == newValue)
         {
+            PublishSelectionSnapshot();
             return;
         }
 
@@ -1339,6 +1719,7 @@ public partial class MainPage : ContentPage
         {
             SelectionLabel.Text = $"{property.Name}: invalid {property.ValueType.Name}";
             SelectionLabel.TextColor = Color.FromArgb("#DC2626");
+            PublishSelectionSnapshot();
             return;
         }
 

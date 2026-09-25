@@ -10,13 +10,21 @@ public interface IHostedDesignerBridge : IDisposable
 
     event EventHandler<string>? ErrorReported;
 
-    event EventHandler<string>? CommandRequested;
+    event EventHandler<HostedDesignerCommand>? CommandRequested;
+
+    event EventHandler<HostedProjectControls>? ProjectControlsReceived;
 
     void Start();
 
     void SendDocumentChanged(string xaml);
 
     void SendTextInputFocusChanged(bool textInputFocused);
+
+    void SendToolboxSnapshot(IReadOnlyList<HostedToolboxItem> items);
+
+    void SendSelectionSnapshot(HostedSelectionSnapshot selection);
+
+    void SendHierarchySnapshot(IReadOnlyList<HostedHierarchyItem> items);
 
     void SendClosed(string requestId, string? xaml);
 }

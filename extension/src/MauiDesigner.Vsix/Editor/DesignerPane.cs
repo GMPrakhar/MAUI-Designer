@@ -1,6 +1,12 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,11 +17,14 @@ using MauiDesigner.Vsix.Projects;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.ComponentModelHost;
 using Microsoft.VisualStudio.Editor;
+using Microsoft.VisualStudio.OLE.Interop;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 using Microsoft.VisualStudio.Text;
 using Microsoft.VisualStudio.TextManager.Interop;
 using Microsoft.VisualStudio.Threading;
+
+using IOleDataObject = Microsoft.VisualStudio.OLE.Interop.IDataObject;
 
 namespace MauiDesigner.Vsix
 {
@@ -25,16 +34,31 @@ namespace MauiDesigner.Vsix
     /// </summary>
     public sealed class DesignerPane :
         WindowPane,
-        IVsWindowFrameNotify3
+        IVsWindowFrameNotify3,
+        IVsToolboxUser
     {
+        private const string LegacyToolboxTabName = "MAUI Designer";
+        private static readonly HashSet<string> ToolboxTabNames =
+            new HashSet<string>(StringComparer.Ordinal);
+        private static WeakReference<DesignerPane>? s_toolboxOwner;
         private readonly IVsTextLines _textLines;
         private readonly string _documentMoniker;
         private readonly IVsHierarchy _hierarchy;
         private readonly DesignerControl _control;
         private readonly DesignerSession _session;
+        private readonly MauiDesignerPackage _package;
+        private readonly List<OleDataObject> _toolboxDataObjects = new List<OleDataObject>();
         private ITextBuffer? _textBuffer;
         private IVsWindowFrame? _registeredFrame;
         private CancellationTokenSource? _bufferReloadCancellation;
+        private SelectionContainer? _selectionContainer;
+        private DesignerSelectionSnapshot? _lastSelection;
+        private IReadOnlyList<DesignerToolboxItem>? _lastToolboxItems;
+        private IReadOnlyList<DesignerToolboxItem>? _populatedToolboxItems;
+        private IReadOnlyList<DesignerHierarchyItem>? _lastHierarchyItems;
+        private DesignerHierarchyToolWindow? _hierarchyWindow;
+        private ProjectControlManifest _projectControls = new ProjectControlManifest();
+        private bool _toolWindowsShown;
 
         /// <summary>
         /// Taken from the package rather than <see cref="ThreadHelper"/>, whose
@@ -62,6 +86,7 @@ namespace MauiDesigner.Vsix
             }
 
             _joinableTaskFactory = package.JoinableTaskFactory;
+            _package = (MauiDesignerPackage)package;
             _textLines = textLines ?? throw new ArgumentNullException(nameof(textLines));
             _documentMoniker = documentMoniker;
             _hierarchy = hierarchy;
@@ -73,6 +98,9 @@ namespace MauiDesigner.Vsix
             _session.DocumentChanged += OnDesignerEdited;
             _session.SaveRequested += OnSaveRequested;
             _session.ManifestsRequested += OnManifestsRequested;
+            _session.ToolboxChanged += OnToolboxChanged;
+            _session.SelectionChanged += OnSelectionChanged;
+            _session.HierarchyChanged += OnHierarchyChanged;
             _session.ErrorReported += (_, message) => WriteToOutput(message);
         }
 
@@ -88,18 +116,338 @@ namespace MauiDesigner.Vsix
 
             _joinableTaskFactory.RunAsync(async () =>
             {
-                await _control.InitializeAsync(NativeDesignerLocator.ExecutablePath);
+                var projectFile = ProjectManifestProvider.FindProjectFile(
+                    _hierarchy,
+                    _documentMoniker);
+                await TaskScheduler.Default;
+                _projectControls = ProjectManifestProvider.ForProject(projectFile);
+
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
                 if (Volatile.Read(ref _disposed) != 0)
                 {
                     return;
                 }
 
+                foreach (var diagnostic in _projectControls.Diagnostics)
+                {
+                    var package = string.IsNullOrWhiteSpace(diagnostic.Package)
+                        ? string.Empty
+                        : diagnostic.Package + ": ";
+                    WriteToOutput($"Third-party control discovery: {package}{diagnostic.Message}");
+                }
+
+                await _control.InitializeAsync(
+                    NativeDesignerLocator.ExecutablePath,
+                    _projectControls);
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
                 RegisterFrameNotifications();
                 SubscribeToBufferChanges();
                 _session.OpenDocument(ReadBuffer(), _documentMoniker);
             }).FileAndForget("vs/mauidesigner/initialize");
         }
+
+        private void OnToolboxChanged(
+            object sender,
+            IReadOnlyList<DesignerToolboxItem> items)
+        {
+            _lastToolboxItems = items;
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    PopulateToolbox(items);
+                }
+            }).FileAndForget("vs/mauidesigner/toolbox");
+        }
+
+        private void PopulateToolbox(IReadOnlyList<DesignerToolboxItem> items)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (GetService(typeof(SVsToolbox)) is not IVsToolbox toolbox)
+            {
+                return;
+            }
+
+            if (s_toolboxOwner is not null &&
+                s_toolboxOwner.TryGetTarget(out DesignerPane? owner) &&
+                ReferenceEquals(owner, this) &&
+                ReferenceEquals(items, _populatedToolboxItems))
+            {
+                return;
+            }
+
+            foreach (string tabName in ToolboxTabNames)
+            {
+                toolbox.RemoveTab(tabName);
+            }
+
+            toolbox.RemoveTab(LegacyToolboxTabName);
+            ToolboxTabNames.Clear();
+            _toolboxDataObjects.Clear();
+            _populatedToolboxItems = null;
+            s_toolboxOwner = new WeakReference<DesignerPane>(this);
+            var iconHandles = new Dictionary<string, IntPtr>(StringComparer.Ordinal);
+            try
+            {
+                foreach (IGrouping<string, DesignerToolboxItem> category in items
+                             .GroupBy(item => DesignerToolboxCategories.Normalize(item.Category))
+                             .OrderBy(group => DesignerToolboxCategories.Order(group.Key))
+                             .ThenBy(group => group.Key, StringComparer.Ordinal))
+                {
+                    string tabName = DesignerToolboxCategories.TabName(category.Key);
+                    ErrorHandler.ThrowOnFailure(toolbox.AddTab(tabName));
+                    ToolboxTabNames.Add(tabName);
+                    IntPtr icon = CreateToolboxIcon(category.Key);
+                    iconHandles.Add(category.Key, icon);
+
+                    foreach (DesignerToolboxItem item in category.OrderBy(
+                                 candidate => candidate.DisplayName,
+                                 StringComparer.Ordinal))
+                    {
+                        var data = new OleDataObject();
+                        data.SetData(
+                            DesignerToolboxPayload.DataFormat,
+                            autoConvert: false,
+                            new MemoryStream(
+                                Encoding.UTF8.GetBytes(item.ControlType),
+                                writable: false));
+                        _toolboxDataObjects.Add(data);
+                        var itemInfo = new[]
+                        {
+                            new TBXITEMINFO
+                            {
+                                bstrText = item.DisplayName,
+                                hBmp = icon,
+                                clrTransparent = (uint)ColorTranslator.ToWin32(Color.Magenta),
+                                dwFlags = (uint)__TBXITEMINFOFLAGS.TBXIF_DONTPERSIST
+                            }
+                        };
+                        ErrorHandler.ThrowOnFailure(
+                            toolbox.AddItem(data, itemInfo, tabName));
+                    }
+                }
+
+                _populatedToolboxItems = items;
+            }
+            finally
+            {
+                foreach (IntPtr icon in iconHandles.Values)
+                {
+                    DeleteObject(icon);
+                }
+            }
+
+            if (!_toolWindowsShown)
+            {
+                ShowToolWindow(
+                    new Guid(ToolWindowGuids80.Toolbox),
+                    dock: true);
+                ShowToolWindow(new Guid(ToolWindowGuids.PropertyBrowser));
+                ShowHierarchyWindow();
+                _toolWindowsShown = true;
+            }
+        }
+
+        private void ShowToolWindow(Guid persistenceSlot, bool dock = false)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (GetService(typeof(SVsUIShell)) is not IVsUIShell shell)
+            {
+                return;
+            }
+
+            ErrorHandler.ThrowOnFailure(shell.FindToolWindow(
+                (uint)__VSFINDTOOLWIN.FTW_fForceCreate,
+                ref persistenceSlot,
+                out IVsWindowFrame frame));
+            ErrorHandler.ThrowOnFailure(frame.ShowNoActivate());
+            if (dock &&
+                ErrorHandler.Failed(frame.SetProperty(
+                    (int)__VSFPROPID.VSFPROPID_FrameMode,
+                    (int)VSFRAMEMODE.VSFM_Dock)))
+            {
+                WriteToOutput(
+                    "Visual Studio could not dock the Toolbox; use its pin button to reserve canvas space.");
+            }
+        }
+
+        private void OnSelectionChanged(object sender, DesignerSelectionSnapshot selection)
+        {
+            _lastSelection = selection;
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    _control.UpdateCommandState(selection);
+                    PublishSelection(selection);
+                }
+            }).FileAndForget("vs/mauidesigner/selection");
+        }
+
+        private void OnHierarchyChanged(
+            object sender,
+            IReadOnlyList<DesignerHierarchyItem> items)
+        {
+            _lastHierarchyItems = items;
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    PublishHierarchy(items);
+                }
+            }).FileAndForget("vs/mauidesigner/hierarchy");
+        }
+
+        private void ShowHierarchyWindow()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            DesignerHierarchyToolWindow window =
+                _hierarchyWindow ??= _package.GetHierarchyWindow();
+            window.SetOwner(this);
+            ((IVsWindowFrame)window.Frame).ShowNoActivate();
+            if (_lastHierarchyItems is not null)
+            {
+                window.UpdateItems(_lastHierarchyItems);
+            }
+        }
+
+        private void PublishHierarchy(IReadOnlyList<DesignerHierarchyItem> items)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            DesignerHierarchyToolWindow window =
+                _hierarchyWindow ??= _package.GetHierarchyWindow();
+            window.SetOwner(this);
+            window.UpdateItems(items);
+        }
+
+        internal void PostDesignerCommand(string command) =>
+            _control.PostMessage(DesignerProtocol.HostCommand(command));
+
+        internal void PostHierarchyCommand(
+            string command,
+            string elementId,
+            string? targetElementId = null) =>
+            _control.PostMessage(DesignerProtocol.HostHierarchyCommand(
+                command,
+                elementId,
+                targetElementId));
+
+        private void PublishSelection(DesignerSelectionSnapshot selection)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            if (GetService(typeof(STrackSelection)) is not ITrackSelection trackSelection)
+            {
+                return;
+            }
+
+            var selected = new ArrayList();
+            if (selection.SelectionCount > 0)
+            {
+                selected.Add(new VisualStudioDesignerSelectionProxy(
+                    selection,
+                    (name, value) =>
+                    {
+                        if (selection.ElementId is not null)
+                        {
+                            _control.PostMessage(DesignerProtocol.HostSetProperty(
+                                selection.ElementId,
+                                name,
+                                value));
+                        }
+                    }));
+            }
+
+            _selectionContainer = new SelectionContainer(true, false)
+            {
+                SelectableObjects = selected,
+                SelectedObjects = selected
+            };
+            ErrorHandler.ThrowOnFailure(trackSelection.OnSelectChange(_selectionContainer));
+        }
+
+        int IVsToolboxUser.IsSupported(IOleDataObject dataObject) =>
+            TryGetToolboxControlType(dataObject, out _)
+                ? VSConstants.S_OK
+                : VSConstants.S_FALSE;
+
+        int IVsToolboxUser.ItemPicked(IOleDataObject dataObject)
+        {
+            if (!TryGetToolboxControlType(dataObject, out string? controlType) ||
+                controlType is null)
+            {
+                return VSConstants.S_FALSE;
+            }
+
+            _control.PostMessage(DesignerProtocol.HostInsertControl(controlType));
+            return VSConstants.S_OK;
+        }
+
+        private static bool TryGetToolboxControlType(
+            IOleDataObject dataObject,
+            out string? controlType)
+        {
+            var managed = new OleDataObject(dataObject);
+            if (!managed.GetDataPresent(DesignerToolboxPayload.DataFormat))
+            {
+                controlType = null;
+                return false;
+            }
+
+            object? payload = managed.GetData(
+                DesignerToolboxPayload.DataFormat,
+                autoConvert: false);
+            controlType = payload switch
+            {
+                string text => text,
+                Stream stream => DesignerToolboxPayload.Decode(stream),
+                _ => null
+            };
+            return !string.IsNullOrWhiteSpace(controlType);
+        }
+
+        private static IntPtr CreateToolboxIcon(string category)
+        {
+            using var bitmap = new Bitmap(16, 16);
+            using Graphics graphics = Graphics.FromImage(bitmap);
+            graphics.Clear(Color.Magenta);
+            graphics.SmoothingMode = SmoothingMode.None;
+            using var pen = new Pen(Color.FromArgb(109, 91, 208), 1.8f);
+            using var brush = new SolidBrush(Color.FromArgb(109, 91, 208));
+
+            switch (category)
+            {
+                case "Layouts":
+                    graphics.DrawRectangle(pen, 2, 2, 5, 5);
+                    graphics.DrawRectangle(pen, 9, 2, 5, 5);
+                    graphics.DrawRectangle(pen, 2, 9, 5, 5);
+                    graphics.DrawRectangle(pen, 9, 9, 5, 5);
+                    break;
+                case "Input":
+                    graphics.DrawRectangle(pen, 1.5f, 4, 13, 8);
+                    graphics.DrawLine(pen, 4, 8, 11, 8);
+                    break;
+                case "Data and collections":
+                    for (int row = 0; row < 3; row++)
+                    {
+                        graphics.FillEllipse(brush, 2, 3 + row * 4, 2, 2);
+                        graphics.DrawLine(pen, 6, 4 + row * 4, 14, 4 + row * 4);
+                    }
+                    break;
+                default:
+                    graphics.DrawRectangle(pen, 2, 2, 12, 12);
+                    graphics.FillEllipse(brush, 5, 5, 6, 6);
+                    break;
+            }
+
+            return bitmap.GetHbitmap(Color.Magenta);
+        }
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteObject(IntPtr objectHandle);
 
         private void RegisterFrameNotifications()
         {
@@ -217,22 +565,7 @@ namespace MauiDesigner.Vsix
             _joinableTaskFactory.RunAsync(async () =>
             {
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
-                var projectFile = ProjectManifestProvider.FindProjectFile(_hierarchy, _documentMoniker);
-
-                await TaskScheduler.Default;
-                IReadOnlyList<CustomControlManifest> manifests;
-                try
-                {
-                    manifests = ProjectManifestProvider.ForProject(projectFile);
-                }
-                catch (Exception error)
-                {
-                    WriteToOutput($"Could not read the project's NuGet controls: {error.Message}");
-                    return;
-                }
-
-                await _joinableTaskFactory.SwitchToMainThreadAsync();
-                _session.PushManifests(manifests);
+                _session.PushManifests(_projectControls);
             }).FileAndForget("vs/mauidesigner/manifests");
         }
 
@@ -351,6 +684,22 @@ namespace MauiDesigner.Vsix
             {
                 DisposeResources();
             }
+            else if (show == (int)__FRAMESHOW.FRAMESHOW_WinShown ||
+                     show == (int)__FRAMESHOW.FRAMESHOW_TabActivated ||
+                     show == (int)__FRAMESHOW.FRAMESHOW_WinRestored)
+            {
+                if (_lastToolboxItems is not null)
+                {
+                    PopulateToolbox(_lastToolboxItems);
+                }
+
+                if (_lastSelection is not null)
+                {
+                    PublishSelection(_lastSelection);
+                }
+
+                ShowHierarchyWindow();
+            }
 
             return VSConstants.S_OK;
         }
@@ -444,6 +793,23 @@ namespace MauiDesigner.Vsix
                 _textBuffer = null;
             }
 
+            if (s_toolboxOwner is not null &&
+                s_toolboxOwner.TryGetTarget(out DesignerPane? owner) &&
+                ReferenceEquals(owner, this) &&
+                GetService(typeof(SVsToolbox)) is IVsToolbox toolbox)
+            {
+                foreach (string tabName in ToolboxTabNames)
+                {
+                    toolbox.RemoveTab(tabName);
+                }
+
+                ToolboxTabNames.Clear();
+                s_toolboxOwner = null;
+            }
+
+            _populatedToolboxItems = null;
+            _hierarchyWindow?.SetOwner(null);
+            _hierarchyWindow = null;
             _registeredFrame = null;
             _control.Dispose();
         }

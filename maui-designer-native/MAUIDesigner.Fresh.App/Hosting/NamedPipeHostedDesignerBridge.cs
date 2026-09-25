@@ -41,7 +41,9 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
 
     public event EventHandler<string>? ErrorReported;
 
-    public event EventHandler<string>? CommandRequested;
+    public event EventHandler<HostedDesignerCommand>? CommandRequested;
+
+    public event EventHandler<HostedProjectControls>? ProjectControlsReceived;
 
     public void Start()
     {
@@ -71,6 +73,21 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         Enqueue(new BridgeMessage(
             "designer.focusChanged",
             TextInputFocused: textInputFocused));
+
+    public void SendToolboxSnapshot(IReadOnlyList<HostedToolboxItem> items) =>
+        Enqueue(new BridgeMessage(
+            "designer.toolboxChanged",
+            ToolboxItems: items));
+
+    public void SendSelectionSnapshot(HostedSelectionSnapshot selection) =>
+        Enqueue(new BridgeMessage(
+            "designer.selectionChanged",
+            Selection: selection));
+
+    public void SendHierarchySnapshot(IReadOnlyList<HostedHierarchyItem> items) =>
+        Enqueue(new BridgeMessage(
+            "designer.hierarchyChanged",
+            HierarchyItems: items));
 
     public void SendClosed(string requestId, string? xaml) =>
         Enqueue(new BridgeMessage("designer.closed", xaml, requestId));
@@ -118,6 +135,7 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             CancellationTokenSource.CreateLinkedTokenSource(_shutdown.Token);
 
         await writer.WriteLineAsync(JsonSerializer.Serialize(new BridgeMessage("designer.ready")));
+        await writer.WriteLineAsync(JsonSerializer.Serialize(new BridgeMessage("manifests.request")));
         await writer.FlushAsync(connectionLifetime.Token);
         Task read = ReadMessagesAsync(reader, connectionLifetime.Token);
         Task write = WriteMessagesAsync(writer, connectionLifetime.Token);
@@ -176,7 +194,25 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             else if (message?.Type == "host.command" &&
                      !string.IsNullOrWhiteSpace(message.Command))
             {
-                CommandRequested?.Invoke(this, message.Command);
+                CommandRequested?.Invoke(
+                    this,
+                    new HostedDesignerCommand(
+                        message.Command,
+                        message.ControlType,
+                        message.ElementId,
+                        message.PropertyName,
+                        message.Value));
+            }
+            else if (message?.Type == "manifests.push")
+            {
+                ProjectControlsReceived?.Invoke(
+                    this,
+                    new HostedProjectControls(
+                        message.Target ?? string.Empty,
+                        message.Manifests ?? [],
+                        message.Assemblies ?? [],
+                        message.StartupMethods ?? [],
+                        message.Diagnostics ?? []));
             }
         }
     }
@@ -242,5 +278,29 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         [property: JsonPropertyName("command")]
         string? Command = null,
         [property: JsonPropertyName("textInputFocused")]
-        bool? TextInputFocused = null);
+        bool? TextInputFocused = null,
+        [property: JsonPropertyName("toolboxItems")]
+        IReadOnlyList<HostedToolboxItem>? ToolboxItems = null,
+        [property: JsonPropertyName("selection")]
+        HostedSelectionSnapshot? Selection = null,
+        [property: JsonPropertyName("hierarchyItems")]
+        IReadOnlyList<HostedHierarchyItem>? HierarchyItems = null,
+        [property: JsonPropertyName("controlType")]
+        string? ControlType = null,
+        [property: JsonPropertyName("elementId")]
+        string? ElementId = null,
+        [property: JsonPropertyName("propertyName")]
+        string? PropertyName = null,
+        [property: JsonPropertyName("value")]
+        string? Value = null,
+        [property: JsonPropertyName("target")]
+        string? Target = null,
+        [property: JsonPropertyName("manifests")]
+        IReadOnlyList<HostedControlManifest>? Manifests = null,
+        [property: JsonPropertyName("assemblies")]
+        IReadOnlyList<HostedRuntimeAssembly>? Assemblies = null,
+        [property: JsonPropertyName("startupMethods")]
+        IReadOnlyList<HostedStartupMethod>? StartupMethods = null,
+        [property: JsonPropertyName("diagnostics")]
+        IReadOnlyList<HostedManifestDiagnostic>? Diagnostics = null);
 }

@@ -26,7 +26,7 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         using var reader = new StreamReader(server);
         using var writer = new StreamWriter(server) { AutoFlush = true };
 
-        Assert.Equal("designer.ready", MessageType(await ReadLineAsync(reader)));
+        await AssertHandshakeAsync(reader);
 
         const string loadedXaml = "<Grid />";
         await writer.WriteLineAsync(JsonSerializer.Serialize(new
@@ -64,7 +64,7 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
         using var reader = new StreamReader(server);
         using var writer = new StreamWriter(server) { AutoFlush = true };
-        _ = await ReadLineAsync(reader);
+        await AssertHandshakeAsync(reader);
 
         bridge.SendDocumentChanged("<Grid><Button /></Grid>");
         using JsonDocument first = JsonDocument.Parse(await ReadLineAsync(reader));
@@ -99,13 +99,13 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
         using (var reader = new StreamReader(server, leaveOpen: true))
         {
-            Assert.Equal("designer.ready", MessageType(await ReadLineAsync(reader)));
+            await AssertHandshakeAsync(reader);
         }
 
         server.Dispose();
 
         string message = await error.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Contains("closed the designer connection", message);
+        Assert.Contains("Visual Studio connection failed", message);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         {
             await firstServer.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
             using var firstReader = new StreamReader(firstServer);
-            Assert.Equal("designer.ready", MessageType(await ReadLineAsync(firstReader)));
+            await AssertHandshakeAsync(firstReader);
             bridge.SendDocumentChanged("<Grid><Label /></Grid>");
             using JsonDocument changed = JsonDocument.Parse(await ReadLineAsync(firstReader));
             revision = changed.RootElement.GetProperty("revision").GetInt64();
@@ -130,7 +130,7 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         await secondServer.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
         using var secondReader = new StreamReader(secondServer);
         using var secondWriter = new StreamWriter(secondServer) { AutoFlush = true };
-        Assert.Equal("designer.ready", MessageType(await ReadLineAsync(secondReader)));
+        await AssertHandshakeAsync(secondReader);
         using JsonDocument replay = JsonDocument.Parse(await ReadLineAsync(secondReader));
         Assert.Equal("document.changed", replay.RootElement.GetProperty("type").GetString());
         Assert.Equal(revision, replay.RootElement.GetProperty("revision").GetInt64());
@@ -156,7 +156,7 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
         using var reader = new StreamReader(server);
         using var writer = new StreamWriter(server) { AutoFlush = true };
-        Assert.Equal("designer.ready", MessageType(await ReadLineAsync(reader)));
+        await AssertHandshakeAsync(reader);
 
         const string requestId = "close-2";
         await writer.WriteLineAsync(
@@ -169,9 +169,147 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         Assert.Equal(requestId, message.RootElement.GetProperty("requestId").GetString());
     }
 
+    [Fact]
+    public async Task Bridge_exchanges_toolbox_selection_and_property_commands()
+    {
+        string pipeName = $"MauiDesigner.Test.{Guid.NewGuid():N}";
+        using var server = CreateServer(pipeName);
+        using var bridge = new NamedPipeHostedDesignerBridge(pipeName);
+        var command = new TaskCompletionSource<HostedDesignerCommand>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        bridge.CommandRequested += (_, value) => command.TrySetResult(value);
+
+        bridge.SendToolboxSnapshot(
+        [
+            new HostedToolboxItem(
+                "Microsoft.Maui.Controls.Button",
+                "Button",
+                "Controls")
+        ]);
+        bridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
+            1,
+            "button-1",
+            "Button",
+            [
+                new HostedPropertySnapshot(
+                    "Text",
+                    "Save",
+                    typeof(string).FullName!,
+                    "Common",
+                    false)
+            ]));
+        bridge.SendHierarchySnapshot(
+        [
+            new HostedHierarchyItem(
+                "button-1",
+                "layout-1",
+                "Button",
+                2,
+                0,
+                true,
+                false,
+                true,
+                true)
+        ]);
+        bridge.Start();
+        await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        using var reader = new StreamReader(server);
+        using var writer = new StreamWriter(server) { AutoFlush = true };
+
+        await AssertHandshakeAsync(reader);
+        using JsonDocument toolbox = JsonDocument.Parse(await ReadLineAsync(reader));
+        using JsonDocument selection = JsonDocument.Parse(await ReadLineAsync(reader));
+        using JsonDocument hierarchy = JsonDocument.Parse(await ReadLineAsync(reader));
+        Assert.Equal(
+            "Microsoft.Maui.Controls.Button",
+            toolbox.RootElement.GetProperty("toolboxItems")[0]
+                .GetProperty("controlType")
+                .GetString());
+        Assert.Equal(
+            "button-1",
+            selection.RootElement.GetProperty("selection")
+                .GetProperty("elementId")
+                .GetString());
+        Assert.Equal(
+            "layout-1",
+            hierarchy.RootElement.GetProperty("hierarchyItems")[0]
+                .GetProperty("parentElementId")
+                .GetString());
+
+        await writer.WriteLineAsync(
+            """{"type":"host.command","command":"setProperty","elementId":"button-1","propertyName":"Text","value":"Updated"}""");
+        HostedDesignerCommand received = await command.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("setProperty", received.Name);
+        Assert.Equal("button-1", received.ElementId);
+        Assert.Equal("Text", received.PropertyName);
+        Assert.Equal("Updated", received.Value);
+    }
+
+    [Fact]
+    public async Task Bridge_requests_and_consumes_project_control_manifests()
+    {
+        string pipeName = $"MauiDesigner.Test.{Guid.NewGuid():N}";
+        using var server = CreateServer(pipeName);
+        using var bridge = new NamedPipeHostedDesignerBridge(pipeName);
+        var received = new TaskCompletionSource<HostedProjectControls>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var error = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        bridge.ProjectControlsReceived += (_, controls) => received.TrySetResult(controls);
+        bridge.ErrorReported += (_, message) => error.TrySetResult(message);
+
+        bridge.Start();
+        await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
+        using var reader = new StreamReader(server);
+        using var writer = new StreamWriter(server) { AutoFlush = true };
+        await AssertHandshakeAsync(reader);
+
+        await writer.WriteLineAsync("""
+            {
+              "type": "manifests.push",
+              "target": "net10.0-windows10.0.19041.0/win-x64",
+              "manifests": [],
+              "assemblies": [
+                {
+                  "path": "C:\\packages\\Syncfusion.Maui.Buttons.dll",
+                  "package": "Syncfusion.Maui.Buttons",
+                  "isRoot": true
+                }
+              ],
+              "startupMethods": [
+                {
+                  "package": "Syncfusion.Maui.Core",
+                  "assembly": "Syncfusion.Maui.Core",
+                  "type": "Syncfusion.Maui.Core.Hosting.AppHostBuilderExtensions",
+                  "method": "ConfigureSyncfusionCore"
+                }
+              ],
+              "diagnostics": []
+            }
+            """.ReplaceLineEndings(string.Empty));
+
+        Task completed = await Task.WhenAny(received.Task, error.Task)
+            .WaitAsync(TimeSpan.FromSeconds(5));
+        if (completed == error.Task)
+        {
+            Assert.Fail(await error.Task);
+        }
+
+        HostedProjectControls controls = await received.Task;
+        Assert.Equal("net10.0-windows10.0.19041.0/win-x64", controls.Target);
+        Assert.True(Assert.Single(controls.Assemblies).IsRoot);
+        Assert.Equal("ConfigureSyncfusionCore", Assert.Single(controls.StartupMethods).Method);
+    }
+
     private static async Task<string> ReadLineAsync(StreamReader reader) =>
         await reader.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(5)) ??
         throw new EndOfStreamException();
+
+    private static async Task AssertHandshakeAsync(StreamReader reader)
+    {
+        Assert.Equal("designer.ready", MessageType(await ReadLineAsync(reader)));
+        Assert.Equal("manifests.request", MessageType(await ReadLineAsync(reader)));
+    }
 
     private static NamedPipeServerStream CreateServer(string pipeName) =>
         new(

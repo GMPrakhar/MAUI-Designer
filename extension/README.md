@@ -98,13 +98,16 @@ With… → MAUI Designer** appears, and validating the embedded native window.
 ## What the core library does
 
 * **`Projects/ProjectAssetsReader`** — reads `obj/project.assets.json` (written by
-  every NuGet restore) to find which packages a project references and where
-  their assemblies live in the global packages folder.
+  every NuGet restore), selects the restored MAUI Windows `win-x64` target rather
+  than the first mobile target, and records compile references, runtime assets,
+  and the package dependency graph.
 * **`Manifests/ControlManifestGenerator`** — inspects those assemblies with
   `MetadataLoadContext` (metadata only, no code is executed), finds public
   concrete types deriving from `Microsoft.Maui.Controls.View`, reads their
   `public static readonly BindableProperty XxxProperty` fields and emits the same
-  manifest JSON the designer already consumes for custom controls.
+  manifest JSON the designer already consumes for custom controls. The VSIX
+  supplies the target .NET reference pack explicitly, which is required because
+  Visual Studio runs the extension on .NET Framework 4.7.2.
 * **`Protocol/DesignerSession`** — the host half of the message contract in
   `src/app/services/host-bridge.ts`, free of any Visual Studio types so it can be
   unit tested anywhere.
@@ -115,7 +118,7 @@ With… → MAUI Designer** appears, and validating the embedded native window.
 | --- | --- | --- |
 | host → designer | `host.ready` | which IDE is hosting, and the open file |
 | host → designer | `document.load` | XAML to edit |
-| host → designer | `manifests.push` | controls found in the project's packages |
+| host → designer | `manifests.push` | controls, Windows runtime dependency closure, startup adapters, and discovery diagnostics |
 | host → designer | `document.saved` | the document reached disk |
 | host → designer | `host.close` | flush final valid XAML for a correlated close attempt |
 | designer → host | `designer.ready` | the native process connected |
@@ -127,6 +130,29 @@ With… → MAUI Designer** appears, and validating the embedded native window.
 
 Both sides ignore malformed payloads, so a protocol mismatch degrades to "the
 designer does nothing" rather than taking down the IDE.
+
+### Third-party runtime controls
+
+Before the native process starts, the VSIX writes a per-session startup
+descriptor under the user's local application-data directory. The descriptor
+contains only restored local assembly paths and metadata; package binaries are
+not copied into the repository. The native host loads root control assemblies
+in an isolated `AssemblyLoadContext`, resolves their transitive package
+dependencies by assembly identity, and registers the resulting real MAUI
+`View` types in the runtime catalog. The same payload is requested again over
+the named pipe so restore/discovery diagnostics are visible and the catalog can
+be refreshed.
+
+Some component suites require a `MauiAppBuilder` registration call before
+`Build()`. Startup adapters describe a public static builder method by assembly,
+type, and method name. Syncfusion packages are mapped to
+`ConfigureSyncfusionCore` without referencing or redistributing the commercial
+package. Additional suites can add equivalent metadata mappings without adding
+a binary dependency to the designer.
+
+If a package is missing, incompatible, or cannot be initialized, its XAML is
+still round-tripped. The canvas shows an `Unavailable: <control>` placeholder
+and the failure is reported rather than silently dropping the element.
 
 ## Building and running the tests
 
@@ -185,6 +211,35 @@ changes made on the canvas appear in the XAML view immediately, undo/redo and th
 dirty indicator keep working, and Ctrl+S saves through the normal solution
 pipeline.
 
+When hosted by Visual Studio, the native app removes its duplicate header,
+toolbox, hierarchy, properties panel, and canvas toolbar so the document pane is
+dedicated to the design surface. Controls are grouped into **MAUI - Layouts**,
+**MAUI - Input**, **MAUI - Display**, and **MAUI - Data and collections** tabs
+in Visual Studio's Toolbox, with category glyphs for quick scanning. The
+selected element is published through
+`ITrackSelection` so Visual Studio's standard Properties window provides
+categorized, typed editors. Activating a Toolbox item with Enter or a
+double-click inserts it into the selected layout. Toolbox items can also be
+dragged onto the hosted canvas through a Windows cross-process data payload.
+The Toolbox is switched from auto-hide to docked mode when the designer first
+opens so it reserves editor space instead of covering the canvas.
+
+Grid `RowDefinitions` and `ColumnDefinitions` expose a modal collection editor
+from the Properties window. It supports adding, removing, and reordering tracks
+and choosing Auto, Star, or Absolute sizing without manually composing the XAML
+collection string. These properties appear as `(Collection)` rather than as
+editable serialized text.
+
+Enum properties use exclusive dropdowns in the Properties window. MAUI
+`LayoutOptions` values such as `HorizontalOptions` and `VerticalOptions` also
+offer the supported Start, Center, End, and Fill choices instead of requiring
+manual text entry.
+
+The compact editor-local toolbar uses Visual Studio `KnownMonikers`, so its
+icons follow the active theme and DPI. It provides undo, redo, clipboard,
+duplicate, delete, zoom, fit, actual-size, snapping, grid, rulers, custom-control
+loading, and preview commands while leaving the canvas as the visual focus.
+
 `DesignerControl` creates a child Win32 host, starts the packaged
 `MAUIDesigner.exe`, and reparents its window into the editor pane. A uniquely
 named pipe carries newline-delimited protocol messages. A reversible pre-close
@@ -206,6 +261,11 @@ owned by that pane, so canceling the prompt leaves the designer usable.
   extension and MAUI backend both use per-monitor-aware Windows UI stacks.
 * Manifest generation reads compile-time metadata, so a control's runtime
   defaults are not known — the designer falls back to its own defaults.
+* Runtime support is Windows-only and requires the package to expose compatible
+  `net10.0-windows` assets. Packages that require proprietary services beyond a
+  public builder registration method may still need a dedicated startup adapter.
+  Licensing remains the application's responsibility; the designer does not
+  register licence keys.
 
 ## Licence
 
