@@ -31,6 +31,8 @@ and keeps edits in an immutable document model that supports undo and redo.
 - Uses binding `FallbackValue` values for design-time previews while retaining
   the original binding expression in generated XAML.
 - Loads custom-control assemblies and their adjacent dependencies at runtime.
+- Discovers third-party controls directly from restored assemblies; ordinary
+  MAUI control libraries need no package-specific registration or control list.
 
 ## Requirements
 
@@ -74,6 +76,9 @@ Controls requiring constructor arguments can be registered through
 `Samples\SyncfusionButtonsPage.xaml` is a ready-to-open third-party-control
 document for validating Syncfusion Toolbox discovery, hierarchy projection,
 selection, property editing, rendering, save, and reopen behavior.
+
+Vendor startup adapters are used only when a package requires configuration
+before `MauiAppBuilder.Build()`; they do not define which controls appear.
 
 ## XAML workflow
 

@@ -10,6 +10,43 @@ namespace MAUIDesigner.Fresh.App.Tests;
 public sealed class ThirdPartyControlPipelineTests
 {
     [Fact]
+    public void Arbitrary_control_assemblies_load_without_a_vendor_adapter()
+    {
+        string controlsPath = Path.Combine(AppContext.BaseDirectory, "DesignerFixture.Controls.dll");
+        string dependencyPath = Path.Combine(AppContext.BaseDirectory, "DesignerFixture.Dependency.dll");
+        var payload = new HostedProjectControls(
+            "net10.0-windows10.0.19041.0/win-x64",
+            [],
+            [
+                new HostedRuntimeAssembly(
+                    controlsPath,
+                    "Acme.Widgets",
+                    true),
+                new HostedRuntimeAssembly(
+                    dependencyPath,
+                    "Acme.Widget.Foundation",
+                    false)
+            ],
+            [],
+            []);
+        var runtime = new DesignerPackageRuntime();
+
+        IReadOnlyList<System.Reflection.Assembly> loaded = runtime.Load(payload);
+        var catalog = new ReflectionControlCatalog(
+            new ServiceCollection().BuildServiceProvider());
+        catalog.RegisterAssembly(typeof(View).Assembly);
+        foreach (System.Reflection.Assembly assembly in loaded)
+        {
+            catalog.RegisterAssembly(assembly);
+        }
+
+        ControlDescriptor descriptor = Assert.Single(catalog.Controls, control =>
+            control.Id.FullName == "DesignerFixture.Controls.FixtureControl");
+        Assert.Equal("DesignerFixture.Controls", descriptor.Id.AssemblyName);
+        Assert.Empty(payload.StartupMethods);
+    }
+
+    [Fact]
     public void Runtime_closure_startup_catalog_xaml_and_materialization_are_connected()
     {
         string controlsPath = Path.Combine(AppContext.BaseDirectory, "DesignerFixture.Controls.dll");
