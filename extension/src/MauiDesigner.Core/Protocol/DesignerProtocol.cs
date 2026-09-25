@@ -31,6 +31,7 @@ namespace MauiDesigner.Core.Protocol
         public const string DesignerFocusChanged = "designer.focusChanged";
         public const string DesignerToolboxChanged = "designer.toolboxChanged";
         public const string DesignerSelectionChanged = "designer.selectionChanged";
+        public const string DesignerHierarchyChanged = "designer.hierarchyChanged";
     }
 
     /// <summary>A single message in either direction.</summary>
@@ -98,6 +99,10 @@ namespace MauiDesigner.Core.Protocol
         [JsonPropertyName("selection")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public DesignerSelectionSnapshot? Selection { get; set; }
+
+        [JsonPropertyName("hierarchyItems")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<DesignerHierarchyItem>? HierarchyItems { get; set; }
 
         [JsonPropertyName("controlType")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -175,6 +180,18 @@ namespace MauiDesigner.Core.Protocol
                 ElementId = elementId,
                 PropertyName = propertyName,
                 Value = value
+            });
+
+        public static string HostHierarchyCommand(
+            string command,
+            string elementId,
+            string? targetElementId = null) =>
+            Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.HostCommand,
+                Command = command,
+                ElementId = elementId,
+                Value = targetElementId
             });
 
         public static string DocumentApplied(long revision) =>
@@ -264,6 +281,36 @@ namespace MauiDesigner.Core.Protocol
 
         [JsonPropertyName("canDuplicate")]
         public bool CanDuplicate { get; set; }
+
+        [JsonPropertyName("canDelete")]
+        public bool CanDelete { get; set; }
+    }
+
+    public sealed class DesignerHierarchyItem
+    {
+        [JsonPropertyName("elementId")]
+        public string ElementId { get; set; } = string.Empty;
+
+        [JsonPropertyName("parentElementId")]
+        public string? ParentElementId { get; set; }
+
+        [JsonPropertyName("displayName")]
+        public string DisplayName { get; set; } = string.Empty;
+
+        [JsonPropertyName("depth")]
+        public int Depth { get; set; }
+
+        [JsonPropertyName("childCount")]
+        public int ChildCount { get; set; }
+
+        [JsonPropertyName("isSelected")]
+        public bool IsSelected { get; set; }
+
+        [JsonPropertyName("canMoveUp")]
+        public bool CanMoveUp { get; set; }
+
+        [JsonPropertyName("canMoveDown")]
+        public bool CanMoveDown { get; set; }
 
         [JsonPropertyName("canDelete")]
         public bool CanDelete { get; set; }

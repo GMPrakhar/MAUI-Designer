@@ -112,6 +112,7 @@ public partial class MainPage : ContentPage
         UpdateViewportVisuals();
         PublishToolboxSnapshot();
         PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
         _hostBridge.Start();
         if (_extensionLoader.Diagnostics.Count > 0)
         {
@@ -572,12 +573,14 @@ public partial class MainPage : ContentPage
         }
 
         PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
         ScheduleRender();
     }
 
     private void OnSelectionChanged(object? sender, EventArgs e)
     {
         PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
         ScheduleSelectionRefresh();
     }
 
@@ -590,6 +593,7 @@ public partial class MainPage : ContentPage
             ApplyToolboxFilter(ToolboxSearch.Text ?? string.Empty);
             PublishToolboxSnapshot();
             PublishSelectionSnapshot();
+            PublishHierarchySnapshot();
         });
 
     private void ApplyToolboxFilter(string search)
@@ -605,7 +609,7 @@ public partial class MainPage : ContentPage
         ControlDescriptor[] visible = matches.ToArray();
         ToolboxItemsHost.Clear();
         foreach (IGrouping<string, ControlDescriptor> category in visible
-                     .GroupBy(descriptor => descriptor.Category)
+                     .GroupBy(ControlToolboxCategory.For)
                      .OrderBy(group => CategoryOrder(group.Key))
                      .ThenBy(group => group.Key, StringComparer.Ordinal))
         {
@@ -695,6 +699,12 @@ public partial class MainPage : ContentPage
             if (command.Name == "setProperty")
             {
                 SetHostedProperty(command);
+                return;
+            }
+
+            if (command.Name is "selectElement" or "reparentElement")
+            {
+                ExecuteHierarchyCommand(command);
                 return;
             }
 
@@ -828,7 +838,7 @@ public partial class MainPage : ContentPage
             .Select(descriptor => new HostedToolboxItem(
                 descriptor.Id.FullName,
                 descriptor.DisplayName,
-                descriptor.Category))
+                ControlToolboxCategory.For(descriptor)))
             .ToArray();
         _hostBridge.SendToolboxSnapshot(items);
     }
@@ -905,6 +915,81 @@ public partial class MainPage : ContentPage
             _workspace.CanPaste,
             _workspace.CanDuplicate,
             _workspace.SelectionCount > 0));
+    }
+
+    private void PublishHierarchySnapshot()
+    {
+        if (!_hostBridge.IsHosted)
+        {
+            return;
+        }
+
+        DesignerNode root = _workspace.Session.Current.Root;
+        IReadOnlyList<HierarchyItem> projection = HierarchyProjection.Build(
+            root,
+            new HashSet<ElementId>());
+        HostedHierarchyItem[] items = projection.Select(item =>
+        {
+            DesignerNode node = item.Node;
+            DesignerNode? parent = _workspace.Session.Current.FindParent(node.Id);
+            int index = parent is null ? -1 : parent.Children.IndexOf(node);
+            string displayName = _catalog.TryGet(
+                node.ControlType,
+                out ControlDescriptor? descriptor)
+                ? descriptor?.DisplayName ?? node.ControlType.XamlName
+                : node.ControlType.XamlName;
+            return new HostedHierarchyItem(
+                node.Id.Value,
+                parent?.Id.Value,
+                displayName,
+                item.Depth,
+                node.Children.Length,
+                _workspace.SelectedIds.Contains(node.Id),
+                index > 0,
+                parent is not null && index >= 0 && index < parent.Children.Length - 1,
+                parent is not null);
+        }).ToArray();
+        _hostBridge.SendHierarchySnapshot(items);
+    }
+
+    private void ExecuteHierarchyCommand(HostedDesignerCommand command)
+    {
+        if (string.IsNullOrWhiteSpace(command.ElementId))
+        {
+            ShowPropertyError("Visual Studio sent an incomplete hierarchy command.");
+            return;
+        }
+
+        var elementId = new ElementId(command.ElementId);
+        if (_workspace.Session.Current.Find(elementId) is null)
+        {
+            ShowPropertyError($"Element '{command.ElementId}' is no longer available.");
+            PublishHierarchySnapshot();
+            return;
+        }
+
+        if (command.Name == "selectElement")
+        {
+            _workspace.Select(elementId);
+            FocusCanvasElement(elementId);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(command.Value))
+        {
+            ShowPropertyError("Visual Studio did not specify the hierarchy destination.");
+            return;
+        }
+
+        try
+        {
+            _workspace.Reparent(elementId, new ElementId(command.Value));
+        }
+        catch (InvalidOperationException exception)
+        {
+            ShowPropertyError(exception.Message);
+            PublishHierarchySnapshot();
+        }
     }
 
     private static IReadOnlyList<string>? StandardValues(Type valueType)
@@ -984,6 +1069,7 @@ public partial class MainPage : ContentPage
         }
 
         PublishSelectionSnapshot();
+        PublishHierarchySnapshot();
     }
 
     private void LoadHostedDocument(string xaml)

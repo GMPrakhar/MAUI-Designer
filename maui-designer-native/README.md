@@ -71,6 +71,10 @@ dependencies from the assembly directory, registers all constructible public
 Controls requiring constructor arguments can be registered through
 `IControlCatalog.RegisterFactory<TView>`.
 
+`Samples\SyncfusionButtonsPage.xaml` is a ready-to-open third-party-control
+document for validating Syncfusion Toolbox discovery, hierarchy projection,
+selection, property editing, rendering, save, and reopen behavior.
+
 ## XAML workflow
 
 Open **XAML** to edit the current document. Changes are parsed automatically

@@ -73,6 +73,7 @@
     <Compile Include="Editor\NativeDesignerLocator.cs" />
     <Compile Include="Editor\DesignerPane.cs" />
     <Compile Include="Editor\VisualStudioDesignerSelectionProxy.cs" />
+    <Compile Include="Hierarchy\DesignerHierarchyToolWindow.cs" />
     <Compile Include="MauiDesignerPackage.cs" />
     <Compile Include="Projects\ProjectManifestProvider.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

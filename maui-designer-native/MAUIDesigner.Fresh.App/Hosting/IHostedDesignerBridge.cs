@@ -24,5 +24,7 @@ public interface IHostedDesignerBridge : IDisposable
 
     void SendSelectionSnapshot(HostedSelectionSnapshot selection);
 
+    void SendHierarchySnapshot(IReadOnlyList<HostedHierarchyItem> items);
+
     void SendClosed(string requestId, string? xaml);
 }

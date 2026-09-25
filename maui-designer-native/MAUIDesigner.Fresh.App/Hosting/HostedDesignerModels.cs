@@ -48,6 +48,26 @@ public sealed record HostedSelectionSnapshot(
     [property: JsonPropertyName("canDelete")]
     bool CanDelete = false);
 
+public sealed record HostedHierarchyItem(
+    [property: JsonPropertyName("elementId")]
+    string ElementId,
+    [property: JsonPropertyName("parentElementId")]
+    string? ParentElementId,
+    [property: JsonPropertyName("displayName")]
+    string DisplayName,
+    [property: JsonPropertyName("depth")]
+    int Depth,
+    [property: JsonPropertyName("childCount")]
+    int ChildCount,
+    [property: JsonPropertyName("isSelected")]
+    bool IsSelected,
+    [property: JsonPropertyName("canMoveUp")]
+    bool CanMoveUp,
+    [property: JsonPropertyName("canMoveDown")]
+    bool CanMoveDown,
+    [property: JsonPropertyName("canDelete")]
+    bool CanDelete);
+
 public sealed record HostedDesignerCommand(
     string Name,
     string? ControlType = null,

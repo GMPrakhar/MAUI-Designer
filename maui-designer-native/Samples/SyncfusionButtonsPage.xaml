@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:buttons="clr-namespace:Syncfusion.Maui.Buttons;assembly=Syncfusion.Maui.Buttons"
+    x:Class="Samples.SyncfusionButtonsPage">
+    <VerticalStackLayout Padding="24" Spacing="16">
+        <Label
+            Text="Syncfusion Buttons"
+            FontSize="24"
+            FontAttributes="Bold" />
+        <buttons:SfButton
+            Text="Syncfusion action"
+            HorizontalOptions="Fill" />
+        <buttons:SfCheckBox
+            Text="Enable Syncfusion option"
+            IsChecked="True" />
+        <buttons:SfSwitch IsOn="True" />
+    </VerticalStackLayout>
+</ContentPage>

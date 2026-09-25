@@ -46,6 +46,7 @@ namespace MauiDesigner.Vsix
         private readonly IVsHierarchy _hierarchy;
         private readonly DesignerControl _control;
         private readonly DesignerSession _session;
+        private readonly MauiDesignerPackage _package;
         private readonly List<OleDataObject> _toolboxDataObjects = new List<OleDataObject>();
         private ITextBuffer? _textBuffer;
         private IVsWindowFrame? _registeredFrame;
@@ -54,6 +55,8 @@ namespace MauiDesigner.Vsix
         private DesignerSelectionSnapshot? _lastSelection;
         private IReadOnlyList<DesignerToolboxItem>? _lastToolboxItems;
         private IReadOnlyList<DesignerToolboxItem>? _populatedToolboxItems;
+        private IReadOnlyList<DesignerHierarchyItem>? _lastHierarchyItems;
+        private DesignerHierarchyToolWindow? _hierarchyWindow;
         private ProjectControlManifest _projectControls = new ProjectControlManifest();
         private bool _toolWindowsShown;
 
@@ -83,6 +86,7 @@ namespace MauiDesigner.Vsix
             }
 
             _joinableTaskFactory = package.JoinableTaskFactory;
+            _package = (MauiDesignerPackage)package;
             _textLines = textLines ?? throw new ArgumentNullException(nameof(textLines));
             _documentMoniker = documentMoniker;
             _hierarchy = hierarchy;
@@ -96,6 +100,7 @@ namespace MauiDesigner.Vsix
             _session.ManifestsRequested += OnManifestsRequested;
             _session.ToolboxChanged += OnToolboxChanged;
             _session.SelectionChanged += OnSelectionChanged;
+            _session.HierarchyChanged += OnHierarchyChanged;
             _session.ErrorReported += (_, message) => WriteToOutput(message);
         }
 
@@ -239,6 +244,7 @@ namespace MauiDesigner.Vsix
                     new Guid(ToolWindowGuids80.Toolbox),
                     dock: true);
                 ShowToolWindow(new Guid(ToolWindowGuids.PropertyBrowser));
+                ShowHierarchyWindow();
                 _toolWindowsShown = true;
             }
         }
@@ -279,6 +285,55 @@ namespace MauiDesigner.Vsix
                 }
             }).FileAndForget("vs/mauidesigner/selection");
         }
+
+        private void OnHierarchyChanged(
+            object sender,
+            IReadOnlyList<DesignerHierarchyItem> items)
+        {
+            _lastHierarchyItems = items;
+            _joinableTaskFactory.RunAsync(async () =>
+            {
+                await _joinableTaskFactory.SwitchToMainThreadAsync();
+                if (Volatile.Read(ref _disposed) == 0)
+                {
+                    PublishHierarchy(items);
+                }
+            }).FileAndForget("vs/mauidesigner/hierarchy");
+        }
+
+        private void ShowHierarchyWindow()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            DesignerHierarchyToolWindow window =
+                _hierarchyWindow ??= _package.GetHierarchyWindow();
+            window.SetOwner(this);
+            ((IVsWindowFrame)window.Frame).ShowNoActivate();
+            if (_lastHierarchyItems is not null)
+            {
+                window.UpdateItems(_lastHierarchyItems);
+            }
+        }
+
+        private void PublishHierarchy(IReadOnlyList<DesignerHierarchyItem> items)
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            DesignerHierarchyToolWindow window =
+                _hierarchyWindow ??= _package.GetHierarchyWindow();
+            window.SetOwner(this);
+            window.UpdateItems(items);
+        }
+
+        internal void PostDesignerCommand(string command) =>
+            _control.PostMessage(DesignerProtocol.HostCommand(command));
+
+        internal void PostHierarchyCommand(
+            string command,
+            string elementId,
+            string? targetElementId = null) =>
+            _control.PostMessage(DesignerProtocol.HostHierarchyCommand(
+                command,
+                elementId,
+                targetElementId));
 
         private void PublishSelection(DesignerSelectionSnapshot selection)
         {
@@ -642,6 +697,8 @@ namespace MauiDesigner.Vsix
                 {
                     PublishSelection(_lastSelection);
                 }
+
+                ShowHierarchyWindow();
             }
 
             return VSConstants.S_OK;
@@ -751,6 +808,8 @@ namespace MauiDesigner.Vsix
             }
 
             _populatedToolboxItems = null;
+            _hierarchyWindow?.SetOwner(null);
+            _hierarchyWindow = null;
             _registeredFrame = null;
             _control.Dispose();
         }

@@ -198,6 +198,19 @@ public sealed class NamedPipeHostedDesignerBridgeTests
                     "Common",
                     false)
             ]));
+        bridge.SendHierarchySnapshot(
+        [
+            new HostedHierarchyItem(
+                "button-1",
+                "layout-1",
+                "Button",
+                2,
+                0,
+                true,
+                false,
+                true,
+                true)
+        ]);
         bridge.Start();
         await server.WaitForConnectionAsync().WaitAsync(TimeSpan.FromSeconds(5));
         using var reader = new StreamReader(server);
@@ -206,6 +219,7 @@ public sealed class NamedPipeHostedDesignerBridgeTests
         await AssertHandshakeAsync(reader);
         using JsonDocument toolbox = JsonDocument.Parse(await ReadLineAsync(reader));
         using JsonDocument selection = JsonDocument.Parse(await ReadLineAsync(reader));
+        using JsonDocument hierarchy = JsonDocument.Parse(await ReadLineAsync(reader));
         Assert.Equal(
             "Microsoft.Maui.Controls.Button",
             toolbox.RootElement.GetProperty("toolboxItems")[0]
@@ -215,6 +229,11 @@ public sealed class NamedPipeHostedDesignerBridgeTests
             "button-1",
             selection.RootElement.GetProperty("selection")
                 .GetProperty("elementId")
+                .GetString());
+        Assert.Equal(
+            "layout-1",
+            hierarchy.RootElement.GetProperty("hierarchyItems")[0]
+                .GetProperty("parentElementId")
                 .GetString());
 
         await writer.WriteLineAsync(

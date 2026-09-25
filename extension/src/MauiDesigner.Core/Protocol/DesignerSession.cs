@@ -50,6 +50,8 @@ namespace MauiDesigner.Core.Protocol
 
         public event EventHandler<DesignerSelectionSnapshot>? SelectionChanged;
 
+        public event EventHandler<IReadOnlyList<DesignerHierarchyItem>>? HierarchyChanged;
+
         /// <summary>
         /// Queues (or sends, once the designer is ready) the document to edit.
         /// </summary>
@@ -205,6 +207,14 @@ namespace MauiDesigner.Core.Protocol
                     if (message.Selection is not null)
                     {
                         SelectionChanged?.Invoke(this, message.Selection);
+                    }
+
+                    break;
+
+                case MessageTypes.DesignerHierarchyChanged:
+                    if (message.HierarchyItems is not null)
+                    {
+                        HierarchyChanged?.Invoke(this, message.HierarchyItems);
                     }
 
                     break;

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 using MauiDesigner.Core.Manifests;
 using MauiDesigner.Core.Protocol;
@@ -126,8 +127,10 @@ namespace MauiDesigner.Core.Tests
             var session = CreateSession();
             IReadOnlyList<DesignerToolboxItem>? toolbox = null;
             DesignerSelectionSnapshot? selection = null;
+            IReadOnlyList<DesignerHierarchyItem>? hierarchy = null;
             session.ToolboxChanged += (_, items) => toolbox = items;
             session.SelectionChanged += (_, value) => selection = value;
+            session.HierarchyChanged += (_, items) => hierarchy = items;
 
             session.HandleMessage(DesignerProtocol.Serialize(new DesignerMessage
             {
@@ -139,6 +142,21 @@ namespace MauiDesigner.Core.Tests
                         ControlType = "Microsoft.Maui.Controls.Button",
                         DisplayName = "Button",
                         Category = "Controls"
+                    }
+                }
+            }));
+            session.HandleMessage(DesignerProtocol.Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DesignerHierarchyChanged,
+                HierarchyItems = new List<DesignerHierarchyItem>
+                {
+                    new DesignerHierarchyItem
+                    {
+                        ElementId = "button-1",
+                        ParentElementId = "layout-1",
+                        DisplayName = "Button",
+                        Depth = 2,
+                        IsSelected = true
                     }
                 }
             }));
@@ -171,6 +189,24 @@ namespace MauiDesigner.Core.Tests
             Assert.Equal(
                 new[] { "One", "Two" },
                 Assert.Single(selection.Properties).EnumValues);
+            DesignerHierarchyItem hierarchyItem = Assert.Single(hierarchy!);
+            Assert.Equal("layout-1", hierarchyItem.ParentElementId);
+            Assert.True(hierarchyItem.IsSelected);
+        }
+
+        [Fact]
+        public void Hierarchy_commands_carry_source_and_destination_ids()
+        {
+            string json = DesignerProtocol.HostHierarchyCommand(
+                "reparentElement",
+                "button-1",
+                "grid-1");
+
+            DesignerMessage message = JsonSerializer.Deserialize<DesignerMessage>(json)!;
+
+            Assert.Equal("reparentElement", message.Command);
+            Assert.Equal("button-1", message.ElementId);
+            Assert.Equal("grid-1", message.Value);
         }
 
         [Theory]

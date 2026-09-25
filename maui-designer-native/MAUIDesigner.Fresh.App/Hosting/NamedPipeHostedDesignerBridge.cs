@@ -84,6 +84,11 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
             "designer.selectionChanged",
             Selection: selection));
 
+    public void SendHierarchySnapshot(IReadOnlyList<HostedHierarchyItem> items) =>
+        Enqueue(new BridgeMessage(
+            "designer.hierarchyChanged",
+            HierarchyItems: items));
+
     public void SendClosed(string requestId, string? xaml) =>
         Enqueue(new BridgeMessage("designer.closed", xaml, requestId));
 
@@ -278,6 +283,8 @@ public sealed class NamedPipeHostedDesignerBridge : IHostedDesignerBridge
         IReadOnlyList<HostedToolboxItem>? ToolboxItems = null,
         [property: JsonPropertyName("selection")]
         HostedSelectionSnapshot? Selection = null,
+        [property: JsonPropertyName("hierarchyItems")]
+        IReadOnlyList<HostedHierarchyItem>? HierarchyItems = null,
         [property: JsonPropertyName("controlType")]
         string? ControlType = null,
         [property: JsonPropertyName("elementId")]

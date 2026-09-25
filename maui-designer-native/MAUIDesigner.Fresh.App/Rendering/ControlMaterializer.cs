@@ -518,30 +518,52 @@ public sealed class ControlMaterializer
 
     private View AddMoveHandle(Grid chrome, DesignerNode node)
     {
+        _catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor);
+        string selectionLabel = SelectionChromePresentation.LabelFor(node, descriptor);
+        var handleContent = new Grid
+        {
+            InputTransparent = true,
+            Padding = new Thickness(5, 0),
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(new GridLength(18)),
+                new ColumnDefinition(GridLength.Auto)
+            }
+        };
+        handleContent.Add(new Label
+        {
+            Text = ":::",
+            FontSize = 9,
+            HorizontalTextAlignment = TextAlignment.Center,
+            VerticalTextAlignment = TextAlignment.Center,
+            TextColor = Colors.White
+        });
+        handleContent.Add(new Label
+        {
+            AutomationId = $"selection-label-{node.Id.Value}",
+            Text = selectionLabel,
+            Margin = new Thickness(4, 0, 2, 0),
+            FontSize = 10,
+            FontAttributes = FontAttributes.Bold,
+            VerticalTextAlignment = TextAlignment.Center,
+            TextColor = Colors.White
+        }, 1);
         var handle = new Border
         {
             AutomationId = $"move-{node.Id.Value}",
-            WidthRequest = 28,
-            HeightRequest = 14,
+            MinimumWidthRequest = 28,
+            HeightRequest = 20,
             HorizontalOptions = LayoutOptions.Start,
             VerticalOptions = LayoutOptions.Start,
             TranslationX = -4,
-            TranslationY = -18,
+            TranslationY = -24,
             BackgroundColor = Color.FromArgb("#7C5CFF"),
             StrokeThickness = 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
             {
                 CornerRadius = new CornerRadius(5)
             },
-            Content = new Label
-            {
-                InputTransparent = true,
-                Text = ":::",
-                FontSize = 9,
-                HorizontalTextAlignment = TextAlignment.Center,
-                VerticalTextAlignment = TextAlignment.Center,
-                TextColor = Colors.White
-            }
+            Content = handleContent
         };
         RectD start = node.Bounds ?? new RectD(0, 0, 160, 48);
         double totalX = 0;
