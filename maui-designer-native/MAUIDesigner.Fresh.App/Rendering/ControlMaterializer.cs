@@ -245,6 +245,13 @@ public sealed class ControlMaterializer
             return CreateUnknownControl(node);
         }
 
+        if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                node.ControlType,
+                out string? placeholderReason))
+        {
+            return CreateDesignTimePlaceholder(node, placeholderReason!);
+        }
+
         try
         {
             View view = _catalog.Create(node.ControlType);
@@ -873,6 +880,33 @@ public sealed class ControlMaterializer
             {
                 Text = $"Could not render {node.ControlType.XamlName}: {reason}",
                 TextColor = Color.FromArgb("#7F1D1D")
+            }
+        };
+
+    private static View CreateDesignTimePlaceholder(DesignerNode node, string reason) =>
+        new Border
+        {
+            Padding = 12,
+            BackgroundColor = Color.FromArgb("#EFF6FF"),
+            Stroke = Color.FromArgb("#2563EB"),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new Label
+                    {
+                        Text = node.ControlType.XamlName,
+                        FontAttributes = FontAttributes.Bold,
+                        TextColor = Color.FromArgb("#1E3A8A")
+                    },
+                    new Label
+                    {
+                        Text = reason,
+                        FontSize = 11,
+                        TextColor = Color.FromArgb("#1E40AF")
+                    }
+                }
             }
         };
 

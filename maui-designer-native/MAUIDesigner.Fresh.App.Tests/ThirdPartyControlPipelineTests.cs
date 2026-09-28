@@ -1,7 +1,9 @@
 using System.Runtime.Loader;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.App.Hosting;
+using MAUIDesigner.Fresh.App.Rendering;
 using MAUIDesigner.Fresh.App.Xaml;
+using MAUIDesigner.Fresh.Core.Documents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Maui.Hosting;
 
@@ -9,6 +11,41 @@ namespace MAUIDesigner.Fresh.App.Tests;
 
 public sealed class ThirdPartyControlPipelineTests
 {
+    [Fact]
+    public void Unsafe_live_third_party_control_uses_an_explicit_placeholder()
+    {
+        var glassEffect = new ControlTypeId(
+            "Syncfusion.Maui.Core",
+            "Syncfusion.Maui.Core.SfGlassEffectView",
+            "http://schemas.syncfusion.com/maui",
+            "SfGlassEffectView");
+        var avatar = new ControlTypeId(
+            "Syncfusion.Maui.Core",
+            "Syncfusion.Maui.Core.SfAvatarView",
+            "http://schemas.syncfusion.com/maui",
+            "SfAvatarView");
+        var button = new ControlTypeId(
+            "Syncfusion.Maui.Buttons",
+            "Syncfusion.Maui.Buttons.SfButton",
+            "clr-namespace:Syncfusion.Maui.Buttons;assembly=Syncfusion.Maui.Buttons",
+            "SfButton");
+
+        Assert.True(
+            DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                glassEffect,
+                out string? reason));
+        Assert.Contains("XAML", reason);
+        Assert.True(
+            DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                avatar,
+                out string? avatarReason));
+        Assert.Contains("XAML", avatarReason);
+        Assert.False(
+            DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                button,
+                out _));
+    }
+
     [Fact]
     public void Arbitrary_control_assemblies_load_without_a_vendor_adapter()
     {

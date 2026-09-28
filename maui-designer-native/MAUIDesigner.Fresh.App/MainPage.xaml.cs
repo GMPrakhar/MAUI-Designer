@@ -759,6 +759,14 @@ public partial class MainPage : ContentPage
             return;
         }
 
+        if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                descriptor.Id,
+                out string? reason))
+        {
+            ShowPropertyError($"{descriptor.DisplayName}: {reason}");
+            return;
+        }
+
         _workspace.Add(descriptor, placement: placement);
     }
 
@@ -888,21 +896,29 @@ public partial class MainPage : ContentPage
         }
 
         DesignerNode? parent = _workspace.Session.Current.FindParent(selected.Id);
-        HostedPropertySnapshot[] properties = PropertyInspectorDescriptorSource
-            .Compose(descriptor, selected, parent)
-            .Where(IsEditableProperty)
-            .OrderBy(PropertyPriority)
-            .ThenBy(property => property.Name, StringComparer.Ordinal)
-            .Select(property => new HostedPropertySnapshot(
-                property.Name,
-                selected.Properties.TryGetValue(property.Name, out DesignerValue? value)
-                    ? value.Text
-                    : PropertyInspectorDescriptorSource.DefaultValue(property.Name),
-                property.ValueType.FullName ?? typeof(string).FullName!,
-                PropertyGroup(property),
-                property.IsReadOnly,
-                StandardValues(property.ValueType)))
-            .ToArray();
+        HostedPropertySnapshot[] properties =
+            DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                descriptor.Id,
+                out _)
+                ? []
+                : PropertyInspectorDescriptorSource
+                    .Compose(descriptor, selected, parent)
+                    .Where(IsEditableProperty)
+                    .OrderBy(PropertyPriority)
+                    .ThenBy(property => property.Name, StringComparer.Ordinal)
+                    .Select(property => new HostedPropertySnapshot(
+                        property.Name,
+                        selected.Properties.TryGetValue(
+                            property.Name,
+                            out DesignerValue? value)
+                            ? value.Text
+                            : PropertyInspectorDescriptorSource.DefaultValue(
+                                property.Name),
+                        property.ValueType.FullName ?? typeof(string).FullName!,
+                        PropertyGroup(property),
+                        property.IsReadOnly,
+                        StandardValues(property.ValueType)))
+                    .ToArray();
         _hostBridge.SendSelectionSnapshot(new HostedSelectionSnapshot(
             1,
             selected.Id.Value,
@@ -1623,6 +1639,19 @@ public partial class MainPage : ContentPage
         }
 
         SelectionLabel.Text = $"{descriptor.DisplayName}  /  {selected.Id}";
+        if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                descriptor.Id,
+                out string? placeholderReason))
+        {
+            PropertyPanel.Add(new Label
+            {
+                Text = placeholderReason,
+                FontSize = 11,
+                TextColor = Color.FromArgb("#1E40AF")
+            });
+            return;
+        }
+
         string filter = PropertySearch.Text?.Trim() ?? string.Empty;
         DesignerNode? parent = _workspace.Session.Current.FindParent(selected.Id);
         IEnumerable<IGrouping<string, PropertyDescriptor>> groups =
