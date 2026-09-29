@@ -39,6 +39,29 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Target_reference_pack_supplies_a_metadata_core_assembly()
+        {
+            var framework = MetadataReferenceLocator.ForTarget(
+                "net10.0-windows10.0.19041.0/win-x64");
+            var references = framework.Paths.Concat(new[] { MauiAssembly }).ToList();
+
+            var manifests = new ControlManifestGenerator().Generate(
+                new[] { PackageAssembly },
+                references,
+                "Contoso.Maui.Controls",
+                "1.2.3",
+                framework.CoreAssemblyName);
+
+            Assert.NotEmpty(framework.Paths);
+            Assert.Contains(
+                framework.CoreAssemblyName,
+                new[] { "System.Runtime", "System.Private.CoreLib" });
+            Assert.Contains(
+                manifests.SelectMany(manifest => manifest.Controls),
+                control => control.Tag == "RatingBar");
+        }
+
+        [Fact]
         public void Produces_one_manifest_per_clr_namespace()
         {
             var manifests = Generate();

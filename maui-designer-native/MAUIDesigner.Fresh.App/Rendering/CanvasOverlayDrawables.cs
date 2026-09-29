@@ -144,6 +144,7 @@ public sealed class GridTrackOverlayDrawable : IDrawable
             return;
         }
 
+        canvas.SaveState();
         canvas.StrokeColor = TrackColor;
         canvas.StrokeSize = _strokeSize;
         canvas.StrokeDashPattern = _dashPattern;
@@ -153,6 +154,7 @@ public sealed class GridTrackOverlayDrawable : IDrawable
             GridTrackLine line = _lines[index];
             canvas.DrawLine(line.X1, line.Y1, line.X2, line.Y2);
         }
+        canvas.RestoreState();
     }
 
     private void EnsureCapacity(int required)
@@ -243,7 +245,8 @@ public sealed class GridTrackOverlayDrawable : IDrawable
 
 public sealed class CanvasRulerDrawable : IDrawable
 {
-    private const float RulerSize = 22;
+    public const float RulerSize = 22;
+    private const float TargetMajorTickSpacing = 72;
     private readonly DesignerViewportState _viewport;
 
     public CanvasRulerDrawable(DesignerViewportState viewport)
@@ -258,53 +261,156 @@ public sealed class CanvasRulerDrawable : IDrawable
             return;
         }
 
+        RectF designBounds = GetDesignBounds(_viewport);
+        RectF horizontalRuler = GetHorizontalRulerBounds(designBounds, dirtyRect);
+        RectF verticalRuler = GetVerticalRulerBounds(designBounds, dirtyRect);
+        bool drawHorizontal = horizontalRuler.Width > 0 && horizontalRuler.Height > 0;
+        bool drawVertical = verticalRuler.Width > 0 && verticalRuler.Height > 0;
+        if (!drawHorizontal && !drawVertical)
+        {
+            return;
+        }
+
+        canvas.SaveState();
         canvas.FillColor = Color.FromArgb("#F8FAFC");
-        canvas.FillRectangle(0, 0, dirtyRect.Width, RulerSize);
-        canvas.FillRectangle(0, 0, RulerSize, dirtyRect.Height);
+        if (drawHorizontal)
+        {
+            canvas.FillRectangle(horizontalRuler);
+        }
+
+        if (drawVertical)
+        {
+            canvas.FillRectangle(verticalRuler);
+        }
+
         canvas.StrokeColor = Color.FromArgb("#CBD5E1");
+        canvas.StrokeSize = 1;
         canvas.FontColor = Color.FromArgb("#475569");
         canvas.FontSize = 8;
 
-        double step = Math.Max(_viewport.GridSize * 5, 40);
-        for (double value = 0; value <= _viewport.DesignWidth; value += step)
+        double majorStep = GetMajorTickStep(_viewport.Zoom);
+        double minorStep = majorStep / 5;
+        int tickCount = (int)Math.Floor(_viewport.DesignWidth / minorStep);
+        for (int index = 0; index <= tickCount; index++)
         {
+            double value = index * minorStep;
             float x = (float)(_viewport.PanX + value * _viewport.Zoom);
-            if (x < RulerSize || x > dirtyRect.Width)
+            if (!drawHorizontal ||
+                x < horizontalRuler.Left ||
+                x > horizontalRuler.Right)
             {
                 continue;
             }
 
-            canvas.DrawLine(x, 14, x, RulerSize);
-            canvas.DrawString(
-                value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                x + 2,
-                0,
-                42,
-                14,
-                HorizontalAlignment.Left,
-                VerticalAlignment.Center);
+            bool major = index % 5 == 0;
+            float tickHeight = major ? 8 : 4;
+            canvas.DrawLine(
+                x,
+                horizontalRuler.Bottom - tickHeight,
+                x,
+                horizontalRuler.Bottom);
+            if (major)
+            {
+                canvas.DrawString(
+                    value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    x + 2,
+                    horizontalRuler.Top,
+                    50,
+                    horizontalRuler.Height - tickHeight,
+                    HorizontalAlignment.Left,
+                    VerticalAlignment.Center);
+            }
         }
 
-        for (double value = 0; value <= _viewport.DesignHeight; value += step)
+        tickCount = (int)Math.Floor(_viewport.DesignHeight / minorStep);
+        for (int index = 0; index <= tickCount; index++)
         {
+            double value = index * minorStep;
             float y = (float)(_viewport.PanY + value * _viewport.Zoom);
-            if (y < RulerSize || y > dirtyRect.Height)
+            if (!drawVertical ||
+                y < verticalRuler.Top ||
+                y > verticalRuler.Bottom)
             {
                 continue;
             }
 
-            canvas.DrawLine(14, y, RulerSize, y);
-            canvas.DrawString(
-                value.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                1,
-                y + 1,
-                20,
-                12,
-                HorizontalAlignment.Left,
-                VerticalAlignment.Top);
+            bool major = index % 5 == 0;
+            float tickWidth = major ? 8 : 4;
+            canvas.DrawLine(
+                verticalRuler.Right - tickWidth,
+                y,
+                verticalRuler.Right,
+                y);
+            if (major)
+            {
+                canvas.DrawString(
+                    value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    verticalRuler.Left + 1,
+                    y + 1,
+                    verticalRuler.Width - tickWidth,
+                    12,
+                    HorizontalAlignment.Left,
+                    VerticalAlignment.Top);
+            }
         }
 
-        canvas.FillColor = Color.FromArgb("#EEF2F7");
-        canvas.FillRectangle(0, 0, RulerSize, RulerSize);
+        if (drawHorizontal && drawVertical)
+        {
+            canvas.FillColor = Color.FromArgb("#EEF2F7");
+            canvas.FillRectangle(
+                verticalRuler.Left,
+                horizontalRuler.Top,
+                verticalRuler.Width,
+                horizontalRuler.Height);
+        }
+
+        canvas.RestoreState();
+    }
+
+    public static RectF GetDesignBounds(DesignerViewportState viewport) =>
+        new(
+            (float)viewport.PanX,
+            (float)viewport.PanY,
+            (float)(viewport.DesignWidth * viewport.Zoom),
+            (float)(viewport.DesignHeight * viewport.Zoom));
+
+    public static RectF GetHorizontalRulerBounds(RectF designBounds, RectF viewportBounds)
+    {
+        float left = Math.Max(viewportBounds.Left, designBounds.Left);
+        float right = Math.Min(viewportBounds.Right, designBounds.Right);
+        float bottom = Math.Clamp(
+            designBounds.Top,
+            viewportBounds.Top,
+            viewportBounds.Bottom);
+        float top = Math.Max(viewportBounds.Top, bottom - RulerSize);
+        return new RectF(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+    }
+
+    public static RectF GetVerticalRulerBounds(RectF designBounds, RectF viewportBounds)
+    {
+        float top = Math.Max(viewportBounds.Top, designBounds.Top);
+        float bottom = Math.Min(viewportBounds.Bottom, designBounds.Bottom);
+        float right = Math.Clamp(
+            designBounds.Left,
+            viewportBounds.Left,
+            viewportBounds.Right);
+        float left = Math.Max(viewportBounds.Left, right - RulerSize);
+        return new RectF(left, top, Math.Max(0, right - left), Math.Max(0, bottom - top));
+    }
+
+    public static double GetMajorTickStep(double zoom)
+    {
+        double safeZoom = double.IsFinite(zoom) && zoom > 0 ? zoom : 1;
+        double targetDesignUnits = TargetMajorTickSpacing / safeZoom;
+        double magnitude = Math.Pow(10, Math.Floor(Math.Log10(targetDesignUnits)));
+        double normalized = targetDesignUnits / magnitude;
+        double nice = normalized <= 1
+            ? 1
+            : normalized <= 2
+                ? 2
+                : normalized <= 5
+                    ? 5
+                    : 10;
+        return nice * magnitude;
     }
 }

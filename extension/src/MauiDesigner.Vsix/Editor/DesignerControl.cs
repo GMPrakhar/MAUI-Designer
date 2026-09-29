@@ -4,13 +4,19 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Media;
 
+using MauiDesigner.Core.Manifests;
 using MauiDesigner.Core.Protocol;
 
+using Microsoft.VisualStudio.Imaging;
+using Microsoft.VisualStudio.Imaging.Interop;
+using Microsoft.VisualStudio.PlatformUI;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Threading;
 
@@ -25,6 +31,8 @@ namespace MauiDesigner.Vsix
         private readonly JoinableTaskFactory _joinableTaskFactory;
         private readonly NativeDesignerHost _nativeHost;
         private readonly TextBlock _status;
+        private readonly Dictionary<string, Button> _commandButtons =
+            new Dictionary<string, Button>(StringComparer.Ordinal);
         private readonly LinkedList<string> _pending = new LinkedList<string>();
         private readonly SemaphoreSlim _writeGate = new SemaphoreSlim(1, 1);
         private readonly object _closeGate = new object();
@@ -32,6 +40,7 @@ namespace MauiDesigner.Vsix
         private StreamReader? _reader;
         private StreamWriter? _writer;
         private Process? _process;
+        private string? _startupManifestPath;
         private string? _pendingCloseRequestId;
         private ManualResetEventSlim? _pendingCloseResponse;
         private string? _pendingFinalXaml;
@@ -53,6 +62,14 @@ namespace MauiDesigner.Vsix
             _nativeHost.ShortcutRequested += OnShortcutRequested;
 
             var root = new Grid();
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition
+            {
+                Height = new GridLength(1, GridUnitType.Star)
+            });
+            root.Children.Add(CreateToolbar());
+            Grid.SetRow(_nativeHost, 1);
+            Grid.SetRow(_status, 1);
             root.Children.Add(_nativeHost);
             root.Children.Add(_status);
             Content = root;
@@ -63,7 +80,108 @@ namespace MauiDesigner.Vsix
         private void OnShortcutRequested(object? sender, string command) =>
             PostMessage(DesignerProtocol.HostCommand(command));
 
-        public async Task InitializeAsync(string executablePath)
+        private ToolBarTray CreateToolbar()
+        {
+            var toolbar = new ToolBar
+            {
+                Band = 0,
+                BandIndex = 0
+            };
+            toolbar.SetResourceReference(
+                Control.BackgroundProperty,
+                EnvironmentColors.CommandBarGradientBrushKey);
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Undo, "Undo (Ctrl+Z)", "undo"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Redo, "Redo (Ctrl+Y)", "redo"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Cut, "Cut (Ctrl+X)", "cut"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Copy, "Copy (Ctrl+C)", "copy"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Paste, "Paste (Ctrl+V)", "paste"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Copy, "Duplicate (Ctrl+D)", "duplicate"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Delete, "Delete", "delete"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.ZoomOut, "Zoom out", "zoomOut"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.ZoomIn, "Zoom in", "zoomIn"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.ZoomToFit, "Fit canvas", "zoomFit"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Zoom, "Actual size", "zoomReset"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.SnapToGrid, "Toggle snapping", "toggleSnap"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Grid, "Toggle grid", "toggleGrid"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Ruler, "Toggle rulers", "toggleRulers"));
+            toolbar.Items.Add(new Separator());
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.OpenFile, "Load custom controls", "loadControls"));
+            toolbar.Items.Add(CreateToolbarButton(KnownMonikers.Run, "Run preview", "runPreview"));
+
+            var tray = new ToolBarTray
+            {
+                IsLocked = true
+            };
+            tray.SetResourceReference(
+                ToolBarTray.BackgroundProperty,
+                EnvironmentColors.CommandBarGradientBrushKey);
+            tray.ToolBars.Add(toolbar);
+            return tray;
+        }
+
+        private Button CreateToolbarButton(
+            ImageMoniker moniker,
+            string tooltip,
+            string command)
+        {
+            var image = new CrispImage
+            {
+                Moniker = moniker,
+                Width = 16,
+                Height = 16,
+                SnapsToDevicePixels = true
+            };
+            var imageHolder = new ContentControl
+            {
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Content = image,
+                Height = 20,
+                Width = 20
+            };
+            imageHolder.SetResourceReference(
+                ImageThemingUtilities.ImageBackgroundColorProperty,
+                EnvironmentColors.CommandBarGradientBeginColorKey);
+
+            var button = new Button
+            {
+                Width = 28,
+                Height = 26,
+                Padding = new Thickness(4),
+                ToolTip = tooltip,
+                Content = imageHolder
+            };
+            System.Windows.Automation.AutomationProperties.SetName(button, tooltip);
+            button.Click += (_, _) => PostMessage(DesignerProtocol.HostCommand(command));
+            _commandButtons[command] = button;
+            return button;
+        }
+
+        public void UpdateCommandState(DesignerSelectionSnapshot selection)
+        {
+            SetCommandEnabled("undo", selection.CanUndo);
+            SetCommandEnabled("redo", selection.CanRedo);
+            SetCommandEnabled("copy", selection.CanCopy);
+            SetCommandEnabled("cut", selection.CanCut);
+            SetCommandEnabled("paste", selection.CanPaste);
+            SetCommandEnabled("duplicate", selection.CanDuplicate);
+            SetCommandEnabled("delete", selection.CanDelete);
+        }
+
+        private void SetCommandEnabled(string command, bool enabled)
+        {
+            if (_commandButtons.TryGetValue(command, out Button? button))
+            {
+                button.IsEnabled = enabled;
+            }
+        }
+
+        public async Task InitializeAsync(
+            string executablePath,
+            ProjectControlManifest projectControls)
         {
             if (!File.Exists(executablePath))
             {
@@ -74,6 +192,7 @@ namespace MauiDesigner.Vsix
             try
             {
                 string pipeName = $"MauiDesigner.{Process.GetCurrentProcess().Id}.{Guid.NewGuid():N}";
+                _startupManifestPath = WriteStartupManifest(projectControls);
                 _pipe = new NamedPipeServerStream(
                     pipeName,
                     PipeDirection.InOut,
@@ -86,7 +205,7 @@ namespace MauiDesigner.Vsix
                     _pipe.EndWaitForConnection,
                     null);
                 IntPtr hostHandle = await _nativeHost.WaitForHandleAsync();
-                _process = StartDesigner(executablePath, pipeName);
+                _process = StartDesigner(executablePath, pipeName, _startupManifestPath);
                 IntPtr designerHandle = await WaitForMainWindowAsync(_process, TimeSpan.FromSeconds(20));
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
                 if (_disposed)
@@ -145,17 +264,33 @@ namespace MauiDesigner.Vsix
             }
         }
 
-        private static Process StartDesigner(string executablePath, string pipeName)
+        private static Process StartDesigner(
+            string executablePath,
+            string pipeName,
+            string startupManifestPath)
         {
             var process = Process.Start(new ProcessStartInfo
             {
                 FileName = executablePath,
-                Arguments = $"--designer-pipe \"{pipeName}\"",
+                Arguments =
+                    $"--designer-pipe \"{pipeName}\" --designer-startup-manifest \"{startupManifestPath}\"",
                 UseShellExecute = false,
                 WorkingDirectory = Path.GetDirectoryName(executablePath)
             });
             return process ?? throw new InvalidOperationException(
                 "Windows did not create the MAUI Designer process.");
+        }
+
+        private static string WriteStartupManifest(ProjectControlManifest projectControls)
+        {
+            var directory = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "MauiDesigner",
+                "Startup");
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, Guid.NewGuid().ToString("N") + ".json");
+            File.WriteAllText(path, ManifestJson.Serialize(projectControls), Encoding.UTF8);
+            return path;
         }
 
         private static async Task<IntPtr> WaitForMainWindowAsync(
@@ -522,6 +657,22 @@ namespace MauiDesigner.Vsix
             _writer?.Dispose();
             _pipe?.Dispose();
             DisposeProcess();
+            if (_startupManifestPath is not null)
+            {
+                try
+                {
+                    File.Delete(_startupManifestPath);
+                }
+                catch (IOException)
+                {
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+
+                _startupManifestPath = null;
+            }
+
             _nativeHost.ShortcutRequested -= OnShortcutRequested;
             _nativeHost.Dispose();
         }

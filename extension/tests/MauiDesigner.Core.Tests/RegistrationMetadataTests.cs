@@ -32,6 +32,8 @@ namespace MauiDesigner.Core.Tests
     {
         private const string PackageTypeName = "MauiDesigner.Vsix.MauiDesignerPackage";
         private const string EditorFactoryTypeName = "MauiDesigner.Vsix.DesignerEditorFactory";
+        private const string HierarchyWindowTypeName =
+            "MauiDesigner.Vsix.DesignerHierarchyToolWindow";
 
         private readonly MetadataLoadContext _context;
         private readonly Assembly _extension;
@@ -86,6 +88,23 @@ namespace MauiDesigner.Core.Tests
             var registration = Attribute(package, "ProvideEditorExtensionAttribute");
 
             Assert.Equal(".xaml", registration.ConstructorArguments[1].Value);
+        }
+
+        [Fact]
+        public void The_hierarchy_window_is_registered_with_visual_studio()
+        {
+            var package = _extension.GetType(PackageTypeName, throwOnError: true)!;
+            var hierarchyWindow = _extension.GetType(
+                HierarchyWindowTypeName,
+                throwOnError: true)!;
+            var registration = Attribute(package, "ProvideToolWindowAttribute");
+            var registeredWindow = Assert.IsAssignableFrom<Type>(
+                registration.ConstructorArguments[0].Value);
+
+            Assert.Equal(hierarchyWindow.FullName, registeredWindow.FullName);
+            Assert.True(
+                Guid.TryParse(GuidOf(hierarchyWindow), out var windowGuid) &&
+                windowGuid != Guid.Empty);
         }
 
         [Fact]

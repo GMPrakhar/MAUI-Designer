@@ -25,11 +25,13 @@ namespace MauiDesigner.Core.Manifests
         /// <param name="referencePaths">Additional assemblies needed to resolve base types (MAUI, BCL).</param>
         /// <param name="packageId">NuGet package the assemblies came from.</param>
         /// <param name="packageVersion">NuGet package version.</param>
+        /// <param name="coreAssemblyName">Metadata core assembly name for the supplied reference set.</param>
         public IReadOnlyList<CustomControlManifest> Generate(
             IEnumerable<string> assemblyPaths,
             IEnumerable<string> referencePaths,
             string packageId,
-            string? packageVersion = null)
+            string? packageVersion = null,
+            string? coreAssemblyName = null)
         {
             var targets = assemblyPaths.Where(File.Exists).Distinct().ToList();
             if (targets.Count == 0)
@@ -43,7 +45,9 @@ namespace MauiDesigner.Core.Manifests
                 .ToList();
 
             var resolver = new PathAssemblyResolver(all);
-            using var context = new MetadataLoadContext(resolver);
+            using var context = coreAssemblyName is null
+                ? new MetadataLoadContext(resolver)
+                : new MetadataLoadContext(resolver, coreAssemblyName);
 
             var manifests = new Dictionary<string, CustomControlManifest>(StringComparer.Ordinal);
 

@@ -102,6 +102,111 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Windows_runtime_target_is_selected_instead_of_first_android_target()
+        {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                "maui-designer-windows-assets-" + Guid.NewGuid().ToString("N"));
+            var android = Path.Combine(root, "contoso.controls", "1.0.0", "lib", "net10.0-android");
+            var windows = Path.Combine(
+                root,
+                "contoso.controls",
+                "1.0.0",
+                "lib",
+                "net10.0-windows10.0.19041");
+            Directory.CreateDirectory(android);
+            Directory.CreateDirectory(windows);
+            File.WriteAllText(Path.Combine(android, "Contoso.Controls.dll"), string.Empty);
+            File.WriteAllText(Path.Combine(windows, "Contoso.Controls.dll"), string.Empty);
+
+            var json = $$"""
+                {
+                  "targets": {
+                    "net10.0-android": {
+                      "Contoso.Controls/1.0.0": {
+                        "type": "package",
+                        "compile": { "lib/net10.0-android/Contoso.Controls.dll": {} }
+                      }
+                    },
+                    "net10.0-windows10.0.19041.0/win-x64": {
+                      "Contoso.Controls/1.0.0": {
+                        "type": "package",
+                        "dependencies": { "Contoso.Core": "1.0.0" },
+                        "compile": { "lib/net10.0-windows10.0.19041/Contoso.Controls.dll": {} },
+                        "runtime": { "lib/net10.0-windows10.0.19041/Contoso.Controls.dll": {} }
+                      }
+                    }
+                  },
+                  "packageFolders": { "{{root.Replace(@"\", @"\\")}}": {} }
+                }
+                """;
+
+            try
+            {
+                var snapshot = ProjectAssetsReader.ReadWindowsJson(json);
+                var package = Assert.Single(snapshot.Packages);
+
+                Assert.Equal("net10.0-windows10.0.19041.0/win-x64", snapshot.Target);
+                Assert.Contains("net10.0-windows10.0.19041", package.AssemblyPaths.Single());
+                Assert.Equal(package.AssemblyPaths, package.RuntimeAssemblyPaths);
+                Assert.Equal(new[] { "Contoso.Core" }, package.Dependencies);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void Windows_runtime_target_excludes_native_runtime_assets()
+        {
+            var root = Path.Combine(
+                Path.GetTempPath(),
+                "maui-designer-runtime-assets-" + Guid.NewGuid().ToString("N"));
+            var runtime = Path.Combine(root, "contoso.controls", "1.0.0", "runtimes", "win-x64");
+            Directory.CreateDirectory(Path.Combine(runtime, "lib", "net10.0"));
+            Directory.CreateDirectory(Path.Combine(runtime, "native"));
+            var managedPath = Path.Combine(runtime, "lib", "net10.0", "Contoso.Controls.dll");
+            var nativePath = Path.Combine(runtime, "native", "Contoso.Native.dll");
+            File.WriteAllText(managedPath, string.Empty);
+            File.WriteAllText(nativePath, string.Empty);
+
+            var json = $$"""
+                {
+                  "targets": {
+                    "net10.0-windows10.0.19041.0/win-x64": {
+                      "Contoso.Controls/1.0.0": {
+                        "type": "package",
+                        "runtimeTargets": {
+                          "runtimes/win-x64/lib/net10.0/Contoso.Controls.dll": {
+                            "assetType": "runtime",
+                            "rid": "win-x64"
+                          },
+                          "runtimes/win-x64/native/Contoso.Native.dll": {
+                            "assetType": "native",
+                            "rid": "win-x64"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "packageFolders": { "{{root.Replace(@"\", @"\\")}}": {} }
+                }
+                """;
+
+            try
+            {
+                var package = Assert.Single(ProjectAssetsReader.ReadWindowsJson(json).Packages);
+
+                Assert.Equal(new[] { managedPath }, package.RuntimeAssemblyPaths);
+            }
+            finally
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+
+        [Fact]
         public void An_assets_file_without_targets_is_empty_rather_than_fatal()
         {
             Assert.Empty(ProjectAssetsReader.ReadJson("{}"));

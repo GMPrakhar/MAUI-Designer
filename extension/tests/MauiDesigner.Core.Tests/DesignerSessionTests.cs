@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 using MauiDesigner.Core.Manifests;
 using MauiDesigner.Core.Protocol;
@@ -102,6 +103,110 @@ namespace MauiDesigner.Core.Tests
 
             Assert.Equal(MessageTypes.HostCommand, message.Type);
             Assert.Equal("duplicate", message.Command);
+        }
+
+        [Fact]
+        public void Host_commands_carry_toolbox_and_property_arguments()
+        {
+            DesignerMessage insert = DesignerProtocol.Parse(
+                DesignerProtocol.HostInsertControl("Microsoft.Maui.Controls.Button"))!;
+            DesignerMessage property = DesignerProtocol.Parse(
+                DesignerProtocol.HostSetProperty("button-1", "Text", "Save"))!;
+
+            Assert.Equal("insertControl", insert.Command);
+            Assert.Equal("Microsoft.Maui.Controls.Button", insert.ControlType);
+            Assert.Equal("setProperty", property.Command);
+            Assert.Equal("button-1", property.ElementId);
+            Assert.Equal("Text", property.PropertyName);
+            Assert.Equal("Save", property.Value);
+        }
+
+        [Fact]
+        public void Designer_shell_snapshots_are_forwarded_to_the_host()
+        {
+            var session = CreateSession();
+            IReadOnlyList<DesignerToolboxItem>? toolbox = null;
+            DesignerSelectionSnapshot? selection = null;
+            IReadOnlyList<DesignerHierarchyItem>? hierarchy = null;
+            session.ToolboxChanged += (_, items) => toolbox = items;
+            session.SelectionChanged += (_, value) => selection = value;
+            session.HierarchyChanged += (_, items) => hierarchy = items;
+
+            session.HandleMessage(DesignerProtocol.Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DesignerToolboxChanged,
+                ToolboxItems = new List<DesignerToolboxItem>
+                {
+                    new DesignerToolboxItem
+                    {
+                        ControlType = "Microsoft.Maui.Controls.Button",
+                        DisplayName = "Button",
+                        Category = "Controls"
+                    }
+                }
+            }));
+            session.HandleMessage(DesignerProtocol.Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DesignerHierarchyChanged,
+                HierarchyItems = new List<DesignerHierarchyItem>
+                {
+                    new DesignerHierarchyItem
+                    {
+                        ElementId = "button-1",
+                        ParentElementId = "layout-1",
+                        DisplayName = "Button",
+                        Depth = 2,
+                        IsSelected = true
+                    }
+                }
+            }));
+            session.HandleMessage(DesignerProtocol.Serialize(new DesignerMessage
+            {
+                Type = MessageTypes.DesignerSelectionChanged,
+                Selection = new DesignerSelectionSnapshot
+                {
+                    SelectionCount = 1,
+                    ElementId = "button-1",
+                    DisplayName = "Button",
+                    Properties =
+                    {
+                        new DesignerPropertySnapshot
+                        {
+                            Name = "Text",
+                            Value = "Save",
+                            ValueType = typeof(string).FullName!,
+                            Category = "Common",
+                            EnumValues = new List<string> { "One", "Two" }
+                        }
+                    }
+                }
+            }));
+
+            DesignerToolboxItem item = Assert.Single(toolbox!);
+            Assert.Equal("Button", item.DisplayName);
+            Assert.Equal("button-1", selection!.ElementId);
+            Assert.Equal("Save", Assert.Single(selection.Properties).Value);
+            Assert.Equal(
+                new[] { "One", "Two" },
+                Assert.Single(selection.Properties).EnumValues);
+            DesignerHierarchyItem hierarchyItem = Assert.Single(hierarchy!);
+            Assert.Equal("layout-1", hierarchyItem.ParentElementId);
+            Assert.True(hierarchyItem.IsSelected);
+        }
+
+        [Fact]
+        public void Hierarchy_commands_carry_source_and_destination_ids()
+        {
+            string json = DesignerProtocol.HostHierarchyCommand(
+                "reparentElement",
+                "button-1",
+                "grid-1");
+
+            DesignerMessage message = JsonSerializer.Deserialize<DesignerMessage>(json)!;
+
+            Assert.Equal("reparentElement", message.Command);
+            Assert.Equal("button-1", message.ElementId);
+            Assert.Equal("grid-1", message.Value);
         }
 
         [Theory]
@@ -319,6 +424,40 @@ namespace MauiDesigner.Core.Tests
             Assert.Equal(MessageTypes.ManifestsPush, message.Type);
             Assert.Equal("contoso", message.Manifests!.Single().Xmlns.Prefix);
             Assert.Contains("\"tag\":\"RatingBar\"", _posted.Single());
+        }
+
+        [Fact]
+        public void Project_control_payload_carries_runtime_and_startup_information()
+        {
+            var session = CreateSession();
+            session.PushManifests(new ProjectControlManifest
+            {
+                Target = "net10.0-windows10.0.19041.0/win-x64",
+                Assemblies =
+                {
+                    new RuntimeAssemblyDefinition
+                    {
+                        Path = @"C:\packages\Syncfusion.Maui.Buttons.dll",
+                        Package = "Syncfusion.Maui.Buttons",
+                        IsRoot = true
+                    }
+                },
+                StartupMethods =
+                {
+                    new PackageStartupMethod
+                    {
+                        Package = "Syncfusion.Maui.Core",
+                        Assembly = "Syncfusion.Maui.Core",
+                        Type = "Syncfusion.Maui.Core.Hosting.AppHostBuilderExtensions",
+                        Method = "ConfigureSyncfusionCore"
+                    }
+                }
+            });
+
+            var message = Assert.Single(Posted());
+            Assert.Equal("net10.0-windows10.0.19041.0/win-x64", message.Target);
+            Assert.True(message.Assemblies!.Single().IsRoot);
+            Assert.Equal("ConfigureSyncfusionCore", message.StartupMethods!.Single().Method);
         }
 
         [Fact]
