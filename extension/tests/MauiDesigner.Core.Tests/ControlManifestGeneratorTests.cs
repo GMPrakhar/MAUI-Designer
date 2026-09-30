@@ -62,6 +62,26 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void Discovers_conventional_startup_extensions_without_vendor_mapping()
+        {
+            var references = RuntimeReferences().Concat(new[] { MauiAssembly }).ToList();
+
+            IReadOnlyList<PackageStartupMethod> methods =
+                new ControlManifestGenerator().DiscoverStartupMethods(
+                    new[] { PackageAssembly },
+                    references,
+                    "Contoso.Maui.Controls");
+
+            PackageStartupMethod method = Assert.Single(methods);
+            Assert.Equal("Contoso.Maui.Controls", method.Package);
+            Assert.Equal("Contoso.Maui.Controls", method.Assembly);
+            Assert.Equal(
+                "Contoso.Maui.Hosting.AppHostBuilderExtensions",
+                method.Type);
+            Assert.Equal("ConfigureContosoControls", method.Method);
+        }
+
+        [Fact]
         public void Produces_one_manifest_per_clr_namespace()
         {
             var manifests = Generate();

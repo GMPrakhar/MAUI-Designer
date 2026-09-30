@@ -133,26 +133,34 @@ designer does nothing" rather than taking down the IDE.
 
 ### Third-party runtime controls
 
-Before the native process starts, the VSIX writes a per-session startup
-descriptor under the user's local application-data directory. The descriptor
-contains only restored local assembly paths and metadata; package binaries are
-not copied into the repository. The native host loads root control assemblies
-in an isolated `AssemblyLoadContext`, resolves their transitive package
-dependencies by assembly identity, and registers the resulting real MAUI
-`View` types in the runtime catalog. The same payload is requested again over
+Before the native process starts, the VSIX builds a cached, data-only runtime
+overlay under the user's local application-data directory. It merges the
+signed designer's PRI with WinUI resources from the project's restored package
+closure while retaining the shipped designer dependency manifest. Package
+assemblies are admitted explicitly after an isolated child-process preflight,
+so Windows Application Control can terminate a blocked module without taking
+down the designer; they load from their restored NuGet paths and are never
+placed beside the designer executable. The staged
+`MAUIDesigner.exe` and designer assemblies are hard links or copies of the
+shipped binaries, not locally generated replacements. Root control assemblies
+then load from that normal dependency graph and register their real MAUI
+`View` types in the runtime catalog. The same metadata is requested again over
 the named pipe so restore/discovery diagnostics are visible and the catalog can
 be refreshed.
 
 Some component suites require a `MauiAppBuilder` registration call before
-`Build()`. Startup adapters describe a public static builder method by assembly,
-type, and method name. Syncfusion packages are mapped to
-`ConfigureSyncfusionCore` without referencing or redistributing the commercial
-package. Additional suites can add equivalent metadata mappings without adding
-a binary dependency to the designer.
+`Build()`. The metadata scanner discovers conventional public static
+`Configure*` extension methods whose sole argument and return type are
+`MauiAppBuilder`; no vendor package names or binaries are compiled into the
+designer.
 
 If a package is missing, incompatible, or cannot be initialized, its XAML is
 still round-tripped. The canvas shows an `Unavailable: <control>` placeholder
 and the failure is reported rather than silently dropping the element.
+Windows Application Control still applies to every vendor DLL. An unsigned or
+untrusted third-party assembly can be blocked even when the Marketplace VSIX
+and designer are signed; the vendor must sign that DLL or an administrator must
+allow it.
 
 ## Building and running the tests
 

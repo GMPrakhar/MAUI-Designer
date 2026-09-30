@@ -47,6 +47,45 @@ public sealed class ThirdPartyControlPipelineTests
     }
 
     [Fact]
+    public void Blocked_third_party_assembly_does_not_prevent_other_roots_from_loading()
+    {
+        string controlsPath = Path.Combine(AppContext.BaseDirectory, "DesignerFixture.Controls.dll");
+        string blockedPath = Path.Combine(
+            Path.GetTempPath(),
+            $"blocked-control-{Guid.NewGuid():N}.dll");
+        File.WriteAllText(blockedPath, "not a managed assembly");
+
+        try
+        {
+            var payload = new HostedProjectControls(
+                "net10.0-windows10.0.19041.0/win-x64",
+                [],
+                [
+                    new HostedRuntimeAssembly(blockedPath, "Blocked.Controls", true),
+                    new HostedRuntimeAssembly(controlsPath, "DesignerFixture.Controls", true)
+                ],
+                [],
+                []);
+            var runtime = new DesignerPackageRuntime();
+
+            IReadOnlyList<System.Reflection.Assembly> loaded = runtime.Load(payload);
+
+            Assert.Contains(
+                loaded,
+                assembly => assembly.GetName().Name == "DesignerFixture.Controls");
+            Assert.Contains(
+                runtime.Diagnostics,
+                diagnostic => diagnostic.Contains(
+                    "blocked-control-",
+                    StringComparison.Ordinal));
+        }
+        finally
+        {
+            File.Delete(blockedPath);
+        }
+    }
+
+    [Fact]
     public void Arbitrary_control_assemblies_load_without_a_vendor_adapter()
     {
         string controlsPath = Path.Combine(AppContext.BaseDirectory, "DesignerFixture.Controls.dll");
@@ -80,6 +119,7 @@ public sealed class ThirdPartyControlPipelineTests
         ControlDescriptor descriptor = Assert.Single(catalog.Controls, control =>
             control.Id.FullName == "DesignerFixture.Controls.FixtureControl");
         Assert.Equal("DesignerFixture.Controls", descriptor.Id.AssemblyName);
+        Assert.Equal("DesignerFixture.Controls", descriptor.Category);
         Assert.Empty(payload.StartupMethods);
     }
 

@@ -20,6 +20,7 @@ public static class MauiProgram
 {
 	public static MauiApp CreateMauiApp()
 	{
+		DesignerPackageRuntime.RunAssemblyProbeIfRequested();
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()

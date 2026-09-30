@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Loader;
 using System.Text.Json;
@@ -9,6 +11,8 @@ namespace MAUIDesigner.Fresh.App.Catalog;
 public sealed class DesignerPackageRuntime
 {
     private const string StartupManifestArgument = "--designer-startup-manifest";
+    private const string ProjectHostArgument = "--designer-project-host";
+    private const string ProbeAssemblyArgument = "--designer-probe-assembly";
     private const string SyncfusionPackage = "Syncfusion.Maui.Core";
     private readonly PackageLoadContext _context = new();
     private readonly Dictionary<string, Assembly> _assemblies =
@@ -18,6 +22,32 @@ public sealed class DesignerPackageRuntime
     public IReadOnlyCollection<Assembly> Assemblies => _assemblies.Values;
 
     public IReadOnlyList<string> Diagnostics => _diagnostics;
+
+    public static void RunAssemblyProbeIfRequested()
+    {
+        string[] arguments = Environment.GetCommandLineArgs();
+        int index = Array.IndexOf(arguments, ProbeAssemblyArgument);
+        if (index < 0 || index + 1 >= arguments.Length)
+        {
+            return;
+        }
+
+        try
+        {
+            string path = Path.GetFullPath(arguments[index + 1]);
+            AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
+            Environment.Exit(0);
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or
+            FileNotFoundException or
+            FileLoadException or
+            BadImageFormatException or
+            TypeLoadException)
+        {
+            Environment.Exit(1);
+        }
+    }
 
     public static (DesignerPackageRuntime Runtime, HostedProjectControls? ProjectControls)
         FromCommandLine()
@@ -79,14 +109,82 @@ public sealed class DesignerPackageRuntime
         var loaded = new List<Assembly>();
         foreach (string path in roots)
         {
-            Assembly assembly = LoadAssembly(path);
-            if (loaded.All(candidate => candidate != assembly))
+            if (IsProjectHost() && !ProbeAssembly(path))
             {
-                loaded.Add(assembly);
+                _diagnostics.Add(
+                    $"Third-party assembly '{Path.GetFileName(path)}' was blocked " +
+                    "or terminated during Windows application-control preflight.");
+                continue;
+            }
+
+            try
+            {
+                Assembly assembly = LoadAssembly(path);
+                if (loaded.All(candidate => candidate != assembly))
+                {
+                    loaded.Add(assembly);
+                }
+            }
+            catch (Exception exception) when (
+                exception is FileNotFoundException or
+                FileLoadException or
+                BadImageFormatException or
+                TypeLoadException)
+            {
+                _diagnostics.Add(
+                    $"Third-party assembly '{Path.GetFileName(path)}' failed " +
+                    $"to load: {exception.InnerException?.Message ?? exception.Message}");
             }
         }
 
         return loaded;
+    }
+
+    private static bool ProbeAssembly(string assemblyPath)
+    {
+        string? executable = Environment.ProcessPath;
+        if (string.IsNullOrWhiteSpace(executable) || !File.Exists(executable))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = executable,
+                Arguments =
+                    $"{ProbeAssemblyArgument} \"{Path.GetFullPath(assemblyPath)}\"",
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = AppContext.BaseDirectory
+            });
+            if (process is null || !process.WaitForExit(TimeSpan.FromSeconds(15)))
+            {
+                if (process is not null && !process.HasExited)
+                {
+                    try
+                    {
+                        process.Kill(entireProcessTree: true);
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // The probe exited between the state check and termination.
+                    }
+                }
+
+                return false;
+            }
+
+            return process.ExitCode == 0;
+        }
+        catch (Exception exception) when (
+            exception is Win32Exception or
+            InvalidOperationException or
+            ArgumentException)
+        {
+            return false;
+        }
     }
 
     public Assembly LoadAssembly(string assemblyPath)
@@ -106,7 +204,24 @@ public sealed class DesignerPackageRuntime
             return existing;
         }
 
-        Assembly assembly = _context.LoadFromAssemblyPath(fullPath);
+        Assembly assembly;
+        if (IsProjectHost())
+        {
+            try
+            {
+                assembly = AssemblyLoadContext.Default.LoadFromAssemblyName(
+                    AssemblyName.GetAssemblyName(fullPath));
+            }
+            catch (FileNotFoundException)
+            {
+                assembly = _context.LoadFromAssemblyPath(fullPath);
+            }
+        }
+        else
+        {
+            assembly = _context.LoadFromAssemblyPath(fullPath);
+        }
+
         _assemblies[name] = assembly;
         return assembly;
     }
@@ -140,11 +255,14 @@ public sealed class DesignerPackageRuntime
                     ?? throw new MissingMethodException(startup.Type, startup.Method);
                 int serviceCount = builder.Services.Count;
                 method.Invoke(null, [builder]);
-                RemoveUnsupportedDesignerInitializers(
-                    builder,
-                    startup,
-                    assembly,
-                    serviceCount);
+                if (!IsProjectHost())
+                {
+                    RemoveUnsupportedDesignerInitializers(
+                        builder,
+                        startup,
+                        assembly,
+                        serviceCount);
+                }
             }
             catch (Exception exception)
             {
@@ -154,6 +272,11 @@ public sealed class DesignerPackageRuntime
             }
         }
     }
+
+    public static bool IsProjectHost() =>
+        Environment.GetCommandLineArgs().Contains(
+            ProjectHostArgument,
+            StringComparer.Ordinal);
 
     private static void RemoveUnsupportedDesignerInitializers(
         MauiAppBuilder builder,
@@ -200,10 +323,20 @@ public sealed class DesignerPackageRuntime
             {
                 foreach (string path in paths.Where(File.Exists))
                 {
-                    string? name = AssemblyName.GetAssemblyName(path).Name;
-                    if (!string.IsNullOrWhiteSpace(name))
+                    try
                     {
-                        _paths[name] = Path.GetFullPath(path);
+                        string? name = AssemblyName.GetAssemblyName(path).Name;
+                        if (!string.IsNullOrWhiteSpace(name))
+                        {
+                            _paths[name] = Path.GetFullPath(path);
+                        }
+                    }
+                    catch (Exception exception) when (
+                        exception is FileNotFoundException or
+                        FileLoadException or
+                        BadImageFormatException)
+                    {
+                        // A blocked or incompatible root is reported by Load.
                     }
                 }
             }
