@@ -1,39 +1,26 @@
 using MAUIDesigner.Fresh.Core.Documents;
-using MAUIDesigner.Fresh.App.Catalog;
-
 namespace MAUIDesigner.Fresh.App.Rendering;
 
 public static class DesignerControlSafetyPolicy
 {
+    private const string FrameworkXamlNamespace =
+        "http://schemas.microsoft.com/dotnet/2021/maui";
+
     public static bool TryGetPlaceholderReason(
         ControlTypeId controlType,
         out string? reason)
     {
         ArgumentNullException.ThrowIfNull(controlType);
 
-        if (DesignerPackageRuntime.IsProjectHost())
-        {
-            reason = null;
-            return false;
-        }
-
-        if (controlType.AssemblyName == "Syncfusion.Maui.Core" &&
-            controlType.FullName == "Syncfusion.Maui.Core.SfGlassEffectView")
+        if (!string.Equals(
+                controlType.XamlNamespace,
+                FrameworkXamlNamespace,
+                StringComparison.Ordinal))
         {
             reason =
-                "Toolbox insertion and live preview are disabled because this " +
-                "control terminates the embedded Windows designer. Existing XAML " +
-                "and properties are preserved.";
-            return true;
-        }
-
-        if (controlType.AssemblyName == "Syncfusion.Maui.Core" &&
-            controlType.FullName == "Syncfusion.Maui.Core.SfAvatarView")
-        {
-            reason =
-                "Toolbox insertion and live preview are disabled because this " +
-                "control terminates the embedded Windows designer. Existing XAML " +
-                "and properties are preserved.";
+                "Live preview uses a design-time placeholder because dynamically " +
+                "loaded controls can terminate the Windows designer. XAML, " +
+                "hierarchy, and properties are preserved.";
             return true;
         }
 

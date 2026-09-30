@@ -759,14 +759,6 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
-                descriptor.Id,
-                out string? reason))
-        {
-            ShowPropertyError($"{descriptor.DisplayName}: {reason}");
-            return;
-        }
-
         _workspace.Add(descriptor, placement: placement);
     }
 
