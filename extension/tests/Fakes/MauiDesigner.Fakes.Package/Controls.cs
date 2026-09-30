@@ -1,5 +1,6 @@
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Graphics;
+using Microsoft.Maui.Hosting;
 
 namespace Contoso.Maui.Controls
 {
@@ -48,6 +49,18 @@ namespace Contoso.Maui.Controls
 
     public class NotAControl
     {
+    }
+}
+
+namespace Contoso.Maui.Hosting
+{
+    public static class AppHostBuilderExtensions
+    {
+        public static MauiAppBuilder ConfigureContosoControls(
+            this MauiAppBuilder builder) => builder;
+
+        public static MauiAppBuilder UseUnrelatedFeature(
+            this MauiAppBuilder builder) => builder;
     }
 }
 

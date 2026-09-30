@@ -191,6 +191,11 @@ namespace MauiDesigner.Vsix
 
             try
             {
+                ShowStatus("Preparing the project-specific MAUI Designer host...");
+                ProjectDesignerHostBuilder.Result designerHost =
+                    await ProjectDesignerHostBuilder.ResolveAsync(
+                        executablePath,
+                        projectControls);
                 string pipeName = $"MauiDesigner.{Process.GetCurrentProcess().Id}.{Guid.NewGuid():N}";
                 _startupManifestPath = WriteStartupManifest(projectControls);
                 _pipe = new NamedPipeServerStream(
@@ -205,7 +210,10 @@ namespace MauiDesigner.Vsix
                     _pipe.EndWaitForConnection,
                     null);
                 IntPtr hostHandle = await _nativeHost.WaitForHandleAsync();
-                _process = StartDesigner(executablePath, pipeName, _startupManifestPath);
+                _process = StartDesigner(
+                    designerHost,
+                    pipeName,
+                    _startupManifestPath);
                 IntPtr designerHandle = await WaitForMainWindowAsync(_process, TimeSpan.FromSeconds(20));
                 await _joinableTaskFactory.SwitchToMainThreadAsync();
                 if (_disposed)
@@ -265,17 +273,23 @@ namespace MauiDesigner.Vsix
         }
 
         private static Process StartDesigner(
-            string executablePath,
+            ProjectDesignerHostBuilder.Result designerHost,
             string pipeName,
             string startupManifestPath)
         {
+            string projectHostArgument = designerHost.UsesProjectPackages
+                ? " --designer-project-host"
+                : string.Empty;
             var process = Process.Start(new ProcessStartInfo
             {
-                FileName = executablePath,
+                FileName = designerHost.ExecutablePath,
                 Arguments =
-                    $"--designer-pipe \"{pipeName}\" --designer-startup-manifest \"{startupManifestPath}\"",
+                    $"--designer-pipe \"{pipeName}\" " +
+                    $"--designer-startup-manifest \"{startupManifestPath}\"" +
+                    projectHostArgument,
                 UseShellExecute = false,
-                WorkingDirectory = Path.GetDirectoryName(executablePath)
+                WorkingDirectory = Path.GetDirectoryName(
+                    designerHost.ExecutablePath)
             });
             return process ?? throw new InvalidOperationException(
                 "Windows did not create the MAUI Designer process.");

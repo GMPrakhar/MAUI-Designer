@@ -84,6 +84,10 @@ namespace MauiDesigner.Core.Protocol
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<RuntimeAssemblyDefinition>? Assemblies { get; set; }
 
+        [JsonPropertyName("packages")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<RuntimePackageDefinition>? Packages { get; set; }
+
         [JsonPropertyName("startupMethods")]
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<PackageStartupMethod>? StartupMethods { get; set; }
@@ -149,6 +153,7 @@ namespace MauiDesigner.Core.Protocol
                 Target = projectControls.Target,
                 Manifests = projectControls.Manifests,
                 Assemblies = projectControls.Assemblies,
+                Packages = projectControls.Packages,
                 StartupMethods = projectControls.StartupMethods,
                 Diagnostics = projectControls.Diagnostics
             });

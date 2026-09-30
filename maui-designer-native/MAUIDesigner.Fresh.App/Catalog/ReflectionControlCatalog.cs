@@ -171,6 +171,11 @@ public sealed class ReflectionControlCatalog : IControlCatalog
 
     private static string GetCategory(Type type)
     {
+        if (type.Assembly != typeof(View).Assembly)
+        {
+            return type.Assembly.GetName().Name ?? "Third party";
+        }
+
         if (typeof(Layout).IsAssignableFrom(type))
         {
             return "Layouts";

@@ -442,6 +442,14 @@ namespace MauiDesigner.Core.Tests
                         IsRoot = true
                     }
                 },
+                Packages =
+                {
+                    new RuntimePackageDefinition
+                    {
+                        Id = "Syncfusion.Maui.Buttons",
+                        Version = "34.2.9"
+                    }
+                },
                 StartupMethods =
                 {
                     new PackageStartupMethod
@@ -457,6 +465,11 @@ namespace MauiDesigner.Core.Tests
             var message = Assert.Single(Posted());
             Assert.Equal("net10.0-windows10.0.19041.0/win-x64", message.Target);
             Assert.True(message.Assemblies!.Single().IsRoot);
+            RuntimePackageDefinition package = Assert.Single(message.Packages!);
+            Assert.Equal(
+                "Syncfusion.Maui.Buttons",
+                package.Id);
+            Assert.Equal("34.2.9", package.Version);
             Assert.Equal("ConfigureSyncfusionCore", message.StartupMethods!.Single().Method);
         }
 

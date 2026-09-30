@@ -18,18 +18,6 @@ namespace MauiDesigner.Vsix.Projects
     /// </summary>
     public static class ProjectManifestProvider
     {
-        private static readonly IReadOnlyDictionary<string, PackageStartupMethod> StartupMethods =
-            new Dictionary<string, PackageStartupMethod>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["Syncfusion.Maui.Core"] = new PackageStartupMethod
-                {
-                    Package = "Syncfusion.Maui.Core",
-                    Assembly = "Syncfusion.Maui.Core",
-                    Type = "Syncfusion.Maui.Core.Hosting.AppHostBuilderExtensions",
-                    Method = "ConfigureSyncfusionCore"
-                }
-            };
-
         /// <summary>Finds the project file that owns an open document.</summary>
         public static string? FindProjectFile(IVsHierarchy? hierarchy, string documentMoniker)
         {
@@ -98,7 +86,8 @@ namespace MauiDesigner.Vsix.Projects
 
             var framework = MetadataReferenceLocator.ForTarget(snapshot.Target);
             var references = snapshot.Packages
-                .SelectMany(package => package.AssemblyPaths)
+                .SelectMany(package =>
+                    package.AssemblyPaths.Concat(package.RuntimeAssemblyPaths))
                 .Concat(framework.Paths)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -154,6 +143,12 @@ namespace MauiDesigner.Vsix.Projects
                          closure.Contains(package.Id) &&
                          !IsDesignerFrameworkPackage(package.Id)))
             {
+                result.Packages.Add(new RuntimePackageDefinition
+                {
+                    Id = package.Id,
+                    Version = package.Version
+                });
+
                 foreach (var path in package.RuntimeAssemblyPaths)
                 {
                     result.Assemblies.Add(new RuntimeAssemblyDefinition
@@ -164,15 +159,32 @@ namespace MauiDesigner.Vsix.Projects
                     });
                 }
 
-                if (StartupMethods.TryGetValue(package.Id, out var startup))
+                try
                 {
-                    result.StartupMethods.Add(startup);
+                    result.StartupMethods.AddRange(generator.DiscoverStartupMethods(
+                        package.AssemblyPaths,
+                        references,
+                        package.Id,
+                        framework.CoreAssemblyName));
+                }
+                catch (Exception error)
+                {
+                    result.Diagnostics.Add(new ManifestDiagnostic
+                    {
+                        Package = package.Id,
+                        Message = $"Startup discovery: {error.GetType().Name}: {error.Message}"
+                    });
                 }
             }
 
             result.Assemblies = result.Assemblies
                 .GroupBy(assembly => assembly.Path, StringComparer.OrdinalIgnoreCase)
                 .Select(group => group.OrderByDescending(assembly => assembly.IsRoot).First())
+                .ToList();
+            result.Packages = result.Packages
+                .GroupBy(package => package.Id, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .OrderBy(package => package.Id, StringComparer.OrdinalIgnoreCase)
                 .ToList();
             return result;
         }

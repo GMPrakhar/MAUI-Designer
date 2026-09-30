@@ -127,6 +127,10 @@ namespace MauiDesigner.Core.Manifests
         public List<RuntimeAssemblyDefinition> Assemblies { get; set; } =
             new List<RuntimeAssemblyDefinition>();
 
+        [JsonPropertyName("packages")]
+        public List<RuntimePackageDefinition> Packages { get; set; } =
+            new List<RuntimePackageDefinition>();
+
         [JsonPropertyName("startupMethods")]
         public List<PackageStartupMethod> StartupMethods { get; set; } =
             new List<PackageStartupMethod>();
@@ -146,6 +150,15 @@ namespace MauiDesigner.Core.Manifests
 
         [JsonPropertyName("isRoot")]
         public bool IsRoot { get; set; }
+    }
+
+    public sealed class RuntimePackageDefinition
+    {
+        [JsonPropertyName("id")]
+        public string Id { get; set; } = string.Empty;
+
+        [JsonPropertyName("version")]
+        public string Version { get; set; } = string.Empty;
     }
 
     public sealed class PackageStartupMethod
