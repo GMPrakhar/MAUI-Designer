@@ -360,6 +360,27 @@ namespace MauiDesigner.Core.Tests
         }
 
         [Fact]
+        public void The_install_check_uninstalls_the_exact_manifest_identity()
+        {
+            var manifestPath = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix", "source.extension.vsixmanifest");
+            var manifest = XDocument.Load(manifestPath);
+            XNamespace ns = "http://schemas.microsoft.com/developer/vsx-schema/2011";
+            var identity = manifest.Root!.Element(ns + "Metadata")!.Element(ns + "Identity")!
+                .Attribute("Id")!.Value;
+
+            var repository = Directory.GetParent(ExtensionDirectory())!.FullName;
+            var workflow = File.ReadAllText(
+                Path.Combine(repository, ".github", "workflows", "release-vsix.yml"));
+            var configuredIdentity = Regex.Match(
+                workflow,
+                @"^\s*EXTENSION_IDENTITY:\s*(\S+)\s*$",
+                RegexOptions.Multiline);
+
+            Assert.True(configuredIdentity.Success, "The VSIX install check does not declare EXTENSION_IDENTITY.");
+            Assert.Equal(identity, configuredIdentity.Groups[1].Value);
+        }
+
+        [Fact]
         public void The_manifest_and_the_assembly_agree_on_the_version()
         {
             var manifestPath = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix", "source.extension.vsixmanifest");
