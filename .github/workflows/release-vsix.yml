@@ -441,7 +441,9 @@ jobs:
             -ArgumentList '/quiet', "/uninstall:$env:EXTENSION_IDENTITY" `
             -Wait -PassThru
 
-          if ($process.ExitCode -ne 0) {
+          # 1002 means the installer catalog already considers the extension
+          # absent. The directory check below remains the cleanup authority.
+          if ($process.ExitCode -notin @(0, 1002)) {
             throw "Uninstalling failed with exit code $($process.ExitCode)."
           }
 
