@@ -12,7 +12,7 @@ namespace MAUIDesigner.Fresh.App.Tests;
 public sealed class ThirdPartyControlPipelineTests
 {
     [Fact]
-    public void Unsafe_live_third_party_control_uses_an_explicit_placeholder()
+    public void Dynamically_loaded_controls_use_an_explicit_placeholder()
     {
         var glassEffect = new ControlTypeId(
             "Syncfusion.Maui.Core",
@@ -29,6 +29,16 @@ public sealed class ThirdPartyControlPipelineTests
             "Syncfusion.Maui.Buttons.SfButton",
             "clr-namespace:Syncfusion.Maui.Buttons;assembly=Syncfusion.Maui.Buttons",
             "SfButton");
+        var arbitraryControl = new ControlTypeId(
+            "Acme.Widgets",
+            "Acme.Widgets.Gauge",
+            "clr-namespace:Acme.Widgets;assembly=Acme.Widgets",
+            "Gauge");
+        var frameworkButton = new ControlTypeId(
+            "Microsoft.Maui.Controls",
+            "Microsoft.Maui.Controls.Button",
+            "http://schemas.microsoft.com/dotnet/2021/maui",
+            "Button");
 
         Assert.True(
             DesignerControlSafetyPolicy.TryGetPlaceholderReason(
@@ -40,9 +50,19 @@ public sealed class ThirdPartyControlPipelineTests
                 avatar,
                 out string? avatarReason));
         Assert.Contains("XAML", avatarReason);
-        Assert.False(
+        Assert.True(
             DesignerControlSafetyPolicy.TryGetPlaceholderReason(
                 button,
+                out string? buttonReason));
+        Assert.Contains("XAML", buttonReason);
+        Assert.True(
+            DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                arbitraryControl,
+                out string? arbitraryReason));
+        Assert.Contains("XAML", arbitraryReason);
+        Assert.False(
+            DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                frameworkButton,
                 out _));
     }
 

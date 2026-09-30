@@ -82,11 +82,11 @@ before `MauiAppBuilder.Build()`; they do not define which controls appear.
 Syncfusion's handler and font registrations are retained, while its private
 Windows package-resource initializer is omitted because dynamically restored
 assemblies are not compiled into the designer's `ms-appx` package graph.
-`SfAvatarView` and `SfGlassEffectView` remain discoverable and their existing
-XAML round-trips unchanged, but the embedded Windows designer shows an explicit
-placeholder and blocks Toolbox insertion because either control can terminate
-WinUI during live design-surface updates. Other discovered Syncfusion controls
-continue to render and insert normally.
+Dynamically loaded controls from any library remain discoverable and insertable
+through the Toolbox, but render as explicit design-time placeholders because a
+vendor control can terminate WinUI during live design-surface updates. Their
+XAML, hierarchy, and properties continue to round-trip without executing
+vendor rendering code in the designer process.
 
 ## XAML workflow
 

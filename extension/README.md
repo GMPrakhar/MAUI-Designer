@@ -154,9 +154,12 @@ Some component suites require a `MauiAppBuilder` registration call before
 `MauiAppBuilder`; no vendor package names or binaries are compiled into the
 designer.
 
-If a package is missing, incompatible, or cannot be initialized, its XAML is
-still round-tripped. The canvas shows an `Unavailable: <control>` placeholder
-and the failure is reported rather than silently dropping the element.
+Dynamically loaded controls remain available in the Toolbox and hierarchy, but
+render as design-time placeholders so vendor WinUI code cannot terminate the
+designer process. Their XAML and properties still round-trip. If a package is
+missing, incompatible, or cannot be initialized, the canvas instead shows an
+`Unavailable: <control>` placeholder and reports the failure rather than
+silently dropping the element.
 Windows Application Control still applies to every vendor DLL. An unsigned or
 untrusted third-party assembly can be blocked even when the Marketplace VSIX
 and designer are signed; the vendor must sign that DLL or an administrator must
