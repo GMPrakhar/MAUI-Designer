@@ -18,6 +18,10 @@ public sealed class CanvasViewportView : Grid
 
     public event EventHandler<CanvasMarqueeEventArgs>? MarqueeRequested;
 
+    public event EventHandler<CanvasToolboxDropEventArgs>? ToolboxDropRequested;
+
+    public event EventHandler<CanvasToolboxDropFailedEventArgs>? ToolboxDropFailed;
+
     protected override void OnHandlerChanged()
     {
 #if WINDOWS
@@ -48,6 +52,9 @@ public sealed class CanvasViewportView : Grid
                 Microsoft.UI.Xaml.UIElement.PointerWheelChangedEvent,
                 new Microsoft.UI.Xaml.Input.PointerEventHandler(OnPointerWheelChanged),
                 true);
+            platformView.AllowDrop = true;
+            platformView.DragOver += OnDragOver;
+            platformView.Drop += OnDrop;
         }
 #endif
     }
@@ -185,6 +192,61 @@ public sealed class CanvasViewportView : Grid
         e.Handled = true;
     }
 
+    private void OnDragOver(
+        object sender,
+        Microsoft.UI.Xaml.DragEventArgs e)
+    {
+        if (CanvasToolboxDropPayload.CanRead(e.DataView))
+        {
+            e.AcceptedOperation =
+                Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+            e.Handled = true;
+        }
+    }
+
+    private async void OnDrop(
+        object sender,
+        Microsoft.UI.Xaml.DragEventArgs e)
+    {
+        if (!CanvasToolboxDropPayload.CanRead(e.DataView) ||
+            _platformView is null)
+        {
+            return;
+        }
+
+        e.AcceptedOperation =
+            Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+        e.Handled = true;
+        Windows.Foundation.Point position = e.GetPosition(_platformView);
+        Microsoft.UI.Xaml.DragOperationDeferral deferral = e.GetDeferral();
+        try
+        {
+            string? controlType =
+                await CanvasToolboxDropPayload.ReadControlTypeAsync(e.DataView);
+            if (controlType is null)
+            {
+                return;
+            }
+
+            ToolboxDropRequested?.Invoke(
+                this,
+                new CanvasToolboxDropEventArgs(
+                    controlType,
+                    position.X,
+                    position.Y));
+        }
+        catch (Exception exception)
+        {
+            ToolboxDropFailed?.Invoke(
+                this,
+                new CanvasToolboxDropFailedEventArgs(exception.Message));
+        }
+        finally
+        {
+            deferral.Complete();
+        }
+    }
+
     private void DetachPlatformView()
     {
         if (_platformView is null)
@@ -207,6 +269,9 @@ public sealed class CanvasViewportView : Grid
         _platformView.RemoveHandler(
             Microsoft.UI.Xaml.UIElement.PointerWheelChangedEvent,
             new Microsoft.UI.Xaml.Input.PointerEventHandler(OnPointerWheelChanged));
+        _platformView.DragOver -= OnDragOver;
+        _platformView.Drop -= OnDrop;
+        _platformView.AllowDrop = false;
         _platformView = null;
         _isPanning = false;
         _isMarqueeSelecting = false;
@@ -258,6 +323,13 @@ public sealed class CanvasViewportView : Grid
 public sealed record CanvasPanEventArgs(double DeltaX, double DeltaY);
 
 public sealed record CanvasZoomEventArgs(int WheelDelta, double X, double Y);
+
+public sealed record CanvasToolboxDropEventArgs(
+    string ControlType,
+    double X,
+    double Y);
+
+public sealed record CanvasToolboxDropFailedEventArgs(string Message);
 
 public sealed record CanvasMarqueeEventArgs(
     GestureStatus StatusType,

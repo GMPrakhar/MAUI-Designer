@@ -32,6 +32,8 @@ namespace MauiDesigner.Core.Tests
     {
         private const string PackageTypeName = "MauiDesigner.Vsix.MauiDesignerPackage";
         private const string EditorFactoryTypeName = "MauiDesigner.Vsix.DesignerEditorFactory";
+        private const string HierarchyWindowTypeName =
+            "MauiDesigner.Vsix.DesignerHierarchyToolWindow";
 
         private readonly MetadataLoadContext _context;
         private readonly Assembly _extension;
@@ -86,6 +88,23 @@ namespace MauiDesigner.Core.Tests
             var registration = Attribute(package, "ProvideEditorExtensionAttribute");
 
             Assert.Equal(".xaml", registration.ConstructorArguments[1].Value);
+        }
+
+        [Fact]
+        public void The_hierarchy_window_is_registered_with_visual_studio()
+        {
+            var package = _extension.GetType(PackageTypeName, throwOnError: true)!;
+            var hierarchyWindow = _extension.GetType(
+                HierarchyWindowTypeName,
+                throwOnError: true)!;
+            var registration = Attribute(package, "ProvideToolWindowAttribute");
+            var registeredWindow = Assert.IsAssignableFrom<Type>(
+                registration.ConstructorArguments[0].Value);
+
+            Assert.Equal(hierarchyWindow.FullName, registeredWindow.FullName);
+            Assert.True(
+                Guid.TryParse(GuidOf(hierarchyWindow), out var windowGuid) &&
+                windowGuid != Guid.Empty);
         }
 
         [Fact]
@@ -338,6 +357,27 @@ namespace MauiDesigner.Core.Tests
             // the extension at all -- the exact bug this range already had once.
             Assert.True(Covers(ranges[0], new Version(17, 0)), $"{ranges[0]} excludes Visual Studio 2022.");
             Assert.True(Covers(ranges[0], new Version(18, 8)), $"{ranges[0]} excludes Visual Studio 2026.");
+        }
+
+        [Fact]
+        public void The_install_check_uninstalls_the_exact_manifest_identity()
+        {
+            var manifestPath = Path.Combine(ExtensionDirectory(), "src", "MauiDesigner.Vsix", "source.extension.vsixmanifest");
+            var manifest = XDocument.Load(manifestPath);
+            XNamespace ns = "http://schemas.microsoft.com/developer/vsx-schema/2011";
+            var identity = manifest.Root!.Element(ns + "Metadata")!.Element(ns + "Identity")!
+                .Attribute("Id")!.Value;
+
+            var repository = Directory.GetParent(ExtensionDirectory())!.FullName;
+            var workflow = File.ReadAllText(
+                Path.Combine(repository, ".github", "workflows", "release-vsix.yml"));
+            var configuredIdentity = Regex.Match(
+                workflow,
+                @"^\s*EXTENSION_IDENTITY:\s*(\S+)\s*$",
+                RegexOptions.Multiline);
+
+            Assert.True(configuredIdentity.Success, "The VSIX install check does not declare EXTENSION_IDENTITY.");
+            Assert.Equal(identity, configuredIdentity.Groups[1].Value);
         }
 
         [Fact]

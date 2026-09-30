@@ -3,6 +3,14 @@ namespace Microsoft.Maui.Graphics
     public class Color
     {
     }
+
+}
+
+namespace Microsoft.Maui.Hosting
+{
+    public sealed class MauiAppBuilder
+    {
+    }
 }
 
 namespace Microsoft.Maui.Controls

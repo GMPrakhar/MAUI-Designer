@@ -26,6 +26,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MAUIDesigner.Fresh.App\MAUIDesigner.Fresh.App.csproj" />
+    <ProjectReference Include="..\TestPackages\DesignerFixture.Controls\DesignerFixture.Controls.csproj" />
+    <ProjectReference Include="..\TestPackages\DesignerFixture.Dependency\DesignerFixture.Dependency.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -20,6 +20,7 @@ public static class MauiProgram
 {
 	public static MauiApp CreateMauiApp()
 	{
+		DesignerPackageRuntime.RunAssemblyProbeIfRequested();
 		var builder = MauiApp.CreateBuilder();
 		builder
 			.UseMauiApp<App>()
@@ -35,6 +36,10 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
+
+		(DesignerPackageRuntime packageRuntime, HostedProjectControls? projectControls) =
+			DesignerPackageRuntime.FromCommandLine();
+		packageRuntime.Configure(builder, projectControls);
 
 #if DEBUG
 		builder.Logging.AddDebug();
@@ -52,8 +57,13 @@ public static class MauiProgram
 			catalog.RegisterAssembly(typeof(View).Assembly);
 			catalog.RegisterAssembly(typeof(CommunityToolkit.Maui.Views.DrawingView).Assembly);
 			catalog.RegisterAssembly(typeof(App).Assembly);
+			foreach (System.Reflection.Assembly assembly in packageRuntime.Assemblies)
+			{
+				catalog.RegisterAssembly(assembly);
+			}
 			return catalog;
 		});
+		builder.Services.AddSingleton(packageRuntime);
 		builder.Services.AddSingleton<AssemblyExtensionLoader>();
 		builder.Services.AddSingleton<MAUIDesigner.Fresh.Core.Xaml.IXamlTypeResolver, CatalogXamlTypeResolver>();
 		builder.Services.AddSingleton<XamlWorkspace>();

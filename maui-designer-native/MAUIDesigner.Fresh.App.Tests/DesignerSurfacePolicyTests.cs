@@ -29,6 +29,40 @@ public sealed class DesignerSurfacePolicyTests
     public void Toolbox_icons_match_control_semantics(string name, ControlIconKind expected) =>
         Assert.Equal(expected, ControlIconClassifier.ForControlName(name));
 
+    [Fact]
+    public void Selection_chrome_names_the_selected_control()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        ControlDescriptor descriptor = Find(catalog, typeof(VerticalStackLayout));
+        var node = new MAUIDesigner.Fresh.Core.Documents.DesignerNode(
+            new MAUIDesigner.Fresh.Core.Documents.ElementId("stack-1"),
+            descriptor.Id);
+
+        Assert.Equal(
+            "Vertical Stack Layout",
+            SelectionChromePresentation.LabelFor(node, descriptor));
+    }
+
+    [Fact]
+    public void Third_party_toolbox_controls_are_grouped_by_library()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        ControlDescriptor mauiButton = Find(catalog, typeof(Button));
+        var thirdParty = mauiButton with
+        {
+            Id = new MAUIDesigner.Fresh.Core.Documents.ControlTypeId(
+                "Syncfusion.Maui.Buttons",
+                mauiButton.Id.FullName,
+                mauiButton.Id.XamlNamespace,
+                mauiButton.Id.XamlName)
+        };
+
+        Assert.Equal("Input", ControlToolboxCategory.For(mauiButton));
+        Assert.Equal(
+            "Syncfusion.Maui.Buttons",
+            ControlToolboxCategory.For(thirdParty));
+    }
+
     [Theory]
     [InlineData(260, 80, true, 340)]
     [InlineData(320, 80, false, 240)]

@@ -17,6 +17,9 @@ namespace MauiDesigner.Core.Manifests
         private const string ViewTypeName = "Microsoft.Maui.Controls.View";
         private const string LayoutTypeName = "Microsoft.Maui.Controls.Layout";
         private const string BindablePropertyTypeName = "Microsoft.Maui.Controls.BindableProperty";
+        private const string MauiAppBuilderTypeName = "Microsoft.Maui.Hosting.MauiAppBuilder";
+        private const string ExtensionAttributeTypeName =
+            "System.Runtime.CompilerServices.ExtensionAttribute";
 
         /// <summary>
         /// Builds one manifest per CLR namespace found in <paramref name="assemblyPaths"/>.
@@ -25,11 +28,13 @@ namespace MauiDesigner.Core.Manifests
         /// <param name="referencePaths">Additional assemblies needed to resolve base types (MAUI, BCL).</param>
         /// <param name="packageId">NuGet package the assemblies came from.</param>
         /// <param name="packageVersion">NuGet package version.</param>
+        /// <param name="coreAssemblyName">Metadata core assembly name for the supplied reference set.</param>
         public IReadOnlyList<CustomControlManifest> Generate(
             IEnumerable<string> assemblyPaths,
             IEnumerable<string> referencePaths,
             string packageId,
-            string? packageVersion = null)
+            string? packageVersion = null,
+            string? coreAssemblyName = null)
         {
             var targets = assemblyPaths.Where(File.Exists).Distinct().ToList();
             if (targets.Count == 0)
@@ -43,7 +48,9 @@ namespace MauiDesigner.Core.Manifests
                 .ToList();
 
             var resolver = new PathAssemblyResolver(all);
-            using var context = new MetadataLoadContext(resolver);
+            using var context = coreAssemblyName is null
+                ? new MetadataLoadContext(resolver)
+                : new MetadataLoadContext(resolver, coreAssemblyName);
 
             var manifests = new Dictionary<string, CustomControlManifest>(StringComparer.Ordinal);
 
@@ -102,6 +109,99 @@ namespace MauiDesigner.Core.Manifests
                 .Where(manifest => manifest.Controls.Count > 0)
                 .OrderBy(manifest => manifest.Xmlns.Uri, StringComparer.Ordinal)
                 .ToList();
+        }
+
+        /// <summary>
+        /// Finds conventional, parameterless MAUI builder extension methods without
+        /// loading or executing the package assemblies.
+        /// </summary>
+        public IReadOnlyList<PackageStartupMethod> DiscoverStartupMethods(
+            IEnumerable<string> assemblyPaths,
+            IEnumerable<string> referencePaths,
+            string packageId,
+            string? coreAssemblyName = null)
+        {
+            var targets = assemblyPaths.Where(File.Exists).Distinct().ToList();
+            var resolver = new PathAssemblyResolver(
+                targets
+                    .Concat(referencePaths.Where(File.Exists))
+                    .Distinct()
+                    .ToList());
+            using var context = coreAssemblyName is null
+                ? new MetadataLoadContext(resolver)
+                : new MetadataLoadContext(resolver, coreAssemblyName);
+            var methods = new List<PackageStartupMethod>();
+
+            foreach (var path in targets)
+            {
+                Assembly assembly;
+                try
+                {
+                    assembly = context.LoadFromAssemblyPath(path);
+                }
+                catch (BadImageFormatException)
+                {
+                    continue;
+                }
+
+                string assemblyName =
+                    assembly.GetName().Name ?? Path.GetFileNameWithoutExtension(path);
+                foreach (Type type in SafeGetTypes(assembly).Where(type =>
+                             type.IsPublic && type.IsAbstract && type.IsSealed))
+                {
+                    foreach (MethodInfo method in type.GetMethods(
+                                 BindingFlags.Public | BindingFlags.Static))
+                    {
+                        if (!IsStartupMethod(method))
+                        {
+                            continue;
+                        }
+
+                        methods.Add(new PackageStartupMethod
+                        {
+                            Package = packageId,
+                            Assembly = assemblyName,
+                            Type = type.FullName ?? type.Name,
+                            Method = method.Name
+                        });
+                    }
+                }
+            }
+
+            return methods
+                .GroupBy(
+                    method => $"{method.Assembly}|{method.Type}|{method.Method}",
+                    StringComparer.Ordinal)
+                .Select(group => group.First())
+                .OrderBy(method => method.Assembly, StringComparer.Ordinal)
+                .ThenBy(method => method.Type, StringComparer.Ordinal)
+                .ThenBy(method => method.Method, StringComparer.Ordinal)
+                .ToList();
+        }
+
+        private static bool IsStartupMethod(MethodInfo method)
+        {
+            if (!method.Name.StartsWith("Configure", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            try
+            {
+                ParameterInfo[] parameters = method.GetParameters();
+                return method.ReturnType.FullName == MauiAppBuilderTypeName &&
+                    parameters.Length == 1 &&
+                    parameters[0].ParameterType.FullName == MauiAppBuilderTypeName &&
+                    method.GetCustomAttributesData().Any(attribute =>
+                        attribute.AttributeType.FullName == ExtensionAttributeTypeName);
+            }
+            catch (Exception exception) when (
+                exception is FileNotFoundException or
+                FileLoadException or
+                TypeLoadException)
+            {
+                return false;
+            }
         }
 
         /// <summary>A type is designable when it is a public, concrete MAUI <c>View</c>.</summary>

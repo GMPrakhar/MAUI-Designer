@@ -16,6 +16,7 @@ public sealed class ControlMaterializer
     private readonly Dictionary<ElementId, Grid> _chromes = [];
     private readonly Dictionary<ElementId, View> _moveHandles = [];
     private readonly Dictionary<ElementId, View> _resizeHandles = [];
+    private readonly Dictionary<ElementId, GraphicsView> _gridTrackOverlays = [];
     private readonly Dictionary<ElementId, (View View, ILayoutAdapter Adapter)> _targets = [];
     private readonly List<Action> _gridTrackUpdates = [];
     private readonly ConditionalWeakTable<Microsoft.UI.Xaml.FrameworkElement, object>
@@ -43,6 +44,7 @@ public sealed class ControlMaterializer
         _chromes.Clear();
         _moveHandles.Clear();
         _resizeHandles.Clear();
+        _gridTrackOverlays.Clear();
         _targets.Clear();
         _gridTrackUpdates.Clear();
         _activeDropPreview = null;
@@ -61,6 +63,11 @@ public sealed class ControlMaterializer
     public void UpdateInteraction()
     {
         RemoveActiveDropPreview();
+        foreach ((ElementId id, GraphicsView overlay) in _gridTrackOverlays)
+        {
+            overlay.IsVisible = id == _workspace.SelectedId;
+        }
+
         foreach ((ElementId id, Grid chrome) in _chromes)
         {
             bool selected = _workspace.SelectedIds.Contains(id);
@@ -238,6 +245,13 @@ public sealed class ControlMaterializer
             return CreateUnknownControl(node);
         }
 
+        if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                node.ControlType,
+                out string? placeholderReason))
+        {
+            return CreateDesignTimePlaceholder(node, placeholderReason!);
+        }
+
         try
         {
             View view = _catalog.Create(node.ControlType);
@@ -278,7 +292,7 @@ public sealed class ControlMaterializer
             if (isRoot)
             {
                 return view is Grid rootGrid
-                    ? CreateGridTrackSurface(rootGrid)
+                    ? CreateGridTrackSurface(rootGrid, node.Id)
                     : view;
             }
 
@@ -302,7 +316,7 @@ public sealed class ControlMaterializer
         chrome.Add(content);
         if (content is Grid gridContent)
         {
-            AddGridTrackOverlay(chrome, gridContent);
+            AddGridTrackOverlay(chrome, gridContent, node.Id);
         }
 
         var tap = new TapGestureRecognizer();
@@ -414,21 +428,25 @@ public sealed class ControlMaterializer
         }
     }
 
-    private Grid CreateGridTrackSurface(Grid content)
+    private Grid CreateGridTrackSurface(Grid content, ElementId elementId)
     {
         var surface = new Grid();
         surface.Add(content);
-        AddGridTrackOverlay(surface, content);
+        AddGridTrackOverlay(surface, content, elementId);
         return surface;
     }
 
-    private void AddGridTrackOverlay(Grid surface, Grid content)
+    private void AddGridTrackOverlay(
+        Grid surface,
+        Grid content,
+        ElementId elementId)
     {
         var drawable = new GridTrackOverlayDrawable();
         var overlay = new GraphicsView
         {
             InputTransparent = true,
-            Drawable = drawable
+            Drawable = drawable,
+            IsVisible = false
         };
         void UpdateTracks()
         {
@@ -442,6 +460,7 @@ public sealed class ControlMaterializer
         content.SizeChanged += (_, _) => UpdateTracks();
         overlay.Loaded += (_, _) => UpdateTracks();
         _gridTrackUpdates.Add(UpdateTracks);
+        _gridTrackOverlays[elementId] = overlay;
         surface.Add(overlay);
     }
 
@@ -506,30 +525,52 @@ public sealed class ControlMaterializer
 
     private View AddMoveHandle(Grid chrome, DesignerNode node)
     {
+        _catalog.TryGet(node.ControlType, out ControlDescriptor? descriptor);
+        string selectionLabel = SelectionChromePresentation.LabelFor(node, descriptor);
+        var handleContent = new Grid
+        {
+            InputTransparent = true,
+            Padding = new Thickness(5, 0),
+            ColumnDefinitions =
+            {
+                new ColumnDefinition(new GridLength(18)),
+                new ColumnDefinition(GridLength.Auto)
+            }
+        };
+        handleContent.Add(new Label
+        {
+            Text = ":::",
+            FontSize = 9,
+            HorizontalTextAlignment = TextAlignment.Center,
+            VerticalTextAlignment = TextAlignment.Center,
+            TextColor = Colors.White
+        });
+        handleContent.Add(new Label
+        {
+            AutomationId = $"selection-label-{node.Id.Value}",
+            Text = selectionLabel,
+            Margin = new Thickness(4, 0, 2, 0),
+            FontSize = 10,
+            FontAttributes = FontAttributes.Bold,
+            VerticalTextAlignment = TextAlignment.Center,
+            TextColor = Colors.White
+        }, 1);
         var handle = new Border
         {
             AutomationId = $"move-{node.Id.Value}",
-            WidthRequest = 28,
-            HeightRequest = 14,
+            MinimumWidthRequest = 28,
+            HeightRequest = 20,
             HorizontalOptions = LayoutOptions.Start,
             VerticalOptions = LayoutOptions.Start,
             TranslationX = -4,
-            TranslationY = -18,
+            TranslationY = -24,
             BackgroundColor = Color.FromArgb("#7C5CFF"),
             StrokeThickness = 0,
             StrokeShape = new Microsoft.Maui.Controls.Shapes.RoundRectangle
             {
                 CornerRadius = new CornerRadius(5)
             },
-            Content = new Label
-            {
-                InputTransparent = true,
-                Text = ":::",
-                FontSize = 9,
-                HorizontalTextAlignment = TextAlignment.Center,
-                VerticalTextAlignment = TextAlignment.Center,
-                TextColor = Colors.White
-            }
+            Content = handleContent
         };
         RectD start = node.Bounds ?? new RectD(0, 0, 160, 48);
         double totalX = 0;
@@ -839,6 +880,33 @@ public sealed class ControlMaterializer
             {
                 Text = $"Could not render {node.ControlType.XamlName}: {reason}",
                 TextColor = Color.FromArgb("#7F1D1D")
+            }
+        };
+
+    private static View CreateDesignTimePlaceholder(DesignerNode node, string reason) =>
+        new Border
+        {
+            Padding = 12,
+            BackgroundColor = Color.FromArgb("#EFF6FF"),
+            Stroke = Color.FromArgb("#2563EB"),
+            Content = new VerticalStackLayout
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new Label
+                    {
+                        Text = node.ControlType.XamlName,
+                        FontAttributes = FontAttributes.Bold,
+                        TextColor = Color.FromArgb("#1E3A8A")
+                    },
+                    new Label
+                    {
+                        Text = reason,
+                        FontSize = 11,
+                        TextColor = Color.FromArgb("#1E40AF")
+                    }
+                }
             }
         };
 

@@ -23,6 +23,7 @@ namespace MauiDesigner.Vsix
     [ProvideEditorFactory(typeof(DesignerEditorFactory), 110, TrustLevel = __VSEDITORTRUSTLEVEL.ETL_AlwaysTrusted)]
     [ProvideEditorExtension(typeof(DesignerEditorFactory), ".xaml", 0x10, NameResourceID = 110)]
     [ProvideEditorLogicalView(typeof(DesignerEditorFactory), VSConstants.LOGVIEWID.Designer_string)]
+    [ProvideToolWindow(typeof(DesignerHierarchyToolWindow))]
     public sealed class MauiDesignerPackage : AsyncPackage
     {
         /// <summary>Package GUID, referenced by the generated pkgdef.</summary>
@@ -37,6 +38,15 @@ namespace MauiDesigner.Vsix
             await JoinableTaskFactory.SwitchToMainThreadAsync(cancellationToken);
 
             RegisterEditorFactory(new DesignerEditorFactory(this));
+        }
+
+        internal DesignerHierarchyToolWindow GetHierarchyWindow()
+        {
+            ThreadHelper.ThrowIfNotOnUIThread();
+            return (DesignerHierarchyToolWindow)FindToolWindow(
+                typeof(DesignerHierarchyToolWindow),
+                0,
+                true);
         }
     }
 }
