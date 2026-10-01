@@ -1,25 +1,36 @@
 using MAUIDesigner.Fresh.Core.Documents;
+
 namespace MAUIDesigner.Fresh.App.Rendering;
 
 public static class DesignerControlSafetyPolicy
 {
-    private const string FrameworkXamlNamespace =
-        "http://schemas.microsoft.com/dotnet/2021/maui";
+    private const string FrameworkAssemblyName = "Microsoft.Maui.Controls";
+    private const string FrameworkTypeNamespace = "Microsoft.Maui.Controls.";
 
     public static bool TryGetPlaceholderReason(
         ControlTypeId controlType,
-        out string? reason)
+        out string? reason,
+        bool hasProjectResources = false)
     {
         ArgumentNullException.ThrowIfNull(controlType);
 
+        if (hasProjectResources)
+        {
+            reason = null;
+            return false;
+        }
+
         if (!string.Equals(
-                controlType.XamlNamespace,
-                FrameworkXamlNamespace,
+                controlType.AssemblyName,
+                FrameworkAssemblyName,
+                StringComparison.Ordinal) ||
+            !controlType.FullName.StartsWith(
+                FrameworkTypeNamespace,
                 StringComparison.Ordinal))
         {
             reason =
-                "Live preview uses a design-time placeholder because dynamically " +
-                "loaded controls can terminate the Windows designer. XAML, " +
+                "Live preview uses a design-time placeholder because the host " +
+                "does not include this project's package resources. XAML, " +
                 "hierarchy, and properties are preserved.";
             return true;
         }

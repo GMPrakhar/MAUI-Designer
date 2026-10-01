@@ -246,10 +246,12 @@ public sealed class ControlMaterializer
         }
 
         if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
-                node.ControlType,
-                out string? placeholderReason))
+                descriptor.Id,
+                out string? placeholderReason,
+                DesignerPackageRuntime.IsProjectHost()))
         {
-            return CreateDesignTimePlaceholder(node, placeholderReason!);
+            View placeholder = CreateDesignTimePlaceholder(node, placeholderReason!);
+            return isRoot ? placeholder : CreateChrome(placeholder, node);
         }
 
         try

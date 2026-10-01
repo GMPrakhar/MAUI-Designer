@@ -79,14 +79,21 @@ selection, property editing, rendering, save, and reopen behavior.
 
 Vendor startup adapters are used only when a package requires configuration
 before `MauiAppBuilder.Build()`; they do not define which controls appear.
-Syncfusion's handler and font registrations are retained, while its private
-Windows package-resource initializer is omitted because dynamically restored
-assemblies are not compiled into the designer's `ms-appx` package graph.
-Dynamically loaded controls from any library remain discoverable and insertable
-through the Toolbox, but render as explicit design-time placeholders because a
-vendor control can terminate WinUI during live design-surface updates. Their
-XAML, hierarchy, and properties continue to round-trip without executing
-vendor rendering code in the designer process.
+The Visual Studio project host merges restored package resources into the
+designer's PRI before startup. It retains complete package startup registration
+and renders dynamically loaded controls live, including in the runtime preview.
+Syncfusion SfSwitch, SfChip, SfButton, and SfAvatarView have been validated in
+the installed extension without static vendor dependencies or a control
+allowlist. Discovery remains assembly-driven for other libraries.
+Without a project resource overlay, Syncfusion's private Windows
+package-resource initializer is omitted while handler and font registrations
+are retained. This fallback host renders only framework control assembly/type
+identities live; declaring the MAUI XAML namespace is not sufficient. Other
+controls remain selectable and property-editable placeholders without invoking
+vendor setters, preserving XAML and hierarchy. Canvas and runtime preview apply
+the same policy.
+Windows application-control policy and vendor runtime incompatibilities still
+apply; an assembly-load preflight cannot prove every native rendering path safe.
 
 ## XAML workflow
 

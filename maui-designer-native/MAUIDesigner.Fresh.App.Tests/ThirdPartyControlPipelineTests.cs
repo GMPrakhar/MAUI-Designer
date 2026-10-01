@@ -1,4 +1,5 @@
 using System.Runtime.Loader;
+using DesignerNamespaceFixture;
 using MAUIDesigner.Fresh.App.Catalog;
 using MAUIDesigner.Fresh.App.Hosting;
 using MAUIDesigner.Fresh.App.Rendering;
@@ -11,23 +12,68 @@ namespace MAUIDesigner.Fresh.App.Tests;
 
 public sealed class ThirdPartyControlPipelineTests
 {
+    [Theory]
+    [InlineData("Syncfusion.Maui.Buttons", "Syncfusion.Maui.Buttons.SfSwitch")]
+    [InlineData("Syncfusion.Maui.Core", "Syncfusion.Maui.Core.SfChip")]
+    [InlineData("Syncfusion.Maui.Core", "Syncfusion.Maui.Core.SfAvatarView")]
+    [InlineData("Syncfusion.Maui.Buttons", "Syncfusion.Maui.Buttons.SfButton")]
+    [InlineData("Acme.Widgets", "Acme.Widgets.Gauge")]
+    public void Package_resource_hosts_enable_generic_live_controls(
+        string assemblyName,
+        string fullName)
+    {
+        var controlType = new ControlTypeId(
+            assemblyName,
+            fullName,
+            "http://schemas.microsoft.com/dotnet/2021/maui",
+            fullName[(fullName.LastIndexOf('.') + 1)..]);
+
+        Assert.True(DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+            controlType,
+            out string? fallbackReason));
+        Assert.Contains("package resources", fallbackReason);
+        Assert.False(DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+            controlType,
+            out string? liveReason,
+            hasProjectResources: true));
+        Assert.Null(liveReason);
+    }
+
+    [Fact]
+    public void Catalog_controls_sharing_the_framework_xaml_namespace_require_placeholders()
+    {
+        var catalog = new ReflectionControlCatalog(
+            new ServiceCollection().BuildServiceProvider());
+        catalog.RegisterAssembly(typeof(View).Assembly);
+        catalog.RegisterAssembly(typeof(NamespaceSharingControl).Assembly);
+        ControlDescriptor descriptor = catalog.Controls.Single(
+            control => control.RuntimeType == typeof(NamespaceSharingControl));
+        Assert.Equal(
+            "http://schemas.microsoft.com/dotnet/2021/maui",
+            descriptor.Id.XamlNamespace);
+        Assert.True(DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+            descriptor.Id,
+            out string? reason));
+        Assert.Contains("design-time placeholder", reason);
+    }
+
     [Fact]
     public void Dynamically_loaded_controls_use_an_explicit_placeholder()
     {
         var glassEffect = new ControlTypeId(
             "Syncfusion.Maui.Core",
             "Syncfusion.Maui.Core.SfGlassEffectView",
-            "http://schemas.syncfusion.com/maui",
+            "http://schemas.microsoft.com/dotnet/2021/maui",
             "SfGlassEffectView");
         var avatar = new ControlTypeId(
             "Syncfusion.Maui.Core",
             "Syncfusion.Maui.Core.SfAvatarView",
-            "http://schemas.syncfusion.com/maui",
+            "http://schemas.microsoft.com/dotnet/2021/maui",
             "SfAvatarView");
         var button = new ControlTypeId(
             "Syncfusion.Maui.Buttons",
             "Syncfusion.Maui.Buttons.SfButton",
-            "clr-namespace:Syncfusion.Maui.Buttons;assembly=Syncfusion.Maui.Buttons",
+            "http://schemas.microsoft.com/dotnet/2021/maui",
             "SfButton");
         var arbitraryControl = new ControlTypeId(
             "Acme.Widgets",

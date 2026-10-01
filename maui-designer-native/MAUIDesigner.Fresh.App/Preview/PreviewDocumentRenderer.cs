@@ -32,6 +32,14 @@ public sealed class PreviewDocumentRenderer
                 $"Control type '{node.ControlType.XamlName}' is not registered.");
         }
 
+        if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+                descriptor.Id,
+                out string? placeholderReason,
+                DesignerPackageRuntime.IsProjectHost()))
+        {
+            return CreatePlaceholder(node, placeholderReason!);
+        }
+
         View view;
         try
         {

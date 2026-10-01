@@ -384,7 +384,8 @@ public sealed class DesignerWorkspace
 
     private bool TryResolveInsertionParent(int childCount, out ElementId parentId)
     {
-        DesignerNode? candidate = Session.Current.Find(SelectedId) ?? Session.Current.Root;
+        DesignerNode selected = Session.Current.Find(SelectedId) ?? Session.Current.Root;
+        DesignerNode? candidate = selected;
         while (candidate is not null)
         {
             if (CanAcceptChildren(candidate.Id, childCount))
@@ -394,6 +395,17 @@ public sealed class DesignerWorkspace
             }
 
             candidate = FindParent(Session.Current.Root, candidate.Id);
+        }
+
+        candidate = selected;
+        while (candidate.Children.Length == 1)
+        {
+            candidate = candidate.Children[0];
+            if (CanAcceptChildren(candidate.Id, childCount))
+            {
+                parentId = candidate.Id;
+                return true;
+            }
         }
 
         parentId = default;
@@ -434,9 +446,8 @@ public sealed class DesignerWorkspace
         }
 
         DesignerNode parent = Session.Current.Find(parentId)!;
-        ControlDescriptor descriptor = _catalog.Controls.First(control =>
-            control.Id == parent.ControlType);
-        return typeof(Layout).IsAssignableFrom(descriptor.RuntimeType) ||
+        _catalog.TryGet(parent.ControlType, out ControlDescriptor? descriptor);
+        return typeof(Layout).IsAssignableFrom(descriptor!.RuntimeType) ||
             parent.Children.Length + childCount <= 1;
     }
 
