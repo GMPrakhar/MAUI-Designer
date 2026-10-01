@@ -87,6 +87,10 @@ through the Toolbox, but render as explicit design-time placeholders because a
 vendor control can terminate WinUI during live design-surface updates. Their
 XAML, hierarchy, and properties continue to round-trip without executing
 vendor rendering code in the designer process.
+The live-render boundary uses framework control assembly/type identities rather
+than XAML namespace URIs, which third-party libraries can also declare. The
+runtime preview window applies the same boundary. Placeholder-backed controls
+remain selectable and property-editable without invoking vendor setters.
 
 ## XAML workflow
 

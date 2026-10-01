@@ -3,8 +3,8 @@ namespace MAUIDesigner.Fresh.App.Rendering;
 
 public static class DesignerControlSafetyPolicy
 {
-    private const string FrameworkXamlNamespace =
-        "http://schemas.microsoft.com/dotnet/2021/maui";
+    private const string FrameworkAssemblyName = "Microsoft.Maui.Controls";
+    private const string FrameworkTypeNamespace = "Microsoft.Maui.Controls.";
 
     public static bool TryGetPlaceholderReason(
         ControlTypeId controlType,
@@ -13,8 +13,11 @@ public static class DesignerControlSafetyPolicy
         ArgumentNullException.ThrowIfNull(controlType);
 
         if (!string.Equals(
-                controlType.XamlNamespace,
-                FrameworkXamlNamespace,
+                controlType.AssemblyName,
+                FrameworkAssemblyName,
+                StringComparison.Ordinal) ||
+            !controlType.FullName.StartsWith(
+                FrameworkTypeNamespace,
                 StringComparison.Ordinal))
         {
             reason =

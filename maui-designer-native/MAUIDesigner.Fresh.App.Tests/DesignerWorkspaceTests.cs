@@ -9,6 +9,31 @@ namespace MAUIDesigner.Fresh.App.Tests;
 public sealed class DesignerWorkspaceTests
 {
     [Fact]
+    public void Insertion_from_a_full_scroll_root_uses_its_content_layout()
+    {
+        ReflectionControlCatalog catalog = CreateCatalog();
+        var workspace = new DesignerWorkspace(catalog);
+        ControlDescriptor scroll = Find(catalog, typeof(ScrollView));
+        ControlDescriptor layout = Find(catalog, typeof(AbsoluteLayout));
+        ControlDescriptor button = Find(catalog, typeof(Button));
+        DesignerDocument document = DesignerDocument.Create(scroll.Id);
+        var layoutId = new ElementId("content-layout");
+        document = document with
+        {
+            Root = document.Root with
+            {
+                Children = [new DesignerNode(layoutId, layout.Id)]
+            }
+        };
+        workspace.ReplaceDocument(document);
+
+        ElementId insertedId = workspace.Add(button);
+
+        Assert.Equal(layoutId, workspace.Session.Current.FindParent(insertedId)!.Id);
+        Assert.NotNull(workspace.Session.Current.Find(insertedId)!.Bounds);
+    }
+
+    [Fact]
     public void Insertion_skips_full_single_content_ancestors()
     {
         ReflectionControlCatalog catalog = CreateCatalog();

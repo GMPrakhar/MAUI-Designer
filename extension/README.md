@@ -157,9 +157,15 @@ designer.
 Dynamically loaded controls remain available in the Toolbox and hierarchy, but
 render as design-time placeholders so vendor WinUI code cannot terminate the
 designer process. Their XAML and properties still round-trip. If a package is
-missing, incompatible, or cannot be initialized, the canvas instead shows an
+sharing the standard MAUI XAML namespace, it is still treated as third-party:
+live rendering is restricted to framework control assembly/type identities, not
+namespace URIs. This restriction also applies to the runtime preview window.
+If a package is missing, incompatible, or cannot be initialized, the canvas instead shows an
 `Unavailable: <control>` placeholder and reports the failure rather than
 silently dropping the element.
+Toolbox insertion from a full single-content root, such as a `ScrollView`,
+uses its existing content layout when possible. If no valid container exists,
+the designer reports an insertion error rather than terminating its host.
 Windows Application Control still applies to every vendor DLL. An unsigned or
 untrusted third-party assembly can be blocked even when the Marketplace VSIX
 and designer are signed; the vendor must sign that DLL or an administrator must

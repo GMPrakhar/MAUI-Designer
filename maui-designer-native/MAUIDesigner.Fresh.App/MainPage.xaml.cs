@@ -759,7 +759,14 @@ public partial class MainPage : ContentPage
             return;
         }
 
-        _workspace.Add(descriptor, placement: placement);
+        try
+        {
+            _workspace.Add(descriptor, placement: placement);
+        }
+        catch (InvalidOperationException exception)
+        {
+            ShowPropertyError($"The Toolbox control could not be inserted: {exception.Message}");
+        }
     }
 
     private void OnCanvasToolboxDropRequested(
@@ -889,11 +896,7 @@ public partial class MainPage : ContentPage
 
         DesignerNode? parent = _workspace.Session.Current.FindParent(selected.Id);
         HostedPropertySnapshot[] properties =
-            DesignerControlSafetyPolicy.TryGetPlaceholderReason(
-                descriptor.Id,
-                out _)
-                ? []
-                : PropertyInspectorDescriptorSource
+            PropertyInspectorDescriptorSource
                     .Compose(descriptor, selected, parent)
                     .Where(IsEditableProperty)
                     .OrderBy(PropertyPriority)
@@ -1641,7 +1644,6 @@ public partial class MainPage : ContentPage
                 FontSize = 11,
                 TextColor = Color.FromArgb("#1E40AF")
             });
-            return;
         }
 
         string filter = PropertySearch.Text?.Trim() ?? string.Empty;
