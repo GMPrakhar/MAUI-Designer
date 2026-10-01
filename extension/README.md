@@ -154,12 +154,18 @@ Some component suites require a `MauiAppBuilder` registration call before
 `MauiAppBuilder`; no vendor package names or binaries are compiled into the
 designer.
 
-Dynamically loaded controls remain available in the Toolbox and hierarchy, but
-render as design-time placeholders so vendor WinUI code cannot terminate the
-designer process. Their XAML and properties still round-trip. If a package is
-sharing the standard MAUI XAML namespace, it is still treated as third-party:
-live rendering is restricted to framework control assembly/type identities, not
-namespace URIs. This restriction also applies to the runtime preview window.
+The resource-overlay host renders dynamically loaded controls live on both the
+design surface and the runtime preview window. Eligibility depends on the host
+including the project's package resources, not on a vendor allowlist or a XAML
+namespace. Syncfusion SfSwitch, SfChip, SfButton, and SfAvatarView have been
+validated through the installed extension, including Toolbox insertion,
+property editing, save/reopen, and runtime preview; no Syncfusion binaries are
+compiled into the designer.
+When the resource-overlay host is unavailable, only framework control
+assembly/type identities render live. Other controls remain selectable and
+property-editable placeholders, preserving their XAML without invoking vendor
+rendering code. Declaring the standard MAUI XAML namespace does not bypass this
+fallback boundary.
 If a package is missing, incompatible, or cannot be initialized, the canvas instead shows an
 `Unavailable: <control>` placeholder and reports the failure rather than
 silently dropping the element.
@@ -170,6 +176,8 @@ Windows Application Control still applies to every vendor DLL. An unsigned or
 untrusted third-party assembly can be blocked even when the Marketplace VSIX
 and designer are signed; the vendor must sign that DLL or an administrator must
 allow it.
+Assembly preflight checks loading, not every later native rendering operation;
+arbitrary vendor controls can still fail during construction or rendering.
 
 ## Building and running the tests
 

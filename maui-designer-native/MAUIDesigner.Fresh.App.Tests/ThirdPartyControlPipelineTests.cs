@@ -12,6 +12,33 @@ namespace MAUIDesigner.Fresh.App.Tests;
 
 public sealed class ThirdPartyControlPipelineTests
 {
+    [Theory]
+    [InlineData("Syncfusion.Maui.Buttons", "Syncfusion.Maui.Buttons.SfSwitch")]
+    [InlineData("Syncfusion.Maui.Core", "Syncfusion.Maui.Core.SfChip")]
+    [InlineData("Syncfusion.Maui.Core", "Syncfusion.Maui.Core.SfAvatarView")]
+    [InlineData("Syncfusion.Maui.Buttons", "Syncfusion.Maui.Buttons.SfButton")]
+    [InlineData("Acme.Widgets", "Acme.Widgets.Gauge")]
+    public void Package_resource_hosts_enable_generic_live_controls(
+        string assemblyName,
+        string fullName)
+    {
+        var controlType = new ControlTypeId(
+            assemblyName,
+            fullName,
+            "http://schemas.microsoft.com/dotnet/2021/maui",
+            fullName[(fullName.LastIndexOf('.') + 1)..]);
+
+        Assert.True(DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+            controlType,
+            out string? fallbackReason));
+        Assert.Contains("package resources", fallbackReason);
+        Assert.False(DesignerControlSafetyPolicy.TryGetPlaceholderReason(
+            controlType,
+            out string? liveReason,
+            hasProjectResources: true));
+        Assert.Null(liveReason);
+    }
+
     [Fact]
     public void Catalog_controls_sharing_the_framework_xaml_namespace_require_placeholders()
     {

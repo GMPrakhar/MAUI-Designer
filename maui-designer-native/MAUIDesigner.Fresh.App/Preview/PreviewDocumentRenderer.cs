@@ -34,7 +34,8 @@ public sealed class PreviewDocumentRenderer
 
         if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
                 descriptor.Id,
-                out string? placeholderReason))
+                out string? placeholderReason,
+                DesignerPackageRuntime.IsProjectHost()))
         {
             return CreatePlaceholder(node, placeholderReason!);
         }

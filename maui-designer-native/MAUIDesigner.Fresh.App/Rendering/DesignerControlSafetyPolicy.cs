@@ -1,4 +1,5 @@
 using MAUIDesigner.Fresh.Core.Documents;
+
 namespace MAUIDesigner.Fresh.App.Rendering;
 
 public static class DesignerControlSafetyPolicy
@@ -8,9 +9,16 @@ public static class DesignerControlSafetyPolicy
 
     public static bool TryGetPlaceholderReason(
         ControlTypeId controlType,
-        out string? reason)
+        out string? reason,
+        bool hasProjectResources = false)
     {
         ArgumentNullException.ThrowIfNull(controlType);
+
+        if (hasProjectResources)
+        {
+            reason = null;
+            return false;
+        }
 
         if (!string.Equals(
                 controlType.AssemblyName,
@@ -21,8 +29,8 @@ public static class DesignerControlSafetyPolicy
                 StringComparison.Ordinal))
         {
             reason =
-                "Live preview uses a design-time placeholder because dynamically " +
-                "loaded controls can terminate the Windows designer. XAML, " +
+                "Live preview uses a design-time placeholder because the host " +
+                "does not include this project's package resources. XAML, " +
                 "hierarchy, and properties are preserved.";
             return true;
         }

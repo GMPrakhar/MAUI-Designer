@@ -1636,7 +1636,8 @@ public partial class MainPage : ContentPage
         SelectionLabel.Text = $"{descriptor.DisplayName}  /  {selected.Id}";
         if (DesignerControlSafetyPolicy.TryGetPlaceholderReason(
                 descriptor.Id,
-                out string? placeholderReason))
+                out string? placeholderReason,
+                DesignerPackageRuntime.IsProjectHost()))
         {
             PropertyPanel.Add(new Label
             {
